@@ -6,12 +6,19 @@ repository. Read this before writing code or documentation here.
 ## What this is
 
 The rebuild of [`mlengmark/O-view`](https://github.com/mlengmark/O-view), a
-desktop notification-area app that reports Claude AI token usage. This
-repository is currently **documentation only** — no `O-view.Core`,
-`O-view.App`, `O-view.Tray`, or `O-view.Linux` equivalent exists here yet.
-Gate G0 (this repository) and gate G1 (target-architecture sign-off) have
-both passed board review; see [`README.md`](README.md) and
+desktop notification-area app that reports Claude AI token usage. Gate G0
+(this repository) and gate G1 (target-architecture sign-off) have both
+passed board review; see [`README.md`](README.md) and
 [`docs/adr/`](docs/adr/) for what that approved.
+
+**Implementation has begun, one reviewed slice at a time.** As of Phase 1
+slice 1 (OVI-10), `O-view.Core` and `O-view.Tray` exist here with exactly
+the surface `TooltipFormatter`'s extraction needed — the Core-to-skin
+contract's tooltip-relevant fields ([ADR-0001](docs/adr/0001-core-to-skin-data-contract.md))
+and the Windows skin that turns them into tooltip text. `O-view.App` and
+`O-view.Linux` do not exist yet; do not assume any capability beyond what a
+merged slice has actually added. Check [`docs/adr/0001`](docs/adr/0001-core-to-skin-data-contract.md)'s
+"current codebase status" section for what has and has not landed.
 
 **Do not assume this repository contains working code.** If you are looking
 for the current, running implementation, that is
@@ -106,10 +113,21 @@ trail rather than assuming.
 
 ## Working in this repository right now
 
-Until the first implementation commit lands, contributions here are
-documentation: ADRs, the data contract, the capability matrix, and
-plain-language feature documentation. When implementation begins, this
-file will be extended with the layering rules, build/test commands, and
-platform constraints that govern code — following the model (but not
-necessarily every specific rule) of the source repository's own
-`CLAUDE.md`.
+Contributions are either documentation (ADRs, the data contract, the
+capability matrix, feature docs) or an approved, gated implementation
+slice. For code:
+
+- Build and test with the solution file: `dotnet build O-view.slnx` and
+  `dotnet test O-view.slnx`. `O-view.Core` and its test project target
+  `net10.0` and must build and test on a non-Windows runner — that is
+  Core's platform-neutrality enforcement mechanism, not a formality.
+  `O-view.Tray` and its test project target `net10.0-windows` and only
+  build on Windows.
+- Follow the layering rule from the section above absolutely:
+  `O-view.Core` gains no display strings, formatting, locale-sensitive
+  formats, platform-imposed limits, OS-conditional branches, or platform
+  APIs. If you're not sure whether something belongs in Core or a skin,
+  it almost always belongs in the skin.
+- A new Core-to-skin contract field is documented in
+  [ADR-0001](docs/adr/0001-core-to-skin-data-contract.md) before a skin may
+  consume it (per that ADR's own consequences section).

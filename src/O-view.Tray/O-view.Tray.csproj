@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Windows-only: this skin owns every Windows-specific presentation fact, including
+         the NotifyIcon.Text 127-character cap (ADR-0001, ADR-0002). Only the layers
+         genuinely different per OS live here — not a shared implementation. -->
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>OView.Tray</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="O-view.Tray.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\O-view.Core\O-view.Core.csproj" />
+  </ItemGroup>
+
+</Project>

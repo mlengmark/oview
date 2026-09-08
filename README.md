@@ -6,14 +6,15 @@ usage allowance you've used, and when it resets. This repository is the
 taken into a new codebase with a stronger data/presentation boundary and a
 documentation trail from the first commit.
 
-> **Status:** documentation only. Gate **G0** (this repository) and gate
-> **G1** (target-architecture sign-off) have both passed board review. No
-> implementation code exists here yet — this commit ships the design
-> documents Phase 1 build work depends on: the Core-to-skin data contract,
-> the cross-platform capability matrix, and the mechanism that replaces
-> `PanelText.cs`'s centralization once display strings move out of the
-> shared layer. See [`docs/adr/`](docs/adr/) for all of it, and the
-> approved PDR (linked from the ADRs) for the full target architecture.
+> **Status:** early implementation. Gate **G0** (this repository) and gate
+> **G1** (target-architecture sign-off) have both passed board review.
+> Phase 1 slice 1 has landed `O-view.Core` and `O-view.Tray` with exactly
+> the surface `TooltipFormatter`'s extraction needed; `O-view.App` and
+> `O-view.Linux` do not exist yet. See [`docs/adr/`](docs/adr/) for the
+> Core-to-skin data contract, the cross-platform capability matrix, and the
+> mechanism that replaces `PanelText.cs`'s centralization once its display
+> strings move out of the shared layer — and the approved PDR (linked from
+> the ADRs) for the full target architecture.
 
 ## What O-view does
 
@@ -128,7 +129,13 @@ of this rebuild.
 
 ## Status of the build
 
-No implementation code has landed in this repository yet. Phase 1's first
-build slice (extracting display-string construction into each skin,
-starting with `TooltipFormatter.cs`) is scoped separately and depends on
-the anti-drift mechanism this repository's ADR-0003 defines.
+Phase 1 slice 1 has landed: `TooltipFormatter.cs`'s display-string
+construction is extracted out of the platform-neutral layer. `O-view.Core`
+(`net10.0`) defines the tooltip-relevant slice of the Core-to-skin contract
+([ADR-0001](docs/adr/0001-core-to-skin-data-contract.md)) as structured,
+status-flagged values; `O-view.Tray` (`net10.0-windows`) owns turning those
+values into tooltip text, including the 127-character `NotifyIcon.Text`
+cap. Build and test with `dotnet build O-view.slnx` / `dotnet test
+O-view.slnx`. `PanelText.cs`, `UsageFormatter.cs`, `PanelStatistics.cs`,
+`O-view.App`, and `O-view.Linux` are separate, later slices and do not
+exist here yet.
