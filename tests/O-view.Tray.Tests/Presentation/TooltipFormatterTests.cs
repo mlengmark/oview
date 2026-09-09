@@ -82,7 +82,51 @@ public class TooltipFormatterTests
 
         var tooltip = TooltipFormatter.Format(snapshot, Utc);
 
-        Assert.Equal("5h: 6% · 7d: 70%", tooltip);
+        Assert.Equal("5h: ~6% · 7d: ~70%", tooltip);
+    }
+
+    /// <summary>
+    /// OVI-11's blocking finding: <c>Format</c> read only nullness, never <c>.Status</c>,
+    /// so an estimated value rendered byte-identical to a real one. A snapshot mixing both
+    /// in the same reading must mark only the estimated field.
+    /// </summary>
+    [Fact]
+    public void MixedRealAndEstimatedFieldsAreLabelledPerField()
+    {
+        var snapshot = new UsageSnapshot(
+            DataSourceKind.JsonlFallback,
+            new UsagePercent(57, UsageValueStatus.Real),
+            new UsageInstant(new DateTimeOffset(2026, 9, 8, 20, 59, 0, TimeSpan.Zero), UsageValueStatus.Real),
+            new UsagePercent(14, UsageValueStatus.Estimated),
+            new UsageInstant(new DateTimeOffset(2026, 9, 7, 23, 0, 0, TimeSpan.Zero), UsageValueStatus.Estimated),
+            UsageLevel.Amber);
+
+        var tooltip = TooltipFormatter.Format(snapshot, Utc);
+
+        Assert.Equal("5h: 57% · resets 20:59 · 7d: ~14% · resets ~Mon 23:00", tooltip);
+    }
+
+    /// <summary>
+    /// OVI-11's second finding: the "local estimate" fallback copy asserts something about
+    /// the snapshot's own provenance, so it must only fire when <c>DataSourceKind</c> is
+    /// actually <see cref="DataSourceKind.Estimate"/> — never merely because both
+    /// percentages happen to be null (e.g. a <c>Live</c> snapshot with nothing sampled yet).
+    /// </summary>
+    [Fact]
+    public void UnknownPercentagesWithALiveSourceDoNotClaimToBeALocalEstimate()
+    {
+        var snapshot = new UsageSnapshot(
+            DataSourceKind.Live,
+            new UsagePercent(null, UsageValueStatus.Unavailable),
+            new UsageInstant(null, UsageValueStatus.Unavailable),
+            new UsagePercent(null, UsageValueStatus.Unavailable),
+            new UsageInstant(null, UsageValueStatus.Unavailable),
+            UsageLevel.Green);
+
+        var tooltip = TooltipFormatter.Format(snapshot, Utc);
+
+        Assert.Equal("5h: ?", tooltip);
+        Assert.DoesNotContain("local estimate", tooltip);
     }
 
     [Fact]

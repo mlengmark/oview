@@ -5,9 +5,10 @@ namespace OView.Tray.Presentation;
 
 /// <summary>
 /// Builds the tray tooltip text from a <see cref="UsageSnapshot"/>. Every presentation
-/// decision — the field separator, fallback copy, local time formatting, and the
-/// 127-character cap that is <c>NotifyIcon.Text</c>'s own OS limit — lives here, in the
-/// Windows skin, and nowhere in O-view.Core (ADR-0001). If Windows and Linux both render a
+/// decision — the field separator, fallback copy, local time formatting, the
+/// 127-character cap that is <c>NotifyIcon.Text</c>'s own OS limit, and the "~" marker
+/// that distinguishes an estimated value from a real one — lives here, in the Windows
+/// skin, and nowhere in O-view.Core (ADR-0001). If Windows and Linux both render a
 /// tooltip, each owns its own wording; this class is not shared with O-view.Linux.
 /// </summary>
 public static class TooltipFormatter
@@ -24,25 +25,30 @@ public static class TooltipFormatter
             return Cap("O-view · no usage data");
         }
 
-        if (snapshot.SessionUtilizationPercent.Value is null && snapshot.WeeklyUtilizationPercent.Value is null)
+        // Only the Estimate confidence tier gets the "local estimate" fallback copy — a
+        // snapshot merely lacking percentages (e.g. Live with nothing sampled yet) must
+        // not be mislabelled as an estimate it isn't.
+        if (snapshot.DataSourceKind == DataSourceKind.Estimate
+            && snapshot.SessionUtilizationPercent.Value is null
+            && snapshot.WeeklyUtilizationPercent.Value is null)
         {
             return Cap("O-view · local estimate · usage % unknown");
         }
 
         var session = snapshot.SessionUtilizationPercent.Value is { } sessionPercent
-            ? string.Create(CultureInfo.InvariantCulture, $"5h: {FormatPercent(sessionPercent)}%")
+            ? string.Create(CultureInfo.InvariantCulture, $"5h: {Marker(snapshot.SessionUtilizationPercent.Status)}{FormatPercent(sessionPercent)}%")
             : "5h: ?";
 
         var reset = snapshot.SessionResetAt.Value is { } sessionReset
-            ? string.Create(CultureInfo.InvariantCulture, $" · resets {ToLocal(sessionReset, zone):HH:mm}")
+            ? string.Create(CultureInfo.InvariantCulture, $" · resets {Marker(snapshot.SessionResetAt.Status)}{ToLocal(sessionReset, zone):HH:mm}")
             : "";
 
         var weekly = snapshot.WeeklyUtilizationPercent.Value is { } weeklyPercent
-            ? string.Create(CultureInfo.InvariantCulture, $" · 7d: {FormatPercent(weeklyPercent)}%")
+            ? string.Create(CultureInfo.InvariantCulture, $" · 7d: {Marker(snapshot.WeeklyUtilizationPercent.Status)}{FormatPercent(weeklyPercent)}%")
             : "";
 
         var weeklyReset = snapshot.WeeklyResetAt.Value is { } weeklyResetAt
-            ? string.Create(CultureInfo.InvariantCulture, $" · resets {ToLocal(weeklyResetAt, zone):ddd HH:mm}")
+            ? string.Create(CultureInfo.InvariantCulture, $" · resets {Marker(snapshot.WeeklyResetAt.Status)}{ToLocal(weeklyResetAt, zone):ddd HH:mm}")
             : "";
 
         return Cap(session + reset + weekly + weeklyReset);
@@ -50,6 +56,14 @@ public static class TooltipFormatter
 
     /// <summary>Internal so the Tray test project can prove the cap is enforced without duplicating it.</summary>
     internal static string Cap(string text) => text.Length <= MaxLength ? text : text[..MaxLength];
+
+    /// <summary>
+    /// The visible marker that distinguishes a modelled value from a measured one, per
+    /// each field's own <see cref="UsageValueStatus"/> (ADR-0001, ADR-0002's "labelling is
+    /// mandatory" rule). A value is only ever rendered without a marker when Core itself
+    /// attests it as <see cref="UsageValueStatus.Real"/>.
+    /// </summary>
+    private static string Marker(UsageValueStatus status) => status == UsageValueStatus.Estimated ? "~" : "";
 
     private static int FormatPercent(double value) => (int)Math.Round(value, MidpointRounding.AwayFromZero);
 
