@@ -61,7 +61,7 @@ render this as an explicit gap, never as zero or blank).
 | `WeeklyResetAt` | timestamp, UTC, ISO-8601 | instant | real / estimated / unavailable | sourced from cached exact reset (source repo ADR-0014) when present, else derived — see `WeeklyResetSource` |
 | `WeeklyResetSource` | enum {`CachedExact`, `Derived`} | — | real | transparency flag distinguishing the two reset-detection paths (source repo ADR-0007/0014) |
 | `UsageLevel` | enum {`Green`, `Amber`, `Red`} | — | real (or unavailable if inputs are) | threshold bands; derivation stays in Core |
-| `DataSourceKind` | enum {`Live`, `JsonlFallback`, `Estimate`, `Unavailable`} | — | real | tells the skin which confidence tier produced the other values in this snapshot |
+| `DataSourceKind` | enum {`Live`, `Stale`, `JsonlFallback`, `Estimate`, `Unavailable`} | — | real | tells the skin which confidence tier produced the other values in this snapshot; `Stale` added 2026-09-09 (OVI-16) — authoritative data older than a per-provider freshness threshold, still trusted above `JsonlFallback`/`Estimate` but no longer current; see the OVI-16 amendment below for source behaviour and migration note |
 | `AccountDisplayName` | string | — | real / unavailable | from account cache |
 | `AccountEmail` | string | — | real / unavailable | from account cache |
 | `AccountPlanTier` | string (vendor-defined) | — | real / unavailable | the field is `oauthAccount.organizationType`, not the emptier-looking `seatTier`/`userRateLimitTier` (source repo `CLAUDE.md` rule 8) |
@@ -76,7 +76,7 @@ render this as an explicit gap, never as zero or blank).
 | `HistoryCoverage.WindowDays` | int32 | days | real | |
 | `OffPlanUsageAmount` | int64 (tokens) or decimal (USD) | tokens or USD | estimated / unavailable | |
 | `NotificationThresholdCrossed` | `{crossed: bool, thresholdPercent: int32}` | percent | real | Core detects the crossing event; the skin decides how (or whether) to notify |
-| `LastIngestAt` | timestamp, UTC, ISO-8601 | instant | real | freshness diagnostic; not necessarily surfaced by every skin |
+| `LastIngestAt` | timestamp, UTC, ISO-8601 | instant | real | freshness diagnostic; not necessarily surfaced by every skin. Serves the same role as the source repo's `UsageSnapshot.CapturedAtUtc` — the capture time a skin would read to word a `Stale` value's age (OVI-16 amendment below); the freshness *threshold* itself stays provider-owned config, not a contract field |
 
 **What Core must never emit, by contract:** a pre-formatted display
 sentence, a field separator, a locale-bound date/time string, or any
@@ -103,6 +103,84 @@ This section is the "living" half of this ADR: it states where the source
 repository stands against the target contract *today*, not where the
 target design wants it to end up. Update this section (with a dated note,
 not a silent rewrite) as extraction work actually lands.
+
+- **2026-09-09 amendment — `Stale`/staleness-age resolved as add-now, not deferred
+  (Adrian II the Architect, OVI-16, triggered by a gap Quinn found in OVI-11's
+  review of the OVI-10 extraction).** The source repository has a fourth
+  `DataSource` tier this table's original `DataSourceKind` (from OVI-9) did not
+  carry. Re-verified directly against the source repo at the same pinned commit
+  this ADR already cites, `897777b` — all claims below are **CONFIRMED** by
+  fetching and, for two files, byte-diffing against copies already pulled for
+  OVI-11:
+  - `DataSource` (`src/O-view.Core/Models/DataSource.cs`) is a 4-value enum —
+    `None`, `Estimate`, `Stale`, `Live` — not the 3 tiers this table's `Estimate`/
+    `Unavailable`-flavoured original implied. `Stale`'s own doc comment:
+    "Authoritative data, but older than the freshness threshold. Label with its
+    age."
+  - The freshness threshold is **provider-owned, not global, and has already
+    changed once**: `PlanHistoryProvider.DefaultFreshness` (the primary usage
+    provider, ADR-0007-equivalent) is `TimeSpan.FromMinutes(16)`, calibrated
+    against 1,443 measured sampling gaps. It was 11 minutes before 2026-08-10,
+    when Claude Desktop's own sampling cadence changed from 5 to 15 minutes —
+    the source project measured and re-tuned the threshold rather than hardcode
+    it once (source `PlanHistoryProvider.cs`, confirmed byte-identical to the
+    live file at that path).
+  - **Two source renderers disagree on purpose**, confirmed from two files:
+    the tray tooltip (`TooltipFormatter.Format`, `src/O-view.Core/Models/TooltipFormatter.cs`)
+    branches explicitly — `Live` gets no suffix, `Stale` gets
+    `" (as of HH:mm)"` (local time, from `CapturedAtUtc`) or, if no capture
+    time is available, the literal fallback `" (stale)"`. The detail panel
+    (`PanelText.Freshness`, `src/O-view.Core/Models/PanelText.cs`, confirmed
+    byte-identical to the live file) **deliberately collapses `Live` and
+    `Stale` into the same text** — `"As of {age}"` either way — per its own doc
+    comment: a capture-time age says how old a reading is more precisely than
+    the Live/Stale split it replaces, and both tiers are authoritative either
+    way. Only `Estimate` gets different wording (`"Local estimate · as of
+    {age}"`). So "how `Stale` reads to the user" is not one fixed answer even
+    in the source app — it is a per-surface skin decision, confirming this
+    contract should carry the tier as data and leave the wording, including
+    whether to word it at all, to each skin (consistent with this ADR's
+    existing "what a skin owns" section).
+  - `RateCard.StaleAfter` (seen in `PanelText.Caveat`) is a **separate,
+    unrelated staleness concept** — pricing-rate age, not usage-data
+    freshness. Noted here only so it is not confused with `DataSource.Stale`
+    in future extraction work.
+
+  **Decision: add now, not deferred.** `Stale` is added to this table's
+  `DataSourceKind` enum today (row above), backed by the existing
+  `LastIngestAt` field as the capture-time value a skin needs to word it —
+  no new contract field required. Reasoning: this table is documented as
+  Core's *complete* target contract (line "Adopt the following table as
+  Core's complete output contract"), and every other not-yet-built row in it
+  (`ModelBreakdown[]`, `HistoryCoverage`, `LastIngestAt` itself) is already
+  carried as aspirational-until-extracted rather than omitted until some
+  slice needs it. Treating `Stale` differently — leaving it out of the
+  "complete" contract because no slice has reached it yet — would recreate
+  exactly the silent-gap problem this ADR's discipline exists to prevent.
+  Deferral was rejected for that reason, not because the freshness threshold
+  or suffix wording is settled — those remain provider/skin implementation
+  detail, out of scope for this contract-shape decision.
+
+  **Migration note — OVI-10/OVI-15's shipped fields do not need to change.**
+  This is a purely additive enum case: `UsageSnapshot`, `TooltipFormatter`,
+  and their tests (OVI-10, OVI-15) compile and behave unchanged, since
+  `TooltipFormatter.Format` branches with `if`/`==`, not an exhaustive
+  `switch`, and no provider in this repository emits any `DataSourceKind`
+  today (no provider has been ported yet — see below). Nothing shipped is
+  reopened by this decision.
+
+  **The real obligation this creates falls on a future slice, named
+  explicitly so it isn't missed:** the slice that first ports a real usage
+  provider (the `PlanHistoryProvider`/ADR-0007 equivalent — the only source
+  of `Stale` in the source app) **must not merge without also teaching every
+  consumer that currently branches on `DataSourceKind` to handle `Stale`
+  explicitly** — starting with `O-view.Tray`'s `TooltipFormatter`, which
+  today has no `Stale` branch and would silently render a stale value
+  identically to a `Live` one. That silent fallthrough is fine *today* only
+  because nothing can produce `Stale` yet; it becomes a violation of ADR-0002's
+  mandatory data-source-labelling rule the moment a provider can. This is a
+  gate on that future slice's own review (OVI-11-style), not new work for
+  this ADR to schedule.
 
 - **2026-09-09 update — `TooltipFormatter.Format` now reads `UsageValueStatus`
   (Kit the Builder, OVI-15, fixing a blocking finding from Quinn's OVI-11
