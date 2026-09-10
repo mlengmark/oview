@@ -54,6 +54,20 @@ not re-tested" or "never observed" into "supported."
 | Self-update | Check for a new version; self-replace only if the OS's package model allows it, else notify-only | **CONFIRMED** — installer self-replaces via Restart Manager, checksum-verified first | **Must never self-replace** under a package-manager install (the package manager owns those files) — getting this wrong already shipped a real bug once (source repo ADR-0009 amendment) |
 | Menu-dismiss-on-outside-click | Dismiss the widget/menu on an outside click | **CONFIRMED** — Win32 `AttachThreadInput`-based fix | No direct equivalent; compositor-dependent. One hardware-found bug here (#129, panel self-dismissing on an unfocused compositor) fixed but not re-tested |
 
+### 2026-09-10 update — `O-view.Linux` project scaffolded (OVI-30)
+
+`src/O-view.Linux` (`net10.0`) now exists in this repository, with a
+minimal `Presentation/TooltipFormatter.cs` that consumes
+[ADR-0001](0001-core-to-skin-data-contract.md)'s `UsageSnapshot` contract
+independently of `O-view.Tray`'s formatter. This was scaffolded solely to
+give OVI-25's cross-skin golden-master harness real code to invoke on both
+skins; it is **project scaffolding, not a hardware-verification event**.
+No capability row above changed, no UI, tray icon, D-Bus/StatusNotifierItem
+integration, startup registration, or self-update mechanism was added, and
+**no evidence label in the table above was upgraded** as part of this
+slice — the Linux column's guarantees remain exactly as verified (or not)
+by Rae II's OVI-4 pass, unaffected by this scaffold existing.
+
 ### Reading the Linux column honestly
 
 Per OVI-4 (2026-09-08), Linux's evidence base is **two hardware reports,

@@ -9,8 +9,11 @@ documentation trail from the first commit.
 > **Status:** early implementation. Gate **G0** (this repository) and gate
 > **G1** (target-architecture sign-off) have both passed board review.
 > Phase 1 slice 1 has landed `O-view.Core` and `O-view.Tray` with exactly
-> the surface `TooltipFormatter`'s extraction needed; `O-view.App` and
-> `O-view.Linux` do not exist yet. See [`docs/adr/`](docs/adr/) for the
+> the surface `TooltipFormatter`'s extraction needed. `O-view.Linux` exists
+> as a minimal scaffold (OVI-30) — its own `TooltipFormatter`, no UI, no
+> tray icon, no D-Bus integration — added only to unblock the cross-skin
+> golden-master harness (OVI-25); `O-view.App` does not exist yet. See
+> [`docs/adr/`](docs/adr/) for the
 > Core-to-skin data contract, the cross-platform capability matrix, and the
 > mechanism that replaces `PanelText.cs`'s centralization once its display
 > strings move out of the shared layer — and the approved PDR (linked from
@@ -136,6 +139,16 @@ construction is extracted out of the platform-neutral layer. `O-view.Core`
 status-flagged values; `O-view.Tray` (`net10.0-windows`) owns turning those
 values into tooltip text, including the 127-character `NotifyIcon.Text`
 cap. Build and test with `dotnet build O-view.slnx` / `dotnet test
-O-view.slnx`. `PanelText.cs`, `UsageFormatter.cs`, `PanelStatistics.cs`,
-`O-view.App`, and `O-view.Linux` are separate, later slices and do not
-exist here yet.
+O-view.slnx`. `PanelText.cs`, `UsageFormatter.cs`, `PanelStatistics.cs`, and
+`O-view.App` are separate, later slices and do not exist here yet.
+
+**2026-09-10 — `O-view.Linux` scaffolded (OVI-30).** `src/O-view.Linux`
+(`net10.0`) exists with its own minimal `Presentation/TooltipFormatter.cs`,
+consuming the same `UsageSnapshot` contract as `O-view.Tray`'s formatter but
+with independent wording and no length cap (per ADR-0001/ADR-0003 — the
+127-character cap is a Windows API fact and does not travel to this skin).
+This is scaffolding to unblock OVI-25's cross-skin golden-master harness,
+not a hardware-verification event: no Avalonia UI, no D-Bus/StatusNotifierItem
+integration, no tray icon rendering, and no other
+[ADR-0002](docs/adr/0002-cross-platform-capability-matrix.md)
+capability-matrix row. No Linux evidence label in that matrix changed.

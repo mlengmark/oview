@@ -15,10 +15,20 @@ passed board review; see [`README.md`](README.md) and
 slice 1 (OVI-10), `O-view.Core` and `O-view.Tray` exist here with exactly
 the surface `TooltipFormatter`'s extraction needed — the Core-to-skin
 contract's tooltip-relevant fields ([ADR-0001](docs/adr/0001-core-to-skin-data-contract.md))
-and the Windows skin that turns them into tooltip text. `O-view.App` and
-`O-view.Linux` do not exist yet; do not assume any capability beyond what a
-merged slice has actually added. Check [`docs/adr/0001`](docs/adr/0001-core-to-skin-data-contract.md)'s
+and the Windows skin that turns them into tooltip text. `O-view.App` does
+not exist yet; do not assume any capability beyond what a merged slice has
+actually added. Check [`docs/adr/0001`](docs/adr/0001-core-to-skin-data-contract.md)'s
 "current codebase status" section for what has and has not landed.
+
+**2026-09-10 update (OVI-30) — `O-view.Linux` now exists here too, as a
+minimal scaffold.** `src/O-view.Linux` (`net10.0`) and its own
+`Presentation/TooltipFormatter.cs` exist solely to give OVI-25's
+cross-skin golden-master harness real string-construction code to invoke
+from both skins. This is project scaffolding, not a hardware-verification
+event: no Avalonia UI, no D-Bus/StatusNotifierItem integration, no tray
+icon, and no other [ADR-0002](docs/adr/0002-cross-platform-capability-matrix.md)
+capability-matrix row lives here yet, and no Linux evidence label in that
+matrix changed as part of this slice.
 
 **Do not assume this repository contains working code.** If you are looking
 for the current, running implementation, that is
@@ -122,7 +132,8 @@ slice. For code:
   `net10.0` and must build and test on a non-Windows runner — that is
   Core's platform-neutrality enforcement mechanism, not a formality.
   `O-view.Tray` and its test project target `net10.0-windows` and only
-  build on Windows.
+  build on Windows. `O-view.Linux` and its test project also target
+  `net10.0` and build on any runner, same as Core.
 - Follow the layering rule from the section above absolutely:
   `O-view.Core` gains no display strings, formatting, locale-sensitive
   formats, platform-imposed limits, OS-conditional branches, or platform

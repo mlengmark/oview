@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Platform-neutral SDK-style project, same shape as O-view.Core: no P/Invoke,
+         no OS-conditional branching. This scaffold intentionally does not yet reference
+         Avalonia or any D-Bus/StatusNotifierItem package — those land with the UI,
+         tray-icon, and positioning slices (out of scope here; see ADR-0002). -->
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>OView.Linux</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="O-view.Linux.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\O-view.Core\O-view.Core.csproj" />
+  </ItemGroup>
+
+</Project>
