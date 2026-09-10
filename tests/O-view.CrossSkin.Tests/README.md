@@ -15,6 +15,17 @@ it does not extract `PanelText.cs`, `UsageFormatter.cs`, or
 `PanelStatistics.cs` (those are separate, later slices this harness
 unblocks).
 
+**2026-09-10 update (OVI-27) — a second, parallel fixture family.**
+`UsageFormatter.cs`/`PanelStatistics.cs`'s extraction needed fixtures over
+a differently-shaped Core snapshot (`UsageStatistics`, not `UsageSnapshot`).
+`Fixtures/UsageStatisticsFixture.cs`, `Fixtures/UsageStatisticsSkinUnderTest.cs`,
+and `UsageStatisticsGoldenMasterCrossSkinTests.cs` mirror
+`GoldenMasterFixture`/`SkinUnderTest`/`GoldenMasterCrossSkinTests` exactly,
+parallel to them rather than a change to them — see ADR-0003's 2026-09-10
+(OVI-27) amendment for why, and its flagged concern about a third such
+family. `ContentFact` is shared as-is between both families; it was
+already snapshot-agnostic.
+
 ## Why this project targets `net10.0-windows`
 
 `O-view.Tray` only builds as `net10.0-windows`. A `net10.0-windows` project
@@ -27,6 +38,15 @@ workflow, this project must run on whatever runner already builds
 `O-view.Tray` — not a Linux-only runner, or it will not build at all.
 
 ## How to add a fixture
+
+Two fixture families exist, one per Core snapshot shape covered so far —
+`GoldenMasterFixture` (`UsageSnapshot`, the tooltip's slice) and
+`UsageStatisticsFixture` (`UsageStatistics`, the usage-figures/history-
+coverage slice, OVI-27). Add to whichever family already matches the
+snapshot shape your fixture needs; only add a third parallel family for a
+genuinely new snapshot shape, and read ADR-0003's OVI-27 amendment first —
+a third family is the point that ADR flags as worth escalating rather than
+repeating unilaterally.
 
 1. **Add the fixture** as a new `GoldenMasterFixture` entry in
    `Fixtures/GoldenMasterFixtures.cs`'s `All` list. A fixture is:

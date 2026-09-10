@@ -104,6 +104,33 @@ repository stands against the target contract *today*, not where the
 target design wants it to end up. Update this section (with a dated note,
 not a silent rewrite) as extraction work actually lands.
 
+- **2026-09-10 update — `UsageFormatter.cs` and `PanelStatistics.cs`'s one
+  presentation leak extracted in this repository (Kit the Builder, Phase 1
+  slice 2, OVI-27).** `O-view.Core.Models` here now defines four new
+  contract types instantiating rows this table already listed:
+  `TokenCount` (`OutputTokensToday`, `OutputTokensWindow31d`), `EstimatedUsd`
+  (`EstimatedSpendToday`, `EstimatedValueWindow31d`), and `HistoryCoverage`
+  (`RecordedDays`, `WindowDays`), composed into a new `UsageStatistics`
+  record — the sibling of `UsageSnapshot` for this slice of the contract,
+  scoped to exactly what these two files' presentation logic needs, no more.
+  `HistoryCoverage.RecordedDays`/`WindowDays` replace `PanelStatistics`'s
+  leaked `CoverageNote` sentence exactly as this table already specified;
+  Core computes the two counts (and `HasPartialHistory`, a comparison, not
+  a display string), never the sentence. String construction — the ~180px
+  panel-tile-width K/M abbreviation threshold, the `"$"` prefix, the
+  `"unknown"`/`"n/a"` fallback text, and the coverage-caveat sentence
+  itself — lives entirely in each skin's own `Presentation/UsageFormatter.cs`
+  and `Presentation/PanelStatisticsFormatter.cs` (`O-view.Tray` and
+  `O-view.Linux`, independently), tested against the source app's own
+  `UsageFormatterTests.cs`/`PanelStatisticsTests.cs` reference values for
+  the Windows skin (`O-view.Tray`, byte-for-byte) and independently-worded
+  equivalents for `O-view.Linux` (per ADR-0003 — content facts must match,
+  exact wording need not). `PanelText.cs` remains **not yet extracted**,
+  per this slice's explicit scope boundary (it is a separate, later,
+  higher-risk slice — issues [#55](https://github.com/mlengmark/O-view/issues/55)/[#56](https://github.com/mlengmark/O-view/issues/56)).
+  See [ADR-0003](0003-paneltext-anti-drift-mechanism.md)'s 2026-09-10 (OVI-27)
+  amendment for how the golden-master harness was extended to cover this
+  slice's figures.
 - **2026-09-09 update — `TooltipFormatter.Format` now reads `UsageValueStatus`
   (Kit the Builder, OVI-15, fixing a blocking finding from Quinn's OVI-11
   review of the OVI-10 extraction).** The initial extraction carried the

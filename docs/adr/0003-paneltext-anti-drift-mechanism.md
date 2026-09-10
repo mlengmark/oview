@@ -21,6 +21,33 @@
   `PanelStatistics.cs`. The CI-runner question flagged in "Consequences"
   below remains open — this repository has no CI workflow yet, so it is
   deferred to whenever one is added, not resolved here.
+- **2026-09-10 amendment (OVI-27) — the harness's fixture/skin types
+  extended by parallel addition, not by generalizing the existing ones.**
+  Extracting `UsageFormatter.cs`/`PanelStatistics.cs`'s one presentation
+  leak needed a golden-master fixture over `UsageStatistics` (tokens,
+  estimated spend, history coverage) — a different Core snapshot shape from
+  `GoldenMasterFixture`'s `UsageSnapshot` (the tooltip's slice). Rather than
+  making `GoldenMasterFixture`/`SkinUnderTest` generic over the snapshot
+  type — which would touch the harness Quinn already reviewed under OVI-26
+  and is closer to a mechanism change than an application of one — this
+  slice added a parallel, additive fixture family:
+  `UsageStatisticsFixture`/`UsageStatisticsSkinUnderTest`/
+  `UsageStatisticsGoldenMasterCrossSkinTests`, following the exact same
+  ADR-0003 mechanism (content facts, not exact strings, checked per skin)
+  against the new snapshot shape. `ContentFact` itself needed no change —
+  it was already snapshot-agnostic. **This is flagged here, not decided
+  unilaterally as settled:** if a third differently-shaped fixture family
+  is needed by a future slice (e.g. `PanelText.cs`'s extraction), three
+  parallel, near-identical harness classes is a real cost this ADR did not
+  anticipate, and genericizing `GoldenMasterFixture`/`SkinUnderTest` over
+  the snapshot type at that point would stop being an application of this
+  mechanism and start being a change to it — worth Chief Gary II's and
+  Quinn's explicit sign-off rather than another slice's unilateral call.
+  Confirmed locally with the same worked example as the OVI-25 amendment
+  above: deliberately mismatching a fixture's input value against its own
+  pinned content fact (`492.52` → `492.53`) made both skins fail with a
+  clear per-fixture, per-skin message naming the actual rendered text and
+  the unsatisfied fact; reverting made the suite pass again.
 - **Date:** 2026-09-08
 - **Deciders:** Adrian II the Architect, resolving board question 0 of the
   approved PDR (rev. 2, `oview-pdr-reissued`, §8)
