@@ -12,7 +12,10 @@ documentation trail from the first commit.
 > the surface `TooltipFormatter`'s extraction needed. `O-view.Linux` exists
 > as a minimal scaffold (OVI-30) — its own `TooltipFormatter`, no UI, no
 > tray icon, no D-Bus integration — added only to unblock the cross-skin
-> golden-master harness (OVI-25); `O-view.App` does not exist yet. See
+> golden-master harness. That harness, `O-view.CrossSkin.Tests` (OVI-25),
+> now exists too, with one smoke fixture proving it invokes both skins'
+> string-construction code and catches a deliberate content mismatch;
+> `O-view.App` does not exist yet. See
 > [`docs/adr/`](docs/adr/) for the
 > Core-to-skin data contract, the cross-platform capability matrix, and the
 > mechanism that replaces `PanelText.cs`'s centralization once its display
@@ -152,3 +155,15 @@ not a hardware-verification event: no Avalonia UI, no D-Bus/StatusNotifierItem
 integration, no tray icon rendering, and no other
 [ADR-0002](docs/adr/0002-cross-platform-capability-matrix.md)
 capability-matrix row. No Linux evidence label in that matrix changed.
+
+**2026-09-10 — cross-skin golden-master harness scaffolded (OVI-25).**
+`tests/O-view.CrossSkin.Tests` (`net10.0-windows`, so it can reference both
+`O-view.Tray` and `O-view.Linux` from one project) now runs
+[ADR-0003](docs/adr/0003-paneltext-anti-drift-mechanism.md)'s golden-master
+mechanism: one smoke fixture (the OVI-4 reference reading) is checked
+against both skins' own `TooltipFormatter`, pinning content facts (the
+percentages, the reset times) rather than exact strings. Harness and
+fixture format only — no product code changed, and `PanelText.cs`,
+`UsageFormatter.cs`, and `PanelStatistics.cs` are not yet extracted. See
+[`tests/O-view.CrossSkin.Tests/README.md`](tests/O-view.CrossSkin.Tests/README.md)
+for how to add the next fixture.
