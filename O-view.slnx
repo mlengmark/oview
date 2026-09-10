@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/O-view.Core/O-view.Core.csproj" />
+    <Project Path="src/O-view.Tray/O-view.Tray.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/O-view.Core.Tests/O-view.Core.Tests.csproj" />
+    <Project Path="tests/O-view.Tray.Tests/O-view.Tray.Tests.csproj" />
+  </Folder>
+</Solution>

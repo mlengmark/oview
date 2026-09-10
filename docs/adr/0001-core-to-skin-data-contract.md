@@ -104,9 +104,43 @@ repository stands against the target contract *today*, not where the
 target design wants it to end up. Update this section (with a dated note,
 not a silent rewrite) as extraction work actually lands.
 
-- **Not yet extracted.** All four files in the table above still live in
-  `src/O-view.Core.Models/` in the source repository. No skin-owned
-  text-resource layer or equivalent exists there yet.
+- **2026-09-09 update — `TooltipFormatter.Format` now reads `UsageValueStatus`
+  (Kit the Builder, OVI-15, fixing a blocking finding from Quinn's OVI-11
+  review of the OVI-10 extraction).** The initial extraction carried the
+  `UsageValueStatus`/`DataSourceKind` fields this table already specifies
+  but only branched on value nullness, so an `Estimated` percent or reset
+  instant rendered byte-identical to a `Real` one — a regression against
+  this ADR's own "never fabricate a number" status-flag rule and the source
+  repo's ADR-0002. `Format` now marks any field whose `.Status` is
+  `Estimated` with a `~` prefix (e.g. `7d: ~14%`, `resets ~Mon 23:00`); a
+  `Real` field renders unmarked, unchanged from the OVI-4 parity string.
+  Separately, the `"O-view · local estimate · usage % unknown"` fallback
+  copy now fires only when `DataSourceKind` is actually `Estimate`, not
+  merely because both percentages happen to be null — a `Live` snapshot
+  with nothing sampled yet no longer misdescribes its own provenance. No
+  contract field changed shape; this was a consumption bug in the skin, not
+  a gap in this table.
+- **2026-09-08 update — `TooltipFormatter.cs` extracted in this repository
+  (Kit the Builder, Phase 1 slice 1, OVI-10).** `O-view.Core.Models` here now
+  defines `UsageSnapshot` carrying exactly the fields this table lists that
+  tooltip presentation needs — `SessionUtilizationPercent`,
+  `SessionResetAt`, `WeeklyUtilizationPercent`, `WeeklyResetAt`,
+  `UsageLevel`, `DataSourceKind` — each percent/instant paired with its
+  `UsageValueStatus` (real/estimated/unavailable), no pre-built sentence, no
+  separator, no locale-bound format, no length cap. String construction,
+  including the 127-character `NotifyIcon` cap, lives entirely in
+  `O-view.Tray`'s `Presentation.TooltipFormatter`, tested against the exact
+  live tooltip OVI-4 observed (`5h: 57% · resets 20:59 · 7d: 14% · resets
+  Mon 23:00`). This is the first field of this table with a real
+  implementation on either side of the contract; every other row is still
+  aspirational until its own extraction lands. `PanelText.cs`,
+  `UsageFormatter.cs`, and `PanelStatistics.cs`'s `CoverageNote` remain
+  **not yet extracted**, per this slice's explicit scope boundary.
+- **Not yet extracted (source repository).** All four files in the table
+  above still live in `src/O-view.Core.Models/` in the source repository —
+  this repository's extraction does not change the source repository,
+  which remains read-only reference. No skin-owned text-resource layer or
+  equivalent exists there yet.
 - **`PanelStatistics.cs`'s computation is already contract-shaped.** Its
   rollup aggregation, pricing, and model-slicing logic (`Build`,
   `WithDivergence`, `EstimateTotal`, `SliceByModel`) already produces
