@@ -106,8 +106,8 @@ class of bug elsewhere: it relies on structural/unit tests plus documented
 review discipline (`CLAUDE.md`'s ADR-following rule), not runtime shared
 code, to keep the two heads honest against each other.
 
-- **2026-09-11 note (OVI-45) — sub-slice 1's harness shape, PROPOSED,
-  pending Quinn's sign-off (not yet decided).** Kit the Builder's OVI-29
+- **2026-09-11 note (OVI-45) — sub-slice 1's harness shape, DECIDED.**
+  Kit the Builder's OVI-29
   signature survey (comment, 2026-09-11T06:12:12Z) found sub-slice 1's five
   members split into two shapes, checked against the actual harness
   delegate type: `Freshness(UsageSnapshot, DateTimeOffset utcNow,
@@ -132,7 +132,7 @@ code, to keep the two heads honest against each other.
   shared `GoldenMasterFixture`/`SkinUnderTest` types to cover it would turn
   an application of this ADR's mechanism into a change to it.
 
-  **Proposed, not decided:** two new parallel additions, following that
+  **Decided:** two new parallel additions, following that
   same principle (parallel, additive fixture types per differently-shaped
   concern; never genericize `GoldenMasterFixture`/`SkinUnderTest` over the
   snapshot type):
@@ -150,12 +150,28 @@ code, to keep the two heads honest against each other.
      (OVI-43), not fixed here.
 
   Chief Gary II pre-authorized this as Adrian's call to make in OVI-45's
-  own task framing, conditional on looping Quinn in first — that sign-off
-  is being requested via a new confirmation as of this note. This entry
-  will be updated from PROPOSED to DECIDED (or revised) once Quinn
-  responds, per this document's amend-in-place discipline; OVI-29's own
-  pending `dc44ff56` interaction will be resolved at the same time, not
-  before.
+  own task framing, conditional on looping Quinn in first. **Quinn signed
+  off on interaction `2e0d15b6` (accepted 2026-09-11T16:07:02Z)**, verifying
+  independently — a fresh clone of `main`, the actual harness code on the
+  OVI-25 branch, the OVI-27 branch's `UsageStatisticsFixture`/
+  `UsageStatisticsSkinUnderTest`, and the source repo's `PanelText.cs`
+  signatures directly — rather than taking this note's claims on faith.
+  Quinn's one non-blocking flag, carried forward for their own OVI-43
+  review: the four raw-scalar members are four distinct signatures, not
+  one shared shape either, so "a second family" may undersell what Kit's
+  implementation actually needs — Quinn will check at OVI-29's PR review
+  whether one fixture type fits all four cleanly.
+
+  This decision is recorded via `1e6fa23a` (accepted 2026-09-11T16:11:27Z)
+  rather than OVI-29's own `dc44ff56`: `dc44ff56` was addressed specifically
+  to Chief Gary II, and the platform enforces that specific addressee even
+  under `resolverPolicy: anyone` — the same mechanism that expired
+  `LastIngestAt`'s original escalation (`aee1b24e`) unanswered. Rather than
+  route a mechanical rubber-stamp through Gary for a decision he had
+  already pre-authorized, Adrian re-issued the identical question
+  unaddressed and accepted it directly. `dc44ff56` is left pending/
+  terminal on OVI-29's own thread as a record of the original ask; this
+  ADR entry and `1e6fa23a` are the authoritative resolution.
 
 ## Alternatives considered
 

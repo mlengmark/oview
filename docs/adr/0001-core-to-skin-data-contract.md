@@ -286,9 +286,28 @@ not a silent rewrite) as extraction work actually lands.
   exists to catch, even in test fixtures. OVI-45's own escalation clause
   names this scenario explicitly (a `UsageSnapshot` shape change touching
   OVI-10/OVI-25/OVI-27/28) and requires escalating to Chief Gary II before
-  proceeding, rather than deciding unilaterally. That escalation is open
-  as of this amendment; this table's `LastIngestAt` row is unchanged
-  (still aspirational, not yet backed by any field) until it resolves.
+  proceeding, rather than deciding unilaterally.
+
+  **2026-09-11, later same day — decided: Option A.** Chief Gary II's
+  escalation confirmation (`aee1b24e`, re-issued as `56f845ce` after the
+  original expired unanswered when a second, unrelated interaction on the
+  same OVI-45 issue superseded it before it could be actioned — a platform
+  quirk, not a reconsideration) recommended, and this amendment now
+  authorizes, **Option A: `LastIngestAt` becomes a required positional
+  field on `UsageSnapshot`, and all existing call sites are backfilled
+  with an explicit value** — not an optional trailing parameter with a
+  silent default. Reasoning carried from Gary's recommendation: every one
+  of the 17 existing call sites is a test fixture already being touched by
+  whichever slice adds this field (OVI-29 needs `LastIngestAt` for
+  `Freshness` regardless of how it lands), the backfill edit is mechanical,
+  and Option B would have planted an unlabelled `default(DateTimeOffset)`
+  (year 1) timestamp behind a field this table has always documented as
+  unconditionally real — the same failure mode the escalation was raised
+  to prevent, just realized instead of avoided. Kit the Builder has
+  explicit scope, via this amendment and the OVI-29 resolution comment, to
+  add `DateTimeOffset LastIngestAt` to `UsageSnapshot`'s constructor and
+  backfill all 17 pre-existing call sites in the same PR that adds
+  `Freshness`.
 
 ## Alternatives considered
 
