@@ -237,6 +237,59 @@ not a silent rewrite) as extraction work actually lands.
   the detail panel, menu, notifications, or the Linux runtime, none of
   which were exercised in that pass.
 
+- **2026-09-11 amendment (OVI-45) — `DataSourceKind.Stale` authorized to
+  land in code via OVI-29; `LastIngestAt`'s code-level addition escalated,
+  not yet decided (Adrian II the Architect, resolving two design questions
+  Kit the Builder correctly stopped on rather than deciding solo).**
+
+  **`DataSourceKind.Stale` — Option A authorized.** The 2026-09-09 amendment
+  above decided `Stale` belongs in this table's contract; it did not land in
+  `src/O-view.Core/Models/DataSourceKind.cs` — OVI-42 (which relanded this
+  amendment's text against current `main` after a first attempt, PR #2,
+  closed unmerged) touched only this markdown file, confirmed by
+  `git show --stat` against its merge commit. Kit's OVI-29 investigation
+  (comment, 2026-09-11T06:09:03Z) confirmed adding the enum member now is
+  safe: neither `O-view.Tray` nor `O-view.Linux`'s `TooltipFormatter.cs`
+  switches exhaustively over `DataSourceKind` (both branch with `if`/`==`,
+  confirmed by grep), and no usage provider exists yet in this repository
+  to silently mishandle the new case — matching this ADR's own 2026-09-09
+  migration note. **Decision: add `DataSourceKind.Stale` as a small
+  additive commit inside OVI-29's own PR**, immediately consumed by
+  `PanelText.Freshness`'s Live/Stale-collapsing extraction (the first real
+  code to exercise it) rather than landing inert in a separate
+  prerequisite task. The original `human_only` confirmation asking this
+  (`0c9dbf48`) expired unanswered; this amendment is the authorization
+  Kit needs to proceed, in place of that expired interaction.
+
+  **`LastIngestAt` — escalated to Chief Gary II, not decided here.** Kit's
+  investigation (comment, 2026-09-11T06:09:03Z) also found `UsageSnapshot`
+  (`src/O-view.Core/Models/UsageSnapshot.cs`) carries no capture-time field
+  at all today — `LastIngestAt` exists only in this table (row above),
+  confirmed by grep against `main`. `Freshness` needs it to word "As of
+  {age}". Adding it is a shape change to `UsageSnapshot`'s positional
+  record constructor, and it is not cosmetic: **17** existing `new
+  UsageSnapshot(...)` call sites already ship on `main` today across
+  OVI-10's `O-view.Tray.Tests` (8), the OVI-30 Linux scaffold's
+  `O-view.Linux.Tests` (8), and `O-view.Core.Tests` (1) — confirmed by
+  `git show origin/main:<path> | grep -c`, counted directly, not inferred.
+  (OVI-25's `O-view.CrossSkin.Tests` golden-master fixture and OVI-27's
+  extraction add more call sites again, but both still sit on open,
+  unmerged PRs — #4 and #5 respectively, confirmed via `gh pr list` — so
+  they are not yet part of the count that ships on `main`; whichever of
+  OVI-25/27/29 merges last will need to reconcile against whatever the
+  earlier ones landed.) This ADR's
+  own table lists `LastIngestAt` as **real** (never estimated or
+  unavailable) — a trailing optional parameter defaulting silently for
+  those 18 pre-existing call sites would plant an unlabelled fabricated
+  timestamp behind a field this contract promises is always real, which
+  is the exact failure mode the "never fabricate a number" principle
+  exists to catch, even in test fixtures. OVI-45's own escalation clause
+  names this scenario explicitly (a `UsageSnapshot` shape change touching
+  OVI-10/OVI-25/OVI-27/28) and requires escalating to Chief Gary II before
+  proceeding, rather than deciding unilaterally. That escalation is open
+  as of this amendment; this table's `LastIngestAt` row is unchanged
+  (still aspirational, not yet backed by any field) until it resolves.
+
 ## Alternatives considered
 
 **Leave the contract implicit, described only by whatever Core's C# types
