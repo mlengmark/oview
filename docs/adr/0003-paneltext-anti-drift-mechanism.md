@@ -106,6 +106,57 @@ class of bug elsewhere: it relies on structural/unit tests plus documented
 review discipline (`CLAUDE.md`'s ADR-following rule), not runtime shared
 code, to keep the two heads honest against each other.
 
+- **2026-09-11 note (OVI-45) — sub-slice 1's harness shape, PROPOSED,
+  pending Quinn's sign-off (not yet decided).** Kit the Builder's OVI-29
+  signature survey (comment, 2026-09-11T06:12:12Z) found sub-slice 1's five
+  members split into two shapes, checked against the actual harness
+  delegate type: `Freshness(UsageSnapshot, DateTimeOffset utcNow,
+  TimeZoneInfo)` is close to today's `GoldenMasterFixture(UsageSnapshot,
+  TimeZoneInfo)`/`SkinUnderTest` shape but needs a third `utcNow` input the
+  delegate doesn't carry; `Countdown(TimeSpan)`, `SessionReset(...)`,
+  `WeeklyReset(...)`, and `WeeklyResetConflict(...)` take raw scalars, not
+  a `UsageSnapshot`, at all — confirmed by reading the actual source
+  signatures, not inferred.
+
+  **Evidence note, confirmed via `gh pr list --repo mlengmark/oview`:**
+  neither the OVI-25 harness this ADR describes above nor OVI-27's
+  `UsageStatisticsFixture` extension of it are merged to `main` yet — both
+  sit on open PRs (#4 and #5 respectively) as of this note. This entry does
+  not assume OVI-27's own ADR-0003 amendment text as settled, since that
+  amendment is itself still on an unmerged PR; it draws on the same
+  underlying fact both that PR and Kit's OVI-29 investigation independently
+  confirmed by reading `tests/O-view.CrossSkin.Tests/Fixtures/`: a
+  differently-shaped fixture family (one whose canonical input isn't a
+  `UsageSnapshot`) needs Chief Gary II's and Quinn's explicit sign-off, not
+  one slice's unilateral call — because widening or genericizing the
+  shared `GoldenMasterFixture`/`SkinUnderTest` types to cover it would turn
+  an application of this ADR's mechanism into a change to it.
+
+  **Proposed, not decided:** two new parallel additions, following that
+  same principle (parallel, additive fixture types per differently-shaped
+  concern; never genericize `GoldenMasterFixture`/`SkinUnderTest` over the
+  snapshot type):
+  1. A `Freshness`-only family — the existing `UsageSnapshot`-based shape
+     plus the one additional `utcNow` scalar it needs, as its own parallel
+     type, not a widening of today's shared `SkinUnderTest` delegate (which
+     would affect the existing Tooltip fixture family too).
+  2. A second family scoped to the four raw-scalar members
+     (`Countdown`/`SessionReset`/`WeeklyReset`/`WeeklyResetConflict`),
+     shaped around their actual signatures rather than force-fitting a
+     `UsageSnapshot` none of them take. This amendment fixes the
+     *principle* the fixture family for the raw-scalar functions must
+     follow (parallel and additive); the concrete per-member C# shape is
+     Kit's implementation decision, reviewed at OVI-29's own PR review
+     (OVI-43), not fixed here.
+
+  Chief Gary II pre-authorized this as Adrian's call to make in OVI-45's
+  own task framing, conditional on looping Quinn in first — that sign-off
+  is being requested via a new confirmation as of this note. This entry
+  will be updated from PROPOSED to DECIDED (or revised) once Quinn
+  responds, per this document's amend-in-place discipline; OVI-29's own
+  pending `dc44ff56` interaction will be resolved at the same time, not
+  before.
+
 ## Alternatives considered
 
 **Shared non-Core text-resource module, consumed by both skins.**
