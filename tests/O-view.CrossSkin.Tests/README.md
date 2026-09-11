@@ -15,6 +15,27 @@ it does not extract `PanelText.cs`, `UsageFormatter.cs`, or
 `PanelStatistics.cs` (those are separate, later slices this harness
 unblocks).
 
+**2026-09-11 update (OVI-29) — two more parallel fixture families.**
+`PanelText.cs`'s `Freshness`/`Countdown`/`SessionReset`/`WeeklyReset`/
+`WeeklyResetConflict` family needed fixtures shaped around inputs
+`GoldenMasterFixture` doesn't carry:
+- `Fixtures/FreshnessFixture.cs`, `Fixtures/FreshnessSkinUnderTest.cs`, and
+  `FreshnessGoldenMasterCrossSkinTests.cs` mirror `GoldenMasterFixture`/
+  `SkinUnderTest`/`GoldenMasterCrossSkinTests`, plus the one extra `UtcNow`
+  scalar `Freshness` needs that the tooltip's `Format` delegate never did.
+- `Fixtures/PanelTextResetFixture.cs`, `Fixtures/PanelTextResetSkinUnderTest.cs`,
+  and `PanelTextResetGoldenMasterCrossSkinTests.cs` cover `Countdown`,
+  `SessionReset`, `WeeklyReset`, and `WeeklyResetConflict` — four raw-scalar
+  members that don't take a `UsageSnapshot` at all, and don't share one
+  input shape with each other either. Rather than four separate
+  fixture/skin/test trios, `PanelTextResetFixture.Render` closes over
+  whichever one `PanelTextResetSkinUnderTest` member and inputs a given
+  fixture exercises.
+
+See ADR-0003's 2026-09-11 (OVI-29) amendment for the reasoning. Both new
+families are parallel and additive; `GoldenMasterFixture`/`SkinUnderTest`
+were not touched or widened.
+
 ## Why this project targets `net10.0-windows`
 
 `O-view.Tray` only builds as `net10.0-windows`. A `net10.0-windows` project
@@ -27,6 +48,14 @@ workflow, this project must run on whatever runner already builds
 `O-view.Tray` — not a Linux-only runner, or it will not build at all.
 
 ## How to add a fixture
+
+Three fixture families exist so far: `GoldenMasterFixture` (`UsageSnapshot`,
+the tooltip's slice), `FreshnessFixture` (`UsageSnapshot` plus `UtcNow`,
+OVI-29), and `PanelTextResetFixture` (four raw-scalar members, OVI-29). Add
+to whichever family already matches the shape your fixture needs; only add
+a new parallel family for a genuinely new shape, and read ADR-0003's
+amendments first — a new family is the point that ADR flags as worth
+Chief Gary II's and Quinn's sign-off rather than a unilateral call.
 
 1. **Add the fixture** as a new `GoldenMasterFixture` entry in
    `Fixtures/GoldenMasterFixtures.cs`'s `All` list. A fixture is:

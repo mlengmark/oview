@@ -42,6 +42,18 @@ for how to add a fixture. This slice ships no product code changes and
 does not extract `PanelText.cs`, `UsageFormatter.cs`, or
 `PanelStatistics.cs` — those remain separate, later slices.
 
+**2026-09-11 update (OVI-29) — the first slice of `PanelText.cs` is
+extracted: `Freshness`/`Countdown`/`SessionReset`/`WeeklyReset`/
+`WeeklyResetConflict`.** `O-view.Tray.Presentation.PanelTextFormatter` and
+`O-view.Linux.Presentation.PanelTextFormatter` each own this wording
+independently. `DataSourceKind` gained `Stale`; `UsageSnapshot` gained a
+required `LastIngestAt` field. The remaining `PanelText.cs` members (the
+boost promo chip, the usage-tile caveat, the off-plan banner, the GitHub
+rate-limit notice) are separate, differently-shaped sub-slices with their
+own new Core surface, not yet extracted — see
+[ADR-0001](docs/adr/0001-core-to-skin-data-contract.md)'s 2026-09-11 entry
+for the full detail.
+
 **Do not assume this repository contains working code.** If you are looking
 for the current, running implementation, that is
 [`mlengmark/O-view`](https://github.com/mlengmark/O-view) — read-only,

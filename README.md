@@ -14,7 +14,11 @@ documentation trail from the first commit.
 > tray icon, no D-Bus integration — added only to unblock the cross-skin
 > golden-master harness. That harness, `O-view.CrossSkin.Tests` (OVI-25),
 > now exists too, with one smoke fixture proving it invokes both skins'
-> string-construction code and catches a deliberate content mismatch;
+> string-construction code and catches a deliberate content mismatch.
+> Phase 1 slice 3.1 (OVI-29) has extracted the first slice of `PanelText.cs`
+> — `Freshness`/`Countdown`/`SessionReset`/`WeeklyReset`/`WeeklyResetConflict`
+> — into each skin's own `PanelTextFormatter`, with `DataSourceKind.Stale`
+> and a required `UsageSnapshot.LastIngestAt` now in the contract.
 > `O-view.App` does not exist yet. See
 > [`docs/adr/`](docs/adr/) for the
 > Core-to-skin data contract, the cross-platform capability matrix, and the
@@ -167,3 +171,21 @@ fixture format only — no product code changed, and `PanelText.cs`,
 `UsageFormatter.cs`, and `PanelStatistics.cs` are not yet extracted. See
 [`tests/O-view.CrossSkin.Tests/README.md`](tests/O-view.CrossSkin.Tests/README.md)
 for how to add the next fixture.
+
+**2026-09-11 — `PanelText.cs`'s Freshness/Countdown/SessionReset/WeeklyReset/
+WeeklyResetConflict family extracted (Phase 1 slice 3.1, OVI-29).**
+`O-view.Tray.Presentation.PanelTextFormatter` and
+`O-view.Linux.Presentation.PanelTextFormatter` each now own this wording
+independently, per ADR-0003. `DataSourceKind` gained `Stale` (5 values), and
+`UsageSnapshot` gained a required `LastIngestAt` field so `Freshness` can
+word a reading's age — see
+[ADR-0001](docs/adr/0001-core-to-skin-data-contract.md)'s 2026-09-11 entries
+for the full detail, including the one implementation decision made at this
+slice's own discretion (where `DataSourceKind.JsonlFallback` falls in
+`Freshness`'s wording). The cross-skin harness gained two more fixture
+families, `FreshnessFixture` and `PanelTextResetFixture`, parallel to the
+existing ones — see
+[ADR-0003](docs/adr/0003-paneltext-anti-drift-mechanism.md)'s matching
+entry. The remaining `PanelText.cs` members (boost chip, usage-tile
+caveat, off-plan banner, GitHub rate-limit notice) are separate,
+differently-shaped sub-slices, not yet extracted.

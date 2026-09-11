@@ -18,6 +18,7 @@ public class TooltipFormatterTests
     {
         var snapshot = new UsageSnapshot(
             DataSourceKind.Live,
+            new DateTimeOffset(2026, 9, 8, 20, 45, 0, TimeSpan.Zero),
             new UsagePercent(57, UsageValueStatus.Real),
             new UsageInstant(new DateTimeOffset(2026, 9, 8, 20, 59, 0, TimeSpan.Zero), UsageValueStatus.Real),
             new UsagePercent(14, UsageValueStatus.Real),
@@ -34,6 +35,7 @@ public class TooltipFormatterTests
     {
         var snapshot = new UsageSnapshot(
             DataSourceKind.Live,
+            new DateTimeOffset(2026, 9, 8, 20, 45, 0, TimeSpan.Zero),
             new UsagePercent(47, UsageValueStatus.Real),
             new UsageInstant(null, UsageValueStatus.Unavailable),
             new UsagePercent(20, UsageValueStatus.Real),
@@ -58,6 +60,7 @@ public class TooltipFormatterTests
     {
         var snapshot = new UsageSnapshot(
             DataSourceKind.Estimate,
+            new DateTimeOffset(2026, 9, 8, 20, 45, 0, TimeSpan.Zero),
             new UsagePercent(null, UsageValueStatus.Unavailable),
             new UsageInstant(null, UsageValueStatus.Unavailable),
             new UsagePercent(null, UsageValueStatus.Unavailable),
@@ -74,6 +77,7 @@ public class TooltipFormatterTests
     {
         var snapshot = new UsageSnapshot(
             DataSourceKind.JsonlFallback,
+            new DateTimeOffset(2026, 9, 8, 20, 45, 0, TimeSpan.Zero),
             new UsagePercent(6, UsageValueStatus.Estimated),
             new UsageInstant(null, UsageValueStatus.Unavailable),
             new UsagePercent(70, UsageValueStatus.Estimated),
@@ -95,6 +99,7 @@ public class TooltipFormatterTests
     {
         var snapshot = new UsageSnapshot(
             DataSourceKind.JsonlFallback,
+            new DateTimeOffset(2026, 9, 8, 20, 45, 0, TimeSpan.Zero),
             new UsagePercent(57, UsageValueStatus.Real),
             new UsageInstant(new DateTimeOffset(2026, 9, 8, 20, 59, 0, TimeSpan.Zero), UsageValueStatus.Real),
             new UsagePercent(14, UsageValueStatus.Estimated),
@@ -117,6 +122,7 @@ public class TooltipFormatterTests
     {
         var snapshot = new UsageSnapshot(
             DataSourceKind.Live,
+            new DateTimeOffset(2026, 9, 8, 20, 45, 0, TimeSpan.Zero),
             new UsagePercent(null, UsageValueStatus.Unavailable),
             new UsageInstant(null, UsageValueStatus.Unavailable),
             new UsagePercent(null, UsageValueStatus.Unavailable),
@@ -134,6 +140,7 @@ public class TooltipFormatterTests
     {
         var snapshot = new UsageSnapshot(
             DataSourceKind.Live,
+            new DateTimeOffset(2026, 9, 8, 20, 45, 0, TimeSpan.Zero),
             new UsagePercent(56.5, UsageValueStatus.Real),
             new UsageInstant(null, UsageValueStatus.Unavailable),
             new UsagePercent(13.4, UsageValueStatus.Real),
@@ -165,6 +172,7 @@ public class TooltipFormatterTests
     {
         var snapshot = new UsageSnapshot(
             DataSourceKind.Live,
+            new DateTimeOffset(2026, 9, 8, 20, 45, 0, TimeSpan.Zero),
             new UsagePercent(100, UsageValueStatus.Real),
             new UsageInstant(new DateTimeOffset(2026, 9, 8, 23, 59, 0, TimeSpan.Zero), UsageValueStatus.Real),
             new UsagePercent(100, UsageValueStatus.Real),

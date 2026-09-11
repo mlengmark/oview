@@ -309,6 +309,59 @@ not a silent rewrite) as extraction work actually lands.
   backfill all 17 pre-existing call sites in the same PR that adds
   `Freshness`.
 
+- **2026-09-11 update — `DataSourceKind.Stale` landed in code, `LastIngestAt` added to
+  `UsageSnapshot`, and `PanelText.cs`'s Freshness/Countdown/SessionReset/WeeklyReset/
+  WeeklyResetConflict family extracted (Kit the Builder, Phase 1 slice 3.1, OVI-29,
+  completing the two decisions the 2026-09-11 amendments above authorized).**
+  - `src/O-view.Core/Models/DataSourceKind.cs` now defines `Stale` (5 values total), per
+    Option A above.
+  - `UsageSnapshot`'s positional constructor now carries a required
+    `DateTimeOffset LastIngestAt`, placed immediately after `DataSourceKind`. All 17
+    pre-existing call sites (`O-view.Tray.Tests`, `O-view.Linux.Tests`,
+    `O-view.Core.Tests`) were backfilled with an explicit value, plus one more introduced
+    by this same PR when it brought OVI-25's `O-view.CrossSkin.Tests` harness commit
+    across — the reconciliation this ADR's 2026-09-11 amendment named as needed,
+    resolved here since OVI-29 is the slice that merges last among OVI-25/27/29.
+    `UsageSnapshot.Unavailable`'s canonical "no data" instance uses
+    `DateTimeOffset.MinValue` as an explicit "never" sentinel, not a fabricated recent
+    timestamp — the same pattern this type already used for `UsageLevel.Green` on that
+    instance (a non-nullable field given a documented sentinel rather than a paired
+    status flag). No skin reads this value for an `Unavailable` snapshot.
+  - `O-view.Tray.Presentation.PanelTextFormatter` and
+    `O-view.Linux.Presentation.PanelTextFormatter` each now implement `Freshness`,
+    `Countdown`, `SessionReset`, `WeeklyReset`, and `WeeklyResetConflict`, independently
+    worded per skin (ADR-0003). Confirmed by test: a `Stale` snapshot renders identically
+    to a `Live` one at the same age, in both skins, matching the source app's confirmed
+    collapsing behaviour.
+  - **One implementation decision beyond what the source app decided, made at this
+    slice's own discretion (not escalated — narrow and non-architectural):**
+    `DataSourceKind.JsonlFallback` did not exist in the source app's 4-value enum, so its
+    place in `Freshness`'s switch was undecided by any prior ADR. This slice groups it
+    with `Live`/`Stale` in the age-labelled `"As of {age}"` branch, not with `Estimate`'s
+    "Local estimate" framing — consistent with `TooltipFormatter`'s existing precedent,
+    where `JsonlFallback` is never treated as a whole-snapshot special case, only its
+    individual fields carry a per-value `~`/estimated marker via `UsageValueStatus`.
+  - **Because `LastIngestAt` is required and non-nullable, the source app's "capture time
+    unknown" fallback text (`CaptureTimeUnknown`, "rare — every shipped provider stamps
+    one") has no reachable case in this contract and was not ported.** The source
+    `Freshness`'s `age is null` branches are dead code once the field is guaranteed
+    present; carrying that fallback text forward would have been unreachable, untestable
+    code, not parity.
+  - **Not part of this slice, unchanged:** `WeeklyResetUnknown`,
+    `WeeklyResetUserSupplied`, and `WeeklyResetUserSuppliedHint` (the source app's
+    separate "no weekly reset known at all" and "user-entered reset" copy) are not this
+    slice's named scope (`Freshness`/`Countdown`/`SessionReset`/`WeeklyReset`/
+    `WeeklyResetConflict` only) and were not extracted here.
+  - The cross-skin golden-master harness (ADR-0003) gained two new fixture families,
+    `FreshnessFixture` and `PanelTextResetFixture`, parallel to the existing
+    `GoldenMasterFixture` and OVI-27's `UsageStatisticsFixture` rather than a change to
+    either — see the ADR-0003 amendment below.
+  - **Still not yet extracted, from `PanelText.cs`:** the boost promo chip/card (needs a
+    new `BoostNotice` Core type and the 281px Windows panel-width budget resolved per
+    ADR-0003), the usage-tile caveat/rate-card fields, the off-plan three-state banner,
+    and the GitHub rate-limit notice. Each is its own differently-shaped sub-slice with
+    its own new Core surface, per the OVI-29 escalation this amendment resolves.
+
 ## Alternatives considered
 
 **Leave the contract implicit, described only by whatever Core's C# types
