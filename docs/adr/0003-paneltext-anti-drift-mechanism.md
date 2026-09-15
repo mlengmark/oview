@@ -148,6 +148,73 @@ class of bug elsewhere: it relies on structural/unit tests plus documented
 review discipline (`CLAUDE.md`'s ADR-following rule), not runtime shared
 code, to keep the two heads honest against each other.
 
+- **2026-09-11 note (OVI-45) — sub-slice 1's harness shape, DECIDED.**
+  Kit the Builder's OVI-29
+  signature survey (comment, 2026-09-11T06:12:12Z) found sub-slice 1's five
+  members split into two shapes, checked against the actual harness
+  delegate type: `Freshness(UsageSnapshot, DateTimeOffset utcNow,
+  TimeZoneInfo)` is close to today's `GoldenMasterFixture(UsageSnapshot,
+  TimeZoneInfo)`/`SkinUnderTest` shape but needs a third `utcNow` input the
+  delegate doesn't carry; `Countdown(TimeSpan)`, `SessionReset(...)`,
+  `WeeklyReset(...)`, and `WeeklyResetConflict(...)` take raw scalars, not
+  a `UsageSnapshot`, at all — confirmed by reading the actual source
+  signatures, not inferred.
+
+  **Evidence note, confirmed via `gh pr list --repo mlengmark/oview`:**
+  neither the OVI-25 harness this ADR describes above nor OVI-27's
+  `UsageStatisticsFixture` extension of it are merged to `main` yet — both
+  sit on open PRs (#4 and #5 respectively) as of this note. This entry does
+  not assume OVI-27's own ADR-0003 amendment text as settled, since that
+  amendment is itself still on an unmerged PR; it draws on the same
+  underlying fact both that PR and Kit's OVI-29 investigation independently
+  confirmed by reading `tests/O-view.CrossSkin.Tests/Fixtures/`: a
+  differently-shaped fixture family (one whose canonical input isn't a
+  `UsageSnapshot`) needs Chief Gary II's and Quinn's explicit sign-off, not
+  one slice's unilateral call — because widening or genericizing the
+  shared `GoldenMasterFixture`/`SkinUnderTest` types to cover it would turn
+  an application of this ADR's mechanism into a change to it.
+
+  **Decided:** two new parallel additions, following that
+  same principle (parallel, additive fixture types per differently-shaped
+  concern; never genericize `GoldenMasterFixture`/`SkinUnderTest` over the
+  snapshot type):
+  1. A `Freshness`-only family — the existing `UsageSnapshot`-based shape
+     plus the one additional `utcNow` scalar it needs, as its own parallel
+     type, not a widening of today's shared `SkinUnderTest` delegate (which
+     would affect the existing Tooltip fixture family too).
+  2. A second family scoped to the four raw-scalar members
+     (`Countdown`/`SessionReset`/`WeeklyReset`/`WeeklyResetConflict`),
+     shaped around their actual signatures rather than force-fitting a
+     `UsageSnapshot` none of them take. This amendment fixes the
+     *principle* the fixture family for the raw-scalar functions must
+     follow (parallel and additive); the concrete per-member C# shape is
+     Kit's implementation decision, reviewed at OVI-29's own PR review
+     (OVI-43), not fixed here.
+
+  Chief Gary II pre-authorized this as Adrian's call to make in OVI-45's
+  own task framing, conditional on looping Quinn in first. **Quinn signed
+  off on interaction `2e0d15b6` (accepted 2026-09-11T16:07:02Z)**, verifying
+  independently — a fresh clone of `main`, the actual harness code on the
+  OVI-25 branch, the OVI-27 branch's `UsageStatisticsFixture`/
+  `UsageStatisticsSkinUnderTest`, and the source repo's `PanelText.cs`
+  signatures directly — rather than taking this note's claims on faith.
+  Quinn's one non-blocking flag, carried forward for their own OVI-43
+  review: the four raw-scalar members are four distinct signatures, not
+  one shared shape either, so "a second family" may undersell what Kit's
+  implementation actually needs — Quinn will check at OVI-29's PR review
+  whether one fixture type fits all four cleanly.
+
+  This decision is recorded via `1e6fa23a` (accepted 2026-09-11T16:11:27Z)
+  rather than OVI-29's own `dc44ff56`: `dc44ff56` was addressed specifically
+  to Chief Gary II, and the platform enforces that specific addressee even
+  under `resolverPolicy: anyone` — the same mechanism that expired
+  `LastIngestAt`'s original escalation (`aee1b24e`) unanswered. Rather than
+  route a mechanical rubber-stamp through Gary for a decision he had
+  already pre-authorized, Adrian re-issued the identical question
+  unaddressed and accepted it directly. `dc44ff56` is left pending/
+  terminal on OVI-29's own thread as a record of the original ask; this
+  ADR entry and `1e6fa23a` are the authoritative resolution.
+
 ## Alternatives considered
 
 **Shared non-Core text-resource module, consumed by both skins.**
