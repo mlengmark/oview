@@ -15,8 +15,12 @@ documentation trail from the first commit.
 > golden-master harness. That harness, `O-view.CrossSkin.Tests` (OVI-25),
 > now exists too, with one smoke fixture proving it invokes both skins'
 > string-construction code and catches a deliberate content mismatch.
-> Phase 1 slice 3.1 (OVI-29) has extracted the first slice of `PanelText.cs`
-> — `Freshness`/`Countdown`/`SessionReset`/`WeeklyReset`/`WeeklyResetConflict`
+> Phase 1 slice 2 (OVI-27) has since extracted `UsageFormatter.cs`'s and
+> `PanelStatistics.cs`'s one presentation leak the same way — a new
+> `UsageStatistics` contract type in `O-view.Core`, and each skin's own
+> `UsageFormatter`/`PanelStatisticsFormatter`. Phase 1 slice 3.1 (OVI-29)
+> has since extracted the first slice of `PanelText.cs` —
+> `Freshness`/`Countdown`/`SessionReset`/`WeeklyReset`/`WeeklyResetConflict`
 > — into each skin's own `PanelTextFormatter`, with `DataSourceKind.Stale`
 > and a required `UsageSnapshot.LastIngestAt` now in the contract.
 > `O-view.App` does not exist yet. See
@@ -146,8 +150,9 @@ construction is extracted out of the platform-neutral layer. `O-view.Core`
 status-flagged values; `O-view.Tray` (`net10.0-windows`) owns turning those
 values into tooltip text, including the 127-character `NotifyIcon.Text`
 cap. Build and test with `dotnet build O-view.slnx` / `dotnet test
-O-view.slnx`. `PanelText.cs`, `UsageFormatter.cs`, `PanelStatistics.cs`, and
-`O-view.App` are separate, later slices and do not exist here yet.
+O-view.slnx`. `PanelText.cs` and `O-view.App` are separate, later slices
+and do not exist here yet; `UsageFormatter.cs`'s and `PanelStatistics.cs`'s
+presentation leaks were extracted in Phase 1 slice 2 (OVI-27), below.
 
 **2026-09-10 — `O-view.Linux` scaffolded (OVI-30).** `src/O-view.Linux`
 (`net10.0`) exists with its own minimal `Presentation/TooltipFormatter.cs`,
@@ -171,6 +176,22 @@ fixture format only — no product code changed, and `PanelText.cs`,
 `UsageFormatter.cs`, and `PanelStatistics.cs` are not yet extracted. See
 [`tests/O-view.CrossSkin.Tests/README.md`](tests/O-view.CrossSkin.Tests/README.md)
 for how to add the next fixture.
+
+**2026-09-10 — `UsageFormatter.cs`/`PanelStatistics.cs` extracted (OVI-27).**
+`O-view.Core` gains `TokenCount`, `EstimatedUsd`, `HistoryCoverage`, and
+`UsageStatistics` — structured, status-flagged values replacing the K/M
+token abbreviation, the `"$"` prefix, the `"unknown"` fallback, and
+`PanelStatistics.CoverageNote`'s leaked sentence. `O-view.Tray` and
+`O-view.Linux` each gain their own `Presentation/UsageFormatter.cs` and
+`Presentation/PanelStatisticsFormatter.cs`, independently worded per
+ADR-0003; the Windows skin's figures are tested byte-for-byte against the
+source app's own `UsageFormatterTests.cs`/`PanelStatisticsTests.cs`. Three
+new golden-master fixtures (ordinary usage, partial history coverage,
+fully unavailable) were added to `O-view.CrossSkin.Tests` via a second,
+parallel fixture family scoped to the new `UsageStatistics` shape — see
+ADR-0003's OVI-27 amendment for why it is parallel rather than a change to
+the existing harness types. `PanelText.cs` remains the one not-yet-extracted
+confirmed leak, and is a separate, later, higher-risk slice.
 
 **2026-09-11 — `PanelText.cs`'s Freshness/Countdown/SessionReset/WeeklyReset/
 WeeklyResetConflict family extracted (Phase 1 slice 3.1, OVI-29).**

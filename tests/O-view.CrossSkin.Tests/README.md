@@ -15,6 +15,17 @@ it does not extract `PanelText.cs`, `UsageFormatter.cs`, or
 `PanelStatistics.cs` (those are separate, later slices this harness
 unblocks).
 
+**2026-09-10 update (OVI-27) — a second, parallel fixture family.**
+`UsageFormatter.cs`/`PanelStatistics.cs`'s extraction needed fixtures over
+a differently-shaped Core snapshot (`UsageStatistics`, not `UsageSnapshot`).
+`Fixtures/UsageStatisticsFixture.cs`, `Fixtures/UsageStatisticsSkinUnderTest.cs`,
+and `UsageStatisticsGoldenMasterCrossSkinTests.cs` mirror
+`GoldenMasterFixture`/`SkinUnderTest`/`GoldenMasterCrossSkinTests` exactly,
+parallel to them rather than a change to them — see ADR-0003's 2026-09-10
+(OVI-27) amendment for why, and its flagged concern about a third such
+family. `ContentFact` is shared as-is between both families; it was
+already snapshot-agnostic.
+
 **2026-09-11 update (OVI-29) — two more parallel fixture families.**
 `PanelText.cs`'s `Freshness`/`Countdown`/`SessionReset`/`WeeklyReset`/
 `WeeklyResetConflict` family needed fixtures shaped around inputs
@@ -49,13 +60,15 @@ workflow, this project must run on whatever runner already builds
 
 ## How to add a fixture
 
-Three fixture families exist so far: `GoldenMasterFixture` (`UsageSnapshot`,
-the tooltip's slice), `FreshnessFixture` (`UsageSnapshot` plus `UtcNow`,
-OVI-29), and `PanelTextResetFixture` (four raw-scalar members, OVI-29). Add
-to whichever family already matches the shape your fixture needs; only add
-a new parallel family for a genuinely new shape, and read ADR-0003's
-amendments first — a new family is the point that ADR flags as worth
-Chief Gary II's and Quinn's sign-off rather than a unilateral call.
+Four fixture families exist so far: `GoldenMasterFixture` (`UsageSnapshot`,
+the tooltip's slice), `UsageStatisticsFixture` (`UsageStatistics`, the
+usage-figures/history-coverage slice, OVI-27), `FreshnessFixture`
+(`UsageSnapshot` plus `UtcNow`, OVI-29), and `PanelTextResetFixture` (four
+raw-scalar members, OVI-29). Add to whichever family already matches the
+shape your fixture needs; only add a new parallel family for a genuinely
+new shape, and read ADR-0003's amendments first — a new family is the
+point that ADR flags as worth Chief Gary II's and Quinn's sign-off rather
+than a unilateral call.
 
 1. **Add the fixture** as a new `GoldenMasterFixture` entry in
    `Fixtures/GoldenMasterFixtures.cs`'s `All` list. A fixture is:
