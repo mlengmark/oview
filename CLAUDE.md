@@ -42,6 +42,21 @@ for how to add a fixture. This slice ships no product code changes and
 does not extract `PanelText.cs`, `UsageFormatter.cs`, or
 `PanelStatistics.cs` — those remain separate, later slices.
 
+**2026-09-10 update (OVI-27) — `UsageFormatter.cs`'s and
+`PanelStatistics.cs`'s one presentation leak extracted.** `O-view.Core`
+gains `TokenCount`, `EstimatedUsd`, `HistoryCoverage`, and `UsageStatistics`
+— the ADR-0001 rows these two files' presentation logic needs, as
+structured, status-flagged values. Each skin gains its own
+`Presentation/UsageFormatter.cs` (K/M token abbreviation, `"$"` prefix,
+unavailable-value fallback) and `Presentation/PanelStatisticsFormatter.cs`
+(the coverage caveat that replaces `PanelStatistics.CoverageNote`),
+independently worded per ADR-0003, and a second parallel fixture family in
+`O-view.CrossSkin.Tests` (`UsageStatisticsFixture`, alongside the existing
+`GoldenMasterFixture`) checks both skins against three fixtures (ordinary
+usage, partial history coverage, fully unavailable). `PanelText.cs` remains
+the one not-yet-extracted confirmed leak — a separate, later, higher-risk
+slice.
+
 **Do not assume this repository contains working code.** If you are looking
 for the current, running implementation, that is
 [`mlengmark/O-view`](https://github.com/mlengmark/O-view) — read-only,
