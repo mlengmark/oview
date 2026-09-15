@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Targets net10.0-windows solely because it must reference O-view.Tray
+         (net10.0-windows) directly — ADR-0003's cross-skin harness needs one test
+         run that invokes both skins' string-construction code. A net10.0-windows
+         project can reference net10.0 projects (O-view.Linux, O-view.Core) without
+         issue, so this single project covers both. The consequence, flagged by
+         ADR-0003 itself: this harness only builds and runs on Windows, same as
+         O-view.Tray and O-view.Tray.Tests — a future CI setup must run it on the
+         same Windows runner the Tray build already needs, not a Linux runner. -->
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>OView.CrossSkin.Tests</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="10.0.1" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="4.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\O-view.Core\O-view.Core.csproj" />
+    <ProjectReference Include="..\..\src\O-view.Tray\O-view.Tray.csproj" />
+    <ProjectReference Include="..\..\src\O-view.Linux\O-view.Linux.csproj" />
+  </ItemGroup>
+
+</Project>

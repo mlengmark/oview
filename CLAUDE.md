@@ -30,6 +30,18 @@ icon, and no other [ADR-0002](docs/adr/0002-cross-platform-capability-matrix.md)
 capability-matrix row lives here yet, and no Linux evidence label in that
 matrix changed as part of this slice.
 
+**2026-09-10 update (OVI-25) — the cross-skin golden-master harness itself
+now exists.** `tests/O-view.CrossSkin.Tests` (`net10.0-windows`) implements
+[ADR-0003](docs/adr/0003-paneltext-anti-drift-mechanism.md)'s mechanism: it
+references `O-view.Tray`, `O-view.Linux`, and `O-view.Core` from one
+project, runs a versioned set of golden-master fixtures (one, so far — the
+OVI-4 reference reading) against both skins' own `TooltipFormatter`, and
+fails if either skin omits or contradicts a pinned content fact. See
+[`tests/O-view.CrossSkin.Tests/README.md`](tests/O-view.CrossSkin.Tests/README.md)
+for how to add a fixture. This slice ships no product code changes and
+does not extract `PanelText.cs`, `UsageFormatter.cs`, or
+`PanelStatistics.cs` — those remain separate, later slices.
+
 **Do not assume this repository contains working code.** If you are looking
 for the current, running implementation, that is
 [`mlengmark/O-view`](https://github.com/mlengmark/O-view) — read-only,
@@ -133,7 +145,10 @@ slice. For code:
   Core's platform-neutrality enforcement mechanism, not a formality.
   `O-view.Tray` and its test project target `net10.0-windows` and only
   build on Windows. `O-view.Linux` and its test project also target
-  `net10.0` and build on any runner, same as Core.
+  `net10.0` and build on any runner, same as Core. `O-view.CrossSkin.Tests`
+  (the [ADR-0003](docs/adr/0003-paneltext-anti-drift-mechanism.md)
+  golden-master harness) targets `net10.0-windows` because it references
+  `O-view.Tray` directly, so it only builds and runs on Windows too.
 - Follow the layering rule from the section above absolutely:
   `O-view.Core` gains no display strings, formatting, locale-sensitive
   formats, platform-imposed limits, OS-conditional branches, or platform

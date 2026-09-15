@@ -6,6 +6,21 @@
   decision introduces a new shared test project — see "Consequences" and
   the escalation note at the end. That cost is flagged to Chief Gary II for
   scoping; this ADR decides the mechanism, not the build ticket.
+- **2026-09-10 amendment (OVI-25):** The harness this ADR called for has
+  landed — `tests/O-view.CrossSkin.Tests` (`net10.0-windows`, so it can
+  reference both `O-view.Tray`'s and `O-view.Linux`'s string-construction
+  code from one project and one `dotnet test` run). It ships with one
+  smoke fixture, the OVI-4 reference reading described below, pinning the
+  session/weekly percentages and reset times as content facts. Deliberately
+  breaking that fixture locally (changing a pinned `"57%"` to `"58%"`) made
+  both skins fail with a clear per-skin message; reverting made the suite
+  pass again — see `tests/O-view.CrossSkin.Tests/README.md` for the
+  worked example and the "how to add a fixture" steps for the next slice.
+  This is harness-only: it ships no product code changes and does not
+  itself extract `PanelText.cs`, `UsageFormatter.cs`, or
+  `PanelStatistics.cs`. The CI-runner question flagged in "Consequences"
+  below remains open — this repository has no CI workflow yet, so it is
+  deferred to whenever one is added, not resolved here.
 - **Date:** 2026-09-08
 - **Deciders:** Adrian II the Architect, resolving board question 0 of the
   approved PDR (rev. 2, `oview-pdr-reissued`, §8)

@@ -8,5 +8,6 @@
     <Project Path="tests/O-view.Core.Tests/O-view.Core.Tests.csproj" />
     <Project Path="tests/O-view.Tray.Tests/O-view.Tray.Tests.csproj" />
     <Project Path="tests/O-view.Linux.Tests/O-view.Linux.Tests.csproj" />
+    <Project Path="tests/O-view.CrossSkin.Tests/O-view.CrossSkin.Tests.csproj" />
   </Folder>
 </Solution>
