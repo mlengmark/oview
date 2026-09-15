@@ -13,15 +13,26 @@ namespace OView.Core.Models;
 /// </summary>
 public sealed record UsageSnapshot(
     DataSourceKind DataSourceKind,
+    DateTimeOffset LastIngestAt,
     UsagePercent SessionUtilizationPercent,
     UsageInstant SessionResetAt,
     UsagePercent WeeklyUtilizationPercent,
     UsageInstant WeeklyResetAt,
     UsageLevel UsageLevel)
 {
-    /// <summary>The canonical "no data" snapshot — every value unavailable, not zero.</summary>
+    /// <summary>
+    /// The canonical "no data" snapshot — every value unavailable, not zero.
+    /// <see cref="LastIngestAt"/> is <see cref="DateTimeOffset.MinValue"/> here as an
+    /// explicit "never" sentinel, not a fabricated recent timestamp: no ingest has ever
+    /// produced this snapshot, so there is no real capture time to report (ADR-0001's
+    /// "never fabricate a number" rule). No skin reads this value for an
+    /// <see cref="OView.Core.Models.DataSourceKind.Unavailable"/> snapshot — the same
+    /// pattern already used by <see cref="UsageLevel"/> below, a non-nullable field given a
+    /// documented sentinel rather than a paired status flag.
+    /// </summary>
     public static UsageSnapshot Unavailable { get; } = new(
         DataSourceKind.Unavailable,
+        DateTimeOffset.MinValue,
         new UsagePercent(null, UsageValueStatus.Unavailable),
         new UsageInstant(null, UsageValueStatus.Unavailable),
         new UsagePercent(null, UsageValueStatus.Unavailable),
