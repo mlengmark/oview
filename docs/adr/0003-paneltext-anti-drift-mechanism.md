@@ -242,6 +242,29 @@ code, to keep the two heads honest against each other.
     `PanelTextResetGoldenMasterCrossSkinTests`) follow `GoldenMasterCrossSkinTests`'
     existing "every skin satisfies every pinned content fact" structure unchanged.
 
+- **2026-09-21 update — a fifth fixture family, `RateLimitedNoticeFixture`, landed (Kit
+  the Builder, Phase 1 slice 3.2, OVI-80).** `PanelText.cs`'s `RateLimitedNotice`
+  (`DateTimeOffset? retryAfterUtc, TimeZoneInfo local -> string`) is a single fixed
+  shape that does not take a `UsageSnapshot` at all, and — unlike the `PanelTextReset`
+  family — is the only member of its own shape, so there was no multi-member
+  `Render`-closure to build. This landed as `RateLimitedNoticeFixture`/
+  `RateLimitedNoticeSkinUnderTest`/`RateLimitedNoticeFixtures`/
+  `RateLimitedNoticeGoldenMasterCrossSkinTests`, mirroring `FreshnessFixture`'s
+  fixed-field shape (not `PanelTextResetFixture`'s closure shape), following
+  `GoldenMasterCrossSkinTests`' existing "every skin satisfies every pinned content
+  fact" test structure unchanged. Two fixtures pin: the formatted retry time when
+  GitHub sent one, that no clock time is rendered when it did not (mirroring
+  `PanelTextResetFixtures.SessionResetUnknown`'s "does not render a clock time"
+  predicate), and — in both cases — that the notice reassures the reader their own
+  connection/install is not at fault. Confirmed locally with the same worked example as
+  prior amendments: deliberately changing the `"14:30"` content fact to `"14:31"` made
+  both skins fail with a clear per-fixture, per-skin message; reverting passed again.
+  `GoldenMasterFixture`/`SkinUnderTest` were not touched or widened. This is now five
+  parallel fixture families — the cost ADR-0003's OVI-27 amendment flagged as worth
+  explicit sign-off past a third family. This slice's own issue (OVI-80) carried that
+  authorization forward from the board-confirmed OVI-29 sub-slice split; it is noted
+  here, not re-litigated, per this ADR's living-document discipline.
+
 ## Alternatives considered
 
 **Shared non-Core text-resource module, consumed by both skins.**

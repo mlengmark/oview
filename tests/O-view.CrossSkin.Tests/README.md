@@ -47,6 +47,19 @@ See ADR-0003's 2026-09-11 (OVI-29) amendment for the reasoning. Both new
 families are parallel and additive; `GoldenMasterFixture`/`SkinUnderTest`
 were not touched or widened.
 
+**2026-09-21 update (OVI-80) — a fifth, minimal parallel fixture family.**
+`PanelText.cs`'s `RateLimitedNotice` (Phase 1 slice 3.2) is a single fixed
+two-scalar shape (`DateTimeOffset?`, `TimeZoneInfo`) that, unlike the rest
+of `PanelText.cs`, needed no new Core surface at all — confirmed at
+implementation time from the source signature, per this slice's own issue.
+`Fixtures/RateLimitedNoticeFixture.cs`, `Fixtures/RateLimitedNoticeSkinUnderTest.cs`,
+`Fixtures/RateLimitedNoticeFixtures.cs`, and `RateLimitedNoticeGoldenMasterCrossSkinTests.cs`
+mirror `FreshnessFixture`/`FreshnessSkinUnderTest`/`FreshnessGoldenMasterCrossSkinTests`'
+single-member shape, not `PanelTextResetFixture`'s `Render`-closure shape —
+`RateLimitedNotice` is the only member this family covers, so there was
+nothing to close over. See ADR-0003's 2026-09-21 (OVI-80) amendment.
+`GoldenMasterFixture`/`SkinUnderTest` were not touched or widened.
+
 ## Why this project targets `net10.0-windows`
 
 `O-view.Tray` only builds as `net10.0-windows`. A `net10.0-windows` project
@@ -60,11 +73,12 @@ workflow, this project must run on whatever runner already builds
 
 ## How to add a fixture
 
-Four fixture families exist so far: `GoldenMasterFixture` (`UsageSnapshot`,
+Five fixture families exist so far: `GoldenMasterFixture` (`UsageSnapshot`,
 the tooltip's slice), `UsageStatisticsFixture` (`UsageStatistics`, the
 usage-figures/history-coverage slice, OVI-27), `FreshnessFixture`
-(`UsageSnapshot` plus `UtcNow`, OVI-29), and `PanelTextResetFixture` (four
-raw-scalar members, OVI-29). Add to whichever family already matches the
+(`UsageSnapshot` plus `UtcNow`, OVI-29), `PanelTextResetFixture` (four
+raw-scalar members, OVI-29), and `RateLimitedNoticeFixture` (one
+`DateTimeOffset?`/`TimeZoneInfo` raw-scalar member, OVI-80). Add to whichever family already matches the
 shape your fixture needs; only add a new parallel family for a genuinely
 new shape, and read ADR-0003's amendments first — a new family is the
 point that ADR flags as worth Chief Gary II's and Quinn's sign-off rather

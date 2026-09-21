@@ -157,4 +157,26 @@ public class PanelTextFormatterTests
         Assert.Contains("different weekly reset time", result);
         Assert.Contains("Re-enter", result);
     }
+
+    [Fact]
+    public void RateLimitedNoticeStatesTheRetryTimeWhenGitHubSentOne()
+    {
+        var retryAfterUtc = new DateTimeOffset(2026, 9, 21, 14, 30, 0, TimeSpan.Zero);
+
+        var result = PanelTextFormatter.RateLimitedNotice(retryAfterUtc, Utc);
+
+        Assert.Contains("14:30", result);
+        Assert.Contains("per network", result);
+        Assert.Contains("Your connection and install are fine", result);
+    }
+
+    [Fact]
+    public void RateLimitedNoticeDoesNotInventARetryTimeWhenGitHubSentNone()
+    {
+        var result = PanelTextFormatter.RateLimitedNotice(null, Utc);
+
+        Assert.DoesNotContain(":", result);
+        Assert.Contains("scheduled check", result);
+        Assert.Contains("Your connection and install are fine", result);
+    }
 }

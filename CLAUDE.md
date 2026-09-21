@@ -69,6 +69,17 @@ own new Core surface, not yet extracted — see
 [ADR-0001](docs/adr/0001-core-to-skin-data-contract.md)'s 2026-09-11 entry
 for the full detail.
 
+**2026-09-21 update (OVI-80) — `PanelText.cs`'s GitHub rate-limit notice
+extracted: `RateLimitedNotice`.** Unlike the rest of `PanelText.cs`, this
+member turned out to need **no new Core surface at all** — its confirmed
+source signature (`DateTimeOffset?`, `TimeZoneInfo` -> `string`) never took
+a `UsageSnapshot`, only two raw scalars, so it moved directly into each
+skin's existing `Presentation/PanelTextFormatter.cs`. See
+[ADR-0001](docs/adr/0001-core-to-skin-data-contract.md)'s 2026-09-21 entry,
+which also corrects the 2026-09-11 entry's assumption that this member
+would need its own Core surface. The boost promo chip, the usage-tile
+caveat, and the off-plan banner remain not yet extracted.
+
 **Do not assume this repository contains working code.** If you are looking
 for the current, running implementation, that is
 [`mlengmark/O-view`](https://github.com/mlengmark/O-view) — read-only,

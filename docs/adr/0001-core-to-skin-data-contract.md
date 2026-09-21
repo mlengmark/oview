@@ -385,9 +385,37 @@ not a silent rewrite) as extraction work actually lands.
     either — see the ADR-0003 amendment below.
   - **Still not yet extracted, from `PanelText.cs`:** the boost promo chip/card (needs a
     new `BoostNotice` Core type and the 281px Windows panel-width budget resolved per
-    ADR-0003), the usage-tile caveat/rate-card fields, the off-plan three-state banner,
-    and the GitHub rate-limit notice. Each is its own differently-shaped sub-slice with
-    its own new Core surface, per the OVI-29 escalation this amendment resolves.
+    ADR-0003), the usage-tile caveat/rate-card fields, and the off-plan three-state
+    banner. Each is its own differently-shaped sub-slice with its own new Core surface,
+    per the OVI-29 escalation this amendment resolves. (`RateLimitedNotice` was in this
+    list originally; see the 2026-09-21 amendment below — it turned out not to need a
+    new Core surface after all.)
+
+- **2026-09-21 update — `PanelText.cs`'s `RateLimitedNotice` (the GitHub rate-limit
+  notice) extracted (Kit the Builder, Phase 1 slice 3.2, OVI-80).**
+  - **This amendment corrects, rather than confirms, the entry directly above.** The
+    2026-09-11 amendment assumed `RateLimitedNotice` would need "its own new Core
+    surface" like the other still-unextracted members. The OVI-29 signature survey this
+    slice's issue cites, and re-verification at implementation time, both **confirm**
+    the source signature is `RateLimitedNotice(DateTimeOffset? retryAfterUtc,
+    TimeZoneInfo local) -> string` — it never took a `UsageSnapshot` or any other Core
+    type, only two raw scalars the caller (a skin's GitHub update-check code) already
+    holds. Extracting it needed **no new Core contract row, and no new Core type at
+    all** — the wording logic moved directly into each skin's own
+    `Presentation/PanelTextFormatter.cs`, next to `Countdown`/`SessionReset`/etc.
+  - `O-view.Tray.Presentation.PanelTextFormatter.RateLimitedNotice` and
+    `O-view.Linux.Presentation.PanelTextFormatter.RateLimitedNotice` each state, in their
+    own wording: the limit is shared by the caller's network (not their device alone),
+    the retry time only when GitHub actually sent one (never fabricated — the standing
+    no-fabrication rule), and a reassurance that nothing is wrong with the user's own
+    connection or install. Confirmed by test in both skins' `Presentation/PanelTextFormatterTests.cs`.
+  - The cross-skin golden-master harness (ADR-0003) gained one new fixture family,
+    `RateLimitedNoticeFixture`, parallel to `GoldenMasterFixture`/`UsageStatisticsFixture`/
+    `FreshnessFixture`/`PanelTextResetFixture` rather than a change to any of them — see
+    the ADR-0003 amendment below.
+  - **Not part of this slice, per its own explicit boundary:** the boost promo
+    chip/card, the usage-tile caveat/rate-card fields, and the off-plan banner remain
+    not yet extracted — see the corrected list above.
 
 ## Alternatives considered
 
