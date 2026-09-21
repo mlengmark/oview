@@ -215,6 +215,33 @@ code, to keep the two heads honest against each other.
   terminal on OVI-29's own thread as a record of the original ask; this
   ADR entry and `1e6fa23a` are the authoritative resolution.
 
+- **2026-09-11, later same day — sub-slice 1's two fixture families landed (Kit the
+  Builder, Phase 1 slice 3.1, OVI-29), per the decision above.**
+  - `FreshnessFixture`/`FreshnessSkinUnderTest`/`FreshnessFixtures`/
+    `FreshnessGoldenMasterCrossSkinTests` implement item 1 of the decision above exactly
+    as specified: the existing `GoldenMasterFixture` shape plus the one `utcNow` scalar,
+    as its own parallel type. Verified locally, the same way OVI-25's smoke fixture was:
+    deliberately changing a pinned `"Local estimate"` fact to `"Modelled estimate"` in
+    `O-view.Tray`'s formatter failed the harness with a clear per-fixture message;
+    reverting passed again. `GoldenMasterFixture`/`SkinUnderTest` were not touched.
+  - Quinn's OVI-45 flag was confirmed correct at implementation time: the four
+    raw-scalar members do not share one input shape (`Countdown(TimeSpan)`,
+    `SessionReset(DateTimeOffset?, DateTimeOffset, TimeZoneInfo, TimeSpan?)`,
+    `WeeklyReset(DateTimeOffset, DateTimeOffset, TimeZoneInfo)`,
+    `WeeklyResetConflict(DateTimeOffset, TimeZoneInfo)`). Rather than force them into one
+    fixture type's input fields (which would need every fixture to carry unused fields
+    for the three members it isn't exercising) or split into four separate
+    fixture/skin-under-test/test-class trios, this landed as **one `PanelTextResetFixture`
+    type whose `Render` closes over the specific `PanelTextResetSkinUnderTest` member and
+    inputs each fixture exercises**, plus one `PanelTextResetSkinUnderTest` record
+    exposing all four skin entry points. This keeps the "one fixture type per shape"
+    principle honest — no fixture is coerced into carrying a shape it doesn't have — while
+    avoiding a fourfold file split for four small, related members added in the same
+    slice. `GoldenMasterFixture`/`SkinUnderTest` were not widened to cover this either.
+  - Both new test classes (`FreshnessGoldenMasterCrossSkinTests`,
+    `PanelTextResetGoldenMasterCrossSkinTests`) follow `GoldenMasterCrossSkinTests`'
+    existing "every skin satisfies every pinned content fact" structure unchanged.
+
 ## Alternatives considered
 
 **Shared non-Core text-resource module, consumed by both skins.**

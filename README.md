@@ -18,8 +18,12 @@ documentation trail from the first commit.
 > Phase 1 slice 2 (OVI-27) has since extracted `UsageFormatter.cs`'s and
 > `PanelStatistics.cs`'s one presentation leak the same way — a new
 > `UsageStatistics` contract type in `O-view.Core`, and each skin's own
-> `UsageFormatter`/`PanelStatisticsFormatter`. `PanelText.cs` and
-> `O-view.App` do not exist yet. See
+> `UsageFormatter`/`PanelStatisticsFormatter`. Phase 1 slice 3.1 (OVI-29)
+> has since extracted the first slice of `PanelText.cs` —
+> `Freshness`/`Countdown`/`SessionReset`/`WeeklyReset`/`WeeklyResetConflict`
+> — into each skin's own `PanelTextFormatter`, with `DataSourceKind.Stale`
+> and a required `UsageSnapshot.LastIngestAt` now in the contract.
+> `O-view.App` does not exist yet. See
 > [`docs/adr/`](docs/adr/) for the
 > Core-to-skin data contract, the cross-platform capability matrix, and the
 > mechanism that replaces `PanelText.cs`'s centralization once its display
@@ -188,3 +192,21 @@ parallel fixture family scoped to the new `UsageStatistics` shape — see
 ADR-0003's OVI-27 amendment for why it is parallel rather than a change to
 the existing harness types. `PanelText.cs` remains the one not-yet-extracted
 confirmed leak, and is a separate, later, higher-risk slice.
+
+**2026-09-11 — `PanelText.cs`'s Freshness/Countdown/SessionReset/WeeklyReset/
+WeeklyResetConflict family extracted (Phase 1 slice 3.1, OVI-29).**
+`O-view.Tray.Presentation.PanelTextFormatter` and
+`O-view.Linux.Presentation.PanelTextFormatter` each now own this wording
+independently, per ADR-0003. `DataSourceKind` gained `Stale` (5 values), and
+`UsageSnapshot` gained a required `LastIngestAt` field so `Freshness` can
+word a reading's age — see
+[ADR-0001](docs/adr/0001-core-to-skin-data-contract.md)'s 2026-09-11 entries
+for the full detail, including the one implementation decision made at this
+slice's own discretion (where `DataSourceKind.JsonlFallback` falls in
+`Freshness`'s wording). The cross-skin harness gained two more fixture
+families, `FreshnessFixture` and `PanelTextResetFixture`, parallel to the
+existing ones — see
+[ADR-0003](docs/adr/0003-paneltext-anti-drift-mechanism.md)'s matching
+entry. The remaining `PanelText.cs` members (boost chip, usage-tile
+caveat, off-plan banner, GitHub rate-limit notice) are separate,
+differently-shaped sub-slices, not yet extracted.

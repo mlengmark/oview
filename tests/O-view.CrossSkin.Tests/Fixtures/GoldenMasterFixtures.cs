@@ -20,6 +20,7 @@ public static class GoldenMasterFixtures
         Name: "ovi4-reference-reading",
         Snapshot: new UsageSnapshot(
             DataSourceKind.Live,
+            new DateTimeOffset(2026, 9, 8, 20, 45, 0, TimeSpan.Zero),
             new UsagePercent(57, UsageValueStatus.Real),
             new UsageInstant(new DateTimeOffset(2026, 9, 8, 20, 59, 0, TimeSpan.Zero), UsageValueStatus.Real),
             new UsagePercent(14, UsageValueStatus.Real),
