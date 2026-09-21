@@ -47,6 +47,16 @@ See ADR-0003's 2026-09-11 (OVI-29) amendment for the reasoning. Both new
 families are parallel and additive; `GoldenMasterFixture`/`SkinUnderTest`
 were not touched or widened.
 
+**2026-09-21 update (OVI-92) — a fifth family, for `BoostChip`/`BoostCard`.**
+`Fixtures/BoostNoticeFixture.cs`, `Fixtures/BoostNoticeSkinUnderTest.cs`,
+`Fixtures/BoostNoticeFixtures.cs`, and `BoostNoticeGoldenMasterCrossSkinTests.cs`
+follow `PanelTextResetFixture`'s member-selecting-`Render` shape: `BoostChip`
+and `BoostCard` share one input shape (a `BoostNotice`, one `DateTimeOffset`,
+one `TimeZoneInfo`) but check different content facts, so one fixture type
+closes over which member a given fixture exercises rather than needing two
+near-identical trios. See ADR-0003's 2026-09-21 (OVI-82/OVI-92) amendments
+for the sign-off trail and the fixture set.
+
 ## Why this project targets `net10.0-windows`
 
 `O-view.Tray` only builds as `net10.0-windows`. A `net10.0-windows` project
@@ -60,15 +70,17 @@ workflow, this project must run on whatever runner already builds
 
 ## How to add a fixture
 
-Four fixture families exist so far: `GoldenMasterFixture` (`UsageSnapshot`,
+Five fixture families exist so far: `GoldenMasterFixture` (`UsageSnapshot`,
 the tooltip's slice), `UsageStatisticsFixture` (`UsageStatistics`, the
 usage-figures/history-coverage slice, OVI-27), `FreshnessFixture`
-(`UsageSnapshot` plus `UtcNow`, OVI-29), and `PanelTextResetFixture` (four
-raw-scalar members, OVI-29). Add to whichever family already matches the
-shape your fixture needs; only add a new parallel family for a genuinely
-new shape, and read ADR-0003's amendments first — a new family is the
-point that ADR flags as worth Chief Gary II's and Quinn's sign-off rather
-than a unilateral call.
+(`UsageSnapshot` plus `UtcNow`, OVI-29), `PanelTextResetFixture` (four
+raw-scalar members, OVI-29), and `BoostNoticeFixture` (`BoostNotice` plus
+one `DateTimeOffset` and one `TimeZoneInfo`, shared by `BoostChip` and
+`BoostCard`, OVI-92). Add to whichever family already matches the shape
+your fixture needs; only add a new parallel family for a genuinely new
+shape, and read ADR-0003's amendments first — a new family is the point
+that ADR flags as worth Chief Gary II's and Quinn's sign-off rather than a
+unilateral call.
 
 1. **Add the fixture** as a new `GoldenMasterFixture` entry in
    `Fixtures/GoldenMasterFixtures.cs`'s `All` list. A fixture is:

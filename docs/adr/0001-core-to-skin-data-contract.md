@@ -504,6 +504,48 @@ not a silent rewrite) as extraction work actually lands.
     [ADR-0003](0003-paneltext-anti-drift-mechanism.md)'s 2026-09-21 (OVI-82) amendment, not
     here — this amendment is the Core-contract half of that sub-slice's sign-off only.
 
+- **2026-09-21 update — `BoostChip`/`BoostCard` extracted (Kit the Builder, Phase 1 slice
+  3.3, OVI-92, building against this ADR's own 2026-09-21 (OVI-82) amendment and Quinn's
+  sign-off on the harness shape it authorized).**
+  - `src/O-view.Core/Models/BoostNotice.cs` now defines `public sealed record
+    BoostNotice(string Text, int? Percent, DateOnly? EndsOn)` — exactly the shape the OVI-82
+    amendment decided, with the source's `Bar` selector key dropped as that amendment
+    specified. **Not added in this slice:** `UsageSnapshot`'s `SessionBoostNotice`/
+    `WeeklyBoostNotice` fields. The OVI-82 amendment's own "out of scope" section names the
+    provider that would populate them as separate, future provider-porting work; without
+    that provider nothing produces a `BoostNotice` to carry on a snapshot yet, and
+    `LastIngestAt`'s precedent (2026-09-11 amendment above) is that a `UsageSnapshot` shape
+    change needing every existing call site backfilled is its own escalation, not a
+    side-effect of an unrelated slice. `BoostNoticeFixture` (below) keys directly on
+    `BoostNotice`, not `UsageSnapshot`, exactly as the OVI-82 amendment's harness proposal
+    specified — so this slice needed no `UsageSnapshot` change to build a working harness
+    against.
+  - `O-view.Tray.Presentation.PanelTextFormatter` and `O-view.Linux.Presentation.PanelTextFormatter`
+    each now implement `BoostChip` and `BoostCard`, independently worded per skin (ADR-0003)
+    exactly as `Freshness`/`Countdown`/etc. were (OVI-29). Both skins reproduce the source's
+    weeks/days/hours countdown decomposition (`BoostRemaining`) and abbreviated-month date
+    formatting as their own chosen wording, not because a width is being enforced — see the
+    next bullet.
+  - **The 281px Windows panel-width budget is confirmed skin-side only, and confirmed not
+    implemented as an actual measure-and-truncate step in this slice.** No width or pixel
+    constant of any kind appears in `BoostNotice` or in either skin's `BoostChip`/`BoostCard`
+    signature — grep-confirmed. `O-view.Tray.Presentation.PanelTextFormatter.BoostChip`'s own
+    doc comment states explicitly why: no `O-view.App` panel window exists yet in this
+    repository (per this repository's own standing caveat, `CLAUDE.md`) to measure a rendered
+    row against, so there is nothing yet to truncate or wrap to. This is not a gap against
+    this ADR's contract, which only requires the budget stay out of Core — it is a gap
+    against the source app's *behaviour*, named explicitly so the slice that first wires a
+    real WPF panel window doesn't assume the truncate-or-wrap step already exists.
+  - The cross-skin golden-master harness (ADR-0003) gained a fifth fixture family,
+    `BoostNoticeFixture`/`BoostNoticeSkinUnderTest`/`BoostNoticeGoldenMasterCrossSkinTests`,
+    built exactly to the shape Quinn signed off on (interaction `22dbaf90`, accepted
+    2026-09-21T20:10:59Z) — see the ADR-0003 entry below for the fixture set and the local
+    drift-detection confirmation.
+  - **Still not yet extracted, from `PanelText.cs`:** the usage-tile caveat/rate-card fields,
+    the off-plan three-state banner, and the GitHub rate-limit notice — sub-slices 4 and 5 of
+    this split, per the OVI-29 escalation this and the prior amendments have been resolving
+    one sub-slice at a time.
+
 ## Alternatives considered
 
 **Leave the contract implicit, described only by whatever Core's C# types
