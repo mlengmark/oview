@@ -77,6 +77,10 @@ render this as an explicit gap, never as zero or blank).
 | `OffPlanUsageAmount` | int64 (tokens) or decimal (USD) | tokens or USD | estimated / unavailable | |
 | `NotificationThresholdCrossed` | `{crossed: bool, thresholdPercent: int32}` | percent | real | Core detects the crossing event; the skin decides how (or whether) to notify |
 | `LastIngestAt` | timestamp, UTC, ISO-8601 | instant | real | freshness diagnostic; not necessarily surfaced by every skin. Serves the same role as the source repo's `UsageSnapshot.CapturedAtUtc` — the capture time a skin would read to word a `Stale` value's age (OVI-16 amendment below); the freshness *threshold* itself stays provider-owned config, not a contract field |
+| `SessionBoostNotice` | `BoostNotice?` (nullable; see row below) | — | real / unavailable | the promo notice, if any, for the 5-hour meter; added 2026-09-21 (OVI-82) — see that amendment below |
+| `WeeklyBoostNotice` | `BoostNotice?` (nullable; see row below) | — | real / unavailable | the promo notice, if any, for the 7-day meter; added 2026-09-21 (OVI-82) |
+| `BoostNotice` (nested type) | `{text: string, percent: int32?, endsOn: date, ISO-8601 (YYYY-MM-DD)?}` | — | fields inherit the parent `Session`/`WeeklyBoostNotice` field's real/unavailable status | `text` is the promo sentence, relayed verbatim, never reworded, truncated, or re-punctuated by Core; `percent`/`endsOn` are independently nullable and their absence is itself a real fact (the source sentence didn't state one), not a separate unavailable state — added 2026-09-21 (OVI-82) |
+| `BoostNoticesFetchedAtUtc` | timestamp, UTC, ISO-8601 | instant | real / unavailable | when the upstream promo-flag cache was last refreshed; distinct from `LastIngestAt` (O-view's own ingest time) — this is provenance for the promo message itself, needed to word how recently it was read; added 2026-09-21 (OVI-82) |
 
 **What Core must never emit, by contract:** a pre-formatted display
 sentence, a field separator, a locale-bound date/time string, or any
@@ -416,6 +420,117 @@ not a silent rewrite) as extraction work actually lands.
   - **Not part of this slice, per its own explicit boundary:** the boost promo
     chip/card, the usage-tile caveat/rate-card fields, and the off-plan banner remain
     not yet extracted — see the corrected list above.
+
+- **2026-09-21 amendment (OVI-82) — `BoostNotice` Core type shape decided and added to
+  the contract table above; the 281px budget question resolved explicitly for this
+  member (Adrian II the Architect, closing the sign-off gap the OVI-29 escalation named
+  for sub-slice 3, per the board's 2026-09-11T02:28Z reply on OVI-29).**
+
+  **Source re-read, re-confirmed against the same pinned commit this ADR already cites,
+  `897777b`** (verified current: `gh api repos/mlengmark/O-view/commits/main` returns
+  the same SHA as of this amendment — the source repo has not moved). **CONFIRMED** by
+  direct read of two files, not the file `PanelText.cs`'s own row in the table above
+  already covers:
+  - `BoostChip(BoostNotice notice, DateTimeOffset utcNow, TimeZoneInfo local) -> string`
+    and `BoostCard(BoostNotice notice, DateTimeOffset fetchedAtUtc, TimeZoneInfo local)
+    -> string` (`src/O-view.Core/Models/PanelText.cs`, lines 300 and 378) — both take a
+    `BoostNotice` plus one `DateTimeOffset` (different meaning per member — "now" for the
+    chip's countdown, "when the cache was fetched" for the card's attribution line — and
+    a `TimeZoneInfo`).
+  - `BoostNotice` itself — `public sealed record BoostNotice(string Bar, string Text, int?
+    Percent, DateOnly? EndsOn)` — is **not** defined in `PanelText.cs` or anywhere under
+    `O-view.Core.Models`. It lives in `src/O-view.Core/Providers/CachedUsage/BoostNotice.cs`,
+    alongside `BoostNotices` (plural), the type that reads it from Claude Code's own
+    `~/.claude.json` → `cachedGrowthBookFeatures.tengu_rate_limit_promo_notices` cache
+    (read-only, no credential, per the file's own doc comment citing `CLAUDE.md` rule 3).
+    `BoostNotice.Bar` is the meter key (`BoostNotice.SessionBar` = `"five_hour"`,
+    `.WeeklyBar` = `"seven_day"` — the only two bars ever named; model-scoped keys such as
+    `seven_day_opus` are recognised in the selection code but never observed populated) and
+    is used only for *selecting* which notice applies to which meter
+    (`BoostNotices.For(bar, today, utcNow)`) — neither `BoostChip` nor `BoostCard` reads
+    `.Bar` directly.
+
+  **Decision — the contract type, following this table's existing per-meter row pattern
+  (`Session`/`WeeklyUtilizationPercent`, `Session`/`WeeklyResetAt`) rather than a single
+  field needing skin-side filtering:** two new nullable fields, `SessionBoostNotice` and
+  `WeeklyBoostNotice`, each an optional `BoostNotice` value — Core has already applied the
+  bar-selection Core computes this from (mirroring how `UsageLevel`'s banding or
+  `WeeklyResetAt`'s cached-vs-derived resolution already happens in Core, not the skin).
+  `Bar` itself is dropped from the contract type — which field a notice is in already says
+  which meter it is for, so carrying the source's own `Bar` string forward would be a
+  redundant, easy-to-desync duplicate of the field name itself. `Text`, `Percent`, and
+  `EndsOn` are carried forward with their source meanings and nullability unchanged: `Text`
+  is always relayed verbatim (the source's own rule — see `BoostCard`'s doc comment, "never
+  edited, summarised or re-worded" — the panel *relays* a claim it cannot itself verify,
+  never asserts it); `Percent`/`EndsOn` are independently nullable because the source
+  sentence's own parsing (`PromoText.Percent`/`PromoText.EndDate`, not re-verified by this
+  amendment — out of scope, upstream of `BoostNotice`'s own shape) may not yield either, and
+  that is itself real information (the sentence didn't state a figure or a date), not a
+  reason to mark the whole notice `unavailable`.
+
+  **`EndsOn` stays a bare date, not a timestamp, by contract — this is itself a "never let a
+  platform assumption leak into Core" instance, same family as the 281px item below.** The
+  source's `EndOfDayUtc` (private, `PanelText.cs`) resolves "the promo's last day" to a UTC
+  instant using the *reader's* `TimeZoneInfo` — a genuinely skin-owned computation (what time
+  is "midnight" is a locale/zone fact), not a Core one. Core hands the skin the calendar date
+  Claude Code's sentence named and nothing else; each skin resolves what "ends" means in its
+  own reader's zone, per this ADR's existing "skin owns locale/format rendering" rule (see
+  the `SessionResetAt` row).
+
+  **The 281px Windows panel-width budget — resolved, not newly decided.** This ADR's
+  "Decision" section already named this exact constraint (`PanelText.BoostChip`, line
+  ~84 above) as Windows-skin-owned, alongside the 127-character tooltip cap, at the time
+  this ADR was first written — before any sub-slice had reached the member it constrains.
+  This amendment confirms that resolution now applies concretely: **nothing about the
+  281px budget, or how much of it a given phrase consumes, appears in the `BoostNotice`
+  contract type or in `BoostChip`/`BoostCard`'s Core-side replacement.** Two source
+  behaviours that exist *because of* the 281px budget are confirmed skin-only, not
+  Core, consequences of that same rule, not new exceptions to it:
+  - The **month abbreviation** (`{last:d MMM}`, "31 Aug" not "August 31") is
+    locale-sensitive date formatting — already excluded from Core by this ADR's "must
+    never emit ... a locale-bound date/time string" rule, independent of the width budget
+    that happens to be *why* the source app chose the abbreviated form.
+  - The **`BoostRemaining` weeks/days/hours decomposition** (`2w 4d 14h`) is presentation
+    wording computed from `EndsOn` and "now" — the same category of skin-owned
+    decomposition this ADR's contract already keeps out of Core for `Countdown`
+    (OVI-29, raw `TimeSpan` in, skin words it). Core supplies `EndsOn`; the skin computes
+    and words the remaining time, including deciding how many units the 281px row has
+    room for.
+  Each skin's own formatter is free to reproduce the source's exact 281px-driven
+  behaviour, choose a different budget appropriate to its own toolkit and panel width (the
+  Linux/Avalonia skin has no reason to share a WPF pixel measurement), or wrap instead of
+  truncate — that choice belongs entirely to the skin, per this ADR's existing ownership
+  rule, and this amendment adds no new constraint beyond confirming the existing one
+  reaches this member.
+
+  **Out of scope for this amendment, named explicitly so it isn't assumed decided:**
+  - **The provider that populates `BoostNotice`** — porting `BoostNotices.TryRead`/`.Parse`/
+    `.For` (the code that actually reads and selects from Claude Code's cache file) is
+    separate, future provider-porting work, exactly as `UsageSnapshot`'s shape was defined
+    (OVI-9/OVI-10) before `PlanHistoryProvider` was ported. This amendment defines only the
+    type the formatter's input needs.
+  - **Whether reading `~/.claude.json`'s `cachedGrowthBookFeatures` block is a "second AI
+    system" under gate G5.** The source app already reads this file today, unaudited by
+    this rebuild's own gate process — it predates this project. Whether porting that
+    specific read counts as introducing a new source under G5, or is covered by the same
+    audit as the rest of Claude Code's `.claude.json` (already the source for
+    `AccountPlanTier` and other fields in this table), is a question for whichever future
+    slice actually ports the provider to raise explicitly — not decided, one way or the
+    other, by this documentation-only amendment.
+  - **The real/unavailable distinction this amendment's contract type makes is stricter
+    than what the source app currently does**, flagged here so a future provider port
+    doesn't silently reproduce the gap: `BoostNotices.TryReadAny` catches read/parse
+    failure (`IOException`, `JsonException`, `UnauthorizedAccessException`) and returns
+    `null` — the same `null` a genuinely empty, successfully-read cache would produce. This
+    contract's `real`/`unavailable` status flags exist so a skin can tell "Core checked and
+    there is no active promo" (`real`, value absent) apart from "Core could not check"
+    (`unavailable`) — a distinction the source app's own provider does not currently
+    preserve. Whichever future slice ports the provider must not collapse the two the way
+    `TryReadAny` does today, or this field would silently fail its own "never fabricate a
+    number" obligation (rendering an unreadable cache identically to a genuinely quiet one).
+  - **The harness fixture-family shape for testing `BoostChip`/`BoostCard`** is decided in
+    [ADR-0003](0003-paneltext-anti-drift-mechanism.md)'s 2026-09-21 (OVI-82) amendment, not
+    here — this amendment is the Core-contract half of that sub-slice's sign-off only.
 
 ## Alternatives considered
 
