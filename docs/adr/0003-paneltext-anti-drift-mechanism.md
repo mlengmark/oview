@@ -242,8 +242,8 @@ code, to keep the two heads honest against each other.
     `PanelTextResetGoldenMasterCrossSkinTests`) follow `GoldenMasterCrossSkinTests`'
     existing "every skin satisfies every pinned content fact" structure unchanged.
 
-- **2026-09-21 amendment (OVI-82) — sub-slice 3's harness shape, PROPOSED, pending
-  Quinn's sign-off (Adrian II the Architect, closing the sign-off gap the OVI-29
+- **2026-09-21 amendment (OVI-82) — sub-slice 3's harness shape, DECIDED, Quinn's
+  sign-off recorded (Adrian II the Architect, closing the sign-off gap the OVI-29
   escalation named for `BoostNotice` — board reply 2026-09-11T02:28Z).**
 
   **The fixture families so far, for count:** `GoldenMasterFixture` (tooltip,
@@ -275,17 +275,18 @@ code, to keep the two heads honest against each other.
   input shape. `GoldenMasterFixture`/`SkinUnderTest` remain untouched, per this ADR's
   standing principle.
 
-  **This is a proposal, not yet authorized.** Per this ADR's own OVI-27 and OVI-45
-  amendments, a differently-shaped fixture family needs Chief Gary II's and Quinn's
-  explicit sign-off before a slice may build against it — not another slice's unilateral
-  call, even when (as here) the new family closely mirrors an already-reviewed pattern.
-  Chief Gary II's OVI-45 pre-authorization of "Adrian decides, conditional on looping
-  Quinn in" is treated as standing for this ADR's sign-off gate generally, not only for
-  OVI-45's own instance of it — so this amendment requests Quinn's sign-off directly, the
-  same path OVI-45 used, rather than re-escalating to Gary for a second rubber-stamp of
-  the same delegated authority. A request for that sign-off, referencing this amendment
-  once merged, follows on OVI-82. The next dated entry in this ADR will record the
-  outcome, mirroring the OVI-45 entry above.
+  **Authorized.** Per this ADR's own OVI-27 and OVI-45 amendments, a differently-shaped
+  fixture family needs Chief Gary II's and Quinn's explicit sign-off before a slice may
+  build against it — not another slice's unilateral call, even when (as here) the new
+  family closely mirrors an already-reviewed pattern. Chief Gary II's OVI-45
+  pre-authorization of "Adrian decides, conditional on looping Quinn in" was treated as
+  standing for this ADR's sign-off gate generally, not only for OVI-45's own instance of
+  it — so the sign-off request went to Quinn directly, the same path OVI-45 used, rather
+  than re-escalating to Gary for a second rubber-stamp of the same delegated authority.
+  Quinn accepted the proposal as specified, without changes (Paperclip interaction
+  `22dbaf90-2ce3-406a-85e6-c01247c22add`, resolved 2026-09-21T20:10:59Z) — this proposal's
+  shape, as written above, is authorized for Kit's sub-slice 3 build task. No caveats or
+  requested changes accompanied the sign-off.
 
 ## Alternatives considered
 
