@@ -157,4 +157,74 @@ public class PanelTextFormatterTests
         Assert.Contains("does not match", result);
         Assert.Contains("Re-enter", result);
     }
+
+    [Fact]
+    public void BoostChipWithBothFiguresSpellsOutPercentDateAndCountdown()
+    {
+        var notice = new BoostNotice("Get 50% more usage until Aug 31st!", 50, new DateOnly(2026, 8, 31));
+        var utcNow = new DateTimeOffset(2026, 8, 13, 10, 0, 0, TimeSpan.Zero);
+
+        var result = PanelTextFormatter.BoostChip(notice, utcNow, Utc);
+
+        Assert.Equal("50% Boosted · until 31 Aug · ends in 2w 4d 14h", result);
+    }
+
+    [Fact]
+    public void BoostChipWithNoFiguresParsedFallsBackToBoostedAlone()
+    {
+        var notice = new BoostNotice("There's a usage boost active on your account.", null, null);
+
+        var result = PanelTextFormatter.BoostChip(notice, DateTimeOffset.UtcNow, Utc);
+
+        Assert.Equal("Boosted", result);
+    }
+
+    [Fact]
+    public void BoostChipWithPercentButNoEndDateOmitsTheCountdown()
+    {
+        var notice = new BoostNotice("Get 75% more usage, no end date given.", 75, null);
+
+        var result = PanelTextFormatter.BoostChip(notice, DateTimeOffset.UtcNow, Utc);
+
+        Assert.Equal("75% Boosted", result);
+    }
+
+    [Fact]
+    public void BoostChipEndingWithinTheHourSaysUnderAnHourRatherThanZeroUnits()
+    {
+        var endsOn = new DateOnly(2026, 8, 31);
+        var notice = new BoostNotice("Boost ending very soon.", 20, endsOn);
+        // End-of-day for 31 Aug UTC is 2026-09-01T00:00Z; 30 minutes before that.
+        var utcNow = new DateTimeOffset(2026, 8, 31, 23, 30, 0, TimeSpan.Zero);
+
+        var result = PanelTextFormatter.BoostChip(notice, utcNow, Utc);
+
+        Assert.Contains("ends in under an hour", result);
+    }
+
+    [Fact]
+    public void BoostCardRelaysTheMessageVerbatimAndNamesTheEndDateAndReadTime()
+    {
+        var notice = new BoostNotice("Enjoy 50% more usage on your plan until August 31st.", 50, new DateOnly(2026, 8, 31));
+        var fetchedAtUtc = new DateTimeOffset(2026, 8, 20, 14, 0, 0, TimeSpan.Zero);
+
+        var result = PanelTextFormatter.BoostCard(notice, fetchedAtUtc, Utc);
+
+        Assert.Contains("Enjoy 50% more usage on your plan until August 31st.", result);
+        Assert.Contains("Ends Mon 31 Aug", result);
+        Assert.Contains("14:00", result);
+    }
+
+    [Fact]
+    public void BoostCardWithNoEndDateStillRelaysTheMessageAndReadTime()
+    {
+        var notice = new BoostNotice("You're getting a usage boost right now.", null, null);
+        var fetchedAtUtc = new DateTimeOffset(2026, 8, 20, 9, 5, 0, TimeSpan.Zero);
+
+        var result = PanelTextFormatter.BoostCard(notice, fetchedAtUtc, Utc);
+
+        Assert.Contains("You're getting a usage boost right now.", result);
+        Assert.Contains("09:05", result);
+        Assert.DoesNotContain("Ends", result);
+    }
 }

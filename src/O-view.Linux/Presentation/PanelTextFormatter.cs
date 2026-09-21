@@ -9,10 +9,11 @@ namespace OView.Linux.Presentation;
 /// took directly. Every wording decision here is this skin's own, per ADR-0001/ADR-0003's
 /// ownership rule — it does not port <c>O-view.Tray</c>'s exact phrasing.
 ///
-/// <para>Covers only the <c>Freshness</c>/<c>Countdown</c>/<c>SessionReset</c>/
-/// <c>WeeklyReset</c>/<c>WeeklyResetConflict</c> family (Phase 1 slice 3.1, OVI-29). The
-/// remaining <c>PanelText.cs</c> members are separate, differently-shaped sub-slices, not
-/// yet extracted.</para>
+/// <para>Covers the <c>Freshness</c>/<c>Countdown</c>/<c>SessionReset</c>/
+/// <c>WeeklyReset</c>/<c>WeeklyResetConflict</c> family (Phase 1 slice 3.1, OVI-29) and, as
+/// of Phase 1 slice 3.3 (OVI-92), <c>BoostChip</c>/<c>BoostCard</c>. The remaining
+/// <c>PanelText.cs</c> members are separate, differently-shaped sub-slices, not yet
+/// extracted.</para>
 /// </summary>
 public static class PanelTextFormatter
 {
@@ -118,4 +119,95 @@ public static class PanelTextFormatter
     public static readonly TimeSpan ApproximateThreshold = TimeSpan.FromMinutes(30);
 
     private static bool IsApproximate(TimeSpan? uncertainty) => (uncertainty ?? TimeSpan.Zero) > ApproximateThreshold;
+
+    /// <summary>
+    /// The boost chip on a meter's label row: <c>Boosted 50%, until 31 Aug, ends in 2w, 4d, 14h</c>.
+    /// Worded independently from the Windows skin's <c>·</c>-joined phrase (ADR-0003), but the
+    /// same facts either way: the percentage (when parsed), the end date, and the
+    /// weeks/days/hours remaining. Every part is optional and drops out silently — with neither
+    /// figure parsed, the chip is just <c>Boosted</c>.
+    ///
+    /// <para>The source app's 281px Windows label-row width budget (ADR-0001, 2026-09-21
+    /// amendment) has no equivalent here — this skin has no reason to share a WPF pixel
+    /// measurement, and no Avalonia panel window exists yet in this repository to measure a
+    /// rendered row against either. Whichever future slice wires this into a real Avalonia
+    /// panel picks this skin's own width budget and truncate-or-wrap rule then.</para>
+    /// </summary>
+    public static string BoostChip(BoostNotice notice, DateTimeOffset utcNow, TimeZoneInfo displayZone)
+    {
+        var chip = notice.Percent is { } pct
+            ? string.Create(CultureInfo.InvariantCulture, $"Boosted {pct}%")
+            : "Boosted";
+
+        if (notice.EndsOn is not { } last)
+        {
+            return chip;
+        }
+
+        var ends = EndOfDayUtc(last, displayZone);
+        return string.Create(CultureInfo.InvariantCulture,
+            $"{chip}, until {last:d MMM}, ends in {BoostRemaining(ends - utcNow)}");
+    }
+
+    /// <summary>
+    /// Time left on a promo, in weeks/days/hours: <c>2w, 4d, 14h</c>, <c>4d, 14h</c>,
+    /// <c>14h</c>. Empty leading units are dropped. Hours are the floor: the source end is a
+    /// <i>date</i>, so the last hour of that day is the finest thing anyone knows.
+    /// </summary>
+    private static string BoostRemaining(TimeSpan left)
+    {
+        if (left <= TimeSpan.Zero)
+        {
+            return "under an hour";
+        }
+
+        var weeks = left.Days / 7;
+        var days = left.Days % 7;
+        var hours = left.Hours;
+
+        var parts = new List<string>(3);
+        if (weeks > 0)
+        {
+            parts.Add(string.Create(CultureInfo.InvariantCulture, $"{weeks}w"));
+        }
+
+        if (days > 0 || parts.Count > 0)
+        {
+            parts.Add(string.Create(CultureInfo.InvariantCulture, $"{days}d"));
+        }
+
+        if (hours > 0 || parts.Count > 0)
+        {
+            parts.Add(string.Create(CultureInfo.InvariantCulture, $"{hours}h"));
+        }
+
+        return parts.Count > 0 ? string.Join(", ", parts) : "under an hour";
+    }
+
+    /// <summary>
+    /// The instant a promo's last day ends, in UTC — the next local midnight after it. Built
+    /// from the zone's offset rather than <see cref="TimeZoneInfo.ConvertTimeToUtc(DateTime, TimeZoneInfo)"/>,
+    /// which throws when the wall-clock time it is handed does not exist.
+    /// </summary>
+    private static DateTimeOffset EndOfDayUtc(DateOnly lastDay, TimeZoneInfo displayZone)
+    {
+        var midnight = lastDay.AddDays(1).ToDateTime(TimeOnly.MinValue);
+        return new DateTimeOffset(midnight, displayZone.GetUtcOffset(midnight)).ToUniversalTime();
+    }
+
+    /// <summary>
+    /// The hover card behind the chip: Claude's sentence, then when O-view read it. Worded
+    /// independently from the Windows skin, but relays <see cref="BoostNotice.Text"/> equally
+    /// verbatim — see that type's doc comment for why.
+    /// </summary>
+    public static string BoostCard(BoostNotice notice, DateTimeOffset fetchedAtUtc, TimeZoneInfo displayZone)
+    {
+        var read = TimeZoneInfo.ConvertTime(fetchedAtUtc, displayZone);
+        var ends = notice.EndsOn is { } last
+            ? string.Create(CultureInfo.InvariantCulture, $"Ends {last:ddd d MMM}. ")
+            : "";
+
+        return string.Create(CultureInfo.InvariantCulture,
+            $"{notice.Text}\n\n{ends}From Claude Code, read at {read:HH:mm}");
+    }
 }

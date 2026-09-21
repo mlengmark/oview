@@ -69,6 +69,23 @@ own new Core surface, not yet extracted — see
 [ADR-0001](docs/adr/0001-core-to-skin-data-contract.md)'s 2026-09-11 entry
 for the full detail.
 
+**2026-09-21 update (OVI-92) — the third sub-slice of `PanelText.cs`'s
+split is extracted: `BoostChip`/`BoostCard`.** `O-view.Core` gains
+`BoostNotice` (`Text`, `Percent`, `EndsOn` — a bare calendar date, not a
+timestamp). Each skin's own `Presentation/PanelTextFormatter.cs` gains
+`BoostChip`/`BoostCard`, independently worded per ADR-0003, and a fifth
+parallel fixture family in `O-view.CrossSkin.Tests` (`BoostNoticeFixture`)
+checks both skins against five fixtures. `UsageSnapshot` was **not**
+changed by this slice — `SessionBoostNotice`/`WeeklyBoostNotice` wait on
+the future slice that ports the provider populating them (see
+[ADR-0001](docs/adr/0001-core-to-skin-data-contract.md)'s 2026-09-21
+entry). The source app's 281px Windows panel-width budget is confirmed
+skin-side only, and confirmed *not* implemented as an actual
+measure-and-truncate step here — no `O-view.App` panel window exists yet
+in this repository to measure a rendered row against. The usage-tile
+caveat, the off-plan banner, and the GitHub rate-limit notice remain the
+last not-yet-extracted `PanelText.cs` members.
+
 **Do not assume this repository contains working code.** If you are looking
 for the current, running implementation, that is
 [`mlengmark/O-view`](https://github.com/mlengmark/O-view) — read-only,

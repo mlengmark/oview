@@ -12,11 +12,12 @@ namespace OView.Tray.Presentation;
 /// O-view.Core (ADR-0001). This class is not shared with O-view.Linux; each skin owns its
 /// own phrasing (ADR-0003).
 ///
-/// <para>Covers only the <c>Freshness</c>/<c>Countdown</c>/<c>SessionReset</c>/
-/// <c>WeeklyReset</c>/<c>WeeklyResetConflict</c> family (Phase 1 slice 3.1, OVI-29). The
-/// remaining <c>PanelText.cs</c> members — the boost promo chip, the usage-tile caveat, the
-/// off-plan banner, the GitHub rate-limit notice — are separate, differently-shaped
-/// sub-slices with their own Core surface, not yet extracted.</para>
+/// <para>Covers the <c>Freshness</c>/<c>Countdown</c>/<c>SessionReset</c>/
+/// <c>WeeklyReset</c>/<c>WeeklyResetConflict</c> family (Phase 1 slice 3.1, OVI-29) and, as
+/// of Phase 1 slice 3.3 (OVI-92), <c>BoostChip</c>/<c>BoostCard</c>. The remaining
+/// <c>PanelText.cs</c> members — the usage-tile caveat, the off-plan banner, the GitHub
+/// rate-limit notice — are separate, differently-shaped sub-slices with their own Core
+/// surface, not yet extracted.</para>
 /// </summary>
 public static class PanelTextFormatter
 {
@@ -135,4 +136,104 @@ public static class PanelTextFormatter
     public static readonly TimeSpan ApproximateThreshold = TimeSpan.FromMinutes(30);
 
     private static bool IsApproximate(TimeSpan? uncertainty) => (uncertainty ?? TimeSpan.Zero) > ApproximateThreshold;
+
+    /// <summary>
+    /// The boost chip on a meter's label row: <c>50% Boosted · until 31 Aug · ends in 2w 4d 14h</c>.
+    /// Every part is optional and drops out silently — with neither figure parsed, the chip is
+    /// just <c>Boosted</c>, which is the floor this never falls below (the message itself is
+    /// relayed verbatim in <see cref="BoostCard"/> regardless of whether either figure parsed).
+    ///
+    /// <para><b>The 281px Windows label-row width budget named in the source app is a real
+    /// constraint on this skin (ADR-0001, 2026-09-21 amendment) but is not enforced here.</b>
+    /// No <c>O-view.App</c> panel window exists yet in this repository to measure a rendered
+    /// row against, so there is no live pixel budget to truncate or wrap to — the source app's
+    /// abbreviated-month/weeks-days-hours wording is reproduced below because it is this
+    /// skin's own choice of a compact phrasing, not because a width is being enforced. Whichever
+    /// future slice wires this into a real WPF panel is responsible for adding the actual
+    /// measure-and-truncate-or-wrap step this ADR reserves for the skin.</para>
+    /// </summary>
+    /// <param name="notice">The notice to describe.</param>
+    /// <param name="utcNow">Now, for the countdown.</param>
+    /// <param name="displayZone">The reader's zone: a promo ends at the end of its last local day.</param>
+    public static string BoostChip(BoostNotice notice, DateTimeOffset utcNow, TimeZoneInfo displayZone)
+    {
+        var chip = notice.Percent is { } pct
+            ? string.Create(CultureInfo.InvariantCulture, $"{pct}% Boosted")
+            : "Boosted";
+
+        if (notice.EndsOn is not { } last)
+        {
+            return chip;
+        }
+
+        var ends = EndOfDayUtc(last, displayZone);
+        return string.Create(CultureInfo.InvariantCulture,
+            $"{chip} · until {last:d MMM} · ends in {BoostRemaining(ends - utcNow)}");
+    }
+
+    /// <summary>
+    /// Time left on a promo, in weeks/days/hours: <c>2w 4d 14h</c>, <c>4d 14h</c>, <c>14h</c>.
+    /// Empty leading units are dropped — a promo ending tonight reads <c>14h</c>, not
+    /// <c>0w 0d 14h</c>. Hours are the floor: the source end is a <i>date</i>, so the last hour
+    /// of that day is the finest thing anyone knows, and minutes would imply precision the
+    /// sentence never carried.
+    /// </summary>
+    private static string BoostRemaining(TimeSpan left)
+    {
+        if (left <= TimeSpan.Zero)
+        {
+            return "under an hour";
+        }
+
+        var weeks = left.Days / 7;
+        var days = left.Days % 7;
+        var hours = left.Hours;
+
+        var parts = new List<string>(3);
+        if (weeks > 0)
+        {
+            parts.Add(string.Create(CultureInfo.InvariantCulture, $"{weeks}w"));
+        }
+
+        if (days > 0 || parts.Count > 0)
+        {
+            parts.Add(string.Create(CultureInfo.InvariantCulture, $"{days}d"));
+        }
+
+        if (hours > 0 || parts.Count > 0)
+        {
+            parts.Add(string.Create(CultureInfo.InvariantCulture, $"{hours}h"));
+        }
+
+        return parts.Count > 0 ? string.Join(" ", parts) : "under an hour";
+    }
+
+    /// <summary>
+    /// The instant a promo's last day ends, in UTC — the next local midnight after it. Built
+    /// from the zone's offset rather than <see cref="TimeZoneInfo.ConvertTimeToUtc(DateTime, TimeZoneInfo)"/>,
+    /// which throws when the wall-clock time it is handed does not exist (midnight is skipped
+    /// outright in a handful of zones on their DST transition day, and a countdown must not be
+    /// the thing that takes the panel down).
+    /// </summary>
+    private static DateTimeOffset EndOfDayUtc(DateOnly lastDay, TimeZoneInfo displayZone)
+    {
+        var midnight = lastDay.AddDays(1).ToDateTime(TimeOnly.MinValue);
+        return new DateTimeOffset(midnight, displayZone.GetUtcOffset(midnight)).ToUniversalTime();
+    }
+
+    /// <summary>
+    /// The hover card behind the chip: Claude's sentence, then when O-view read it. The
+    /// message is never edited, summarised, or re-worded — see <see cref="BoostNotice"/>'s
+    /// doc comment for why the panel relays rather than asserts it.
+    /// </summary>
+    public static string BoostCard(BoostNotice notice, DateTimeOffset fetchedAtUtc, TimeZoneInfo displayZone)
+    {
+        var read = TimeZoneInfo.ConvertTime(fetchedAtUtc, displayZone);
+        var ends = notice.EndsOn is { } last
+            ? string.Create(CultureInfo.InvariantCulture, $"Ends {last:ddd d MMM} · ")
+            : "";
+
+        return string.Create(CultureInfo.InvariantCulture,
+            $"{notice.Text}\n\n{ends}reported by Claude Code, read {read:HH:mm}");
+    }
 }

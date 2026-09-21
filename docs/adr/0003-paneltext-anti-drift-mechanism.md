@@ -288,6 +288,34 @@ code, to keep the two heads honest against each other.
   shape, as written above, is authorized for Kit's sub-slice 3 build task. No caveats or
   requested changes accompanied the sign-off.
 
+- **2026-09-21, later same day — `BoostNoticeFixture` family landed exactly to the signed-off
+  shape (Kit the Builder, Phase 1 slice 3.3, OVI-92).**
+  - `Fixtures/BoostNoticeFixture.cs`, `Fixtures/BoostNoticeSkinUnderTest.cs`,
+    `Fixtures/BoostNoticeFixtures.cs`, and `BoostNoticeGoldenMasterCrossSkinTests.cs` mirror
+    `PanelTextResetFixture`'s member-selecting-`Render` shape exactly as proposed above: one
+    fixture type whose `Render` closes over which `BoostNoticeSkinUnderTest` member
+    (`BoostChip` or `BoostCard`) a given fixture exercises, and one skin-under-test record
+    exposing both entry points (since, unlike the four raw-scalar members, `BoostChip` and
+    `BoostCard` do share one input shape). `GoldenMasterFixture`/`SkinUnderTest` were not
+    touched.
+  - Five fixtures: a chip with both percent and end date (reusing the source app's own worked
+    example from `PanelText.BoostChip`'s doc comment — 18 days 14 hours before a 31 Aug end
+    date renders `2w 4d 14h` remaining), a chip with neither figure parsed (falls back to the
+    bare "Boosted" word, pinned via a content fact that the rendering contains no digit at
+    all), a chip with a percent but no end date (countdown omitted entirely), and two card
+    fixtures (with and without an end date) both pinning that the notice's exact message text
+    appears verbatim in the rendered card — the strongest content fact this family checks,
+    directly proving `BoostCard`'s own "never edited, summarised or re-worded" rule rather
+    than merely trusting the doc comment that states it.
+  - **Verified locally, the same way every prior fixture family in this project was:**
+    deliberately changing the Windows skin's `BoostChip` separator from `" · "` to `" :: "`
+    and truncating its final countdown unit by one character made the harness fail with a
+    clear per-fixture message naming the actual rendered text (`"...ends in 2w 4d 14"`,
+    missing the pinned `"14h"` content fact); reverting made the suite pass again. All 119
+    tests across the four project's test assemblies (`O-view.Core.Tests`,
+    `O-view.Tray.Tests`, `O-view.Linux.Tests`, `O-view.CrossSkin.Tests`) pass after the
+    revert, confirmed by `dotnet test O-view.slnx`.
+
 ## Alternatives considered
 
 **Shared non-Core text-resource module, consumed by both skins.**
