@@ -10,10 +10,10 @@ namespace OView.Linux.Presentation;
 /// ownership rule — it does not port <c>O-view.Tray</c>'s exact phrasing.
 ///
 /// <para>Covers the <c>Freshness</c>/<c>Countdown</c>/<c>SessionReset</c>/
-/// <c>WeeklyReset</c>/<c>WeeklyResetConflict</c> family (Phase 1 slice 3.1, OVI-29) and, as
-/// of Phase 1 slice 3.3 (OVI-92), <c>BoostChip</c>/<c>BoostCard</c>. The remaining
-/// <c>PanelText.cs</c> members are separate, differently-shaped sub-slices, not yet
-/// extracted.</para>
+/// <c>WeeklyReset</c>/<c>WeeklyResetConflict</c> family (Phase 1 slice 3.1, OVI-29), as of
+/// Phase 1 slice 3.3 (OVI-92) <c>BoostChip</c>/<c>BoostCard</c>, and as of Phase 1 slice 3.4
+/// (OVI-98) <c>RateLimitedNotice</c>. The remaining <c>PanelText.cs</c> members are separate,
+/// differently-shaped sub-slices, not yet extracted.</para>
 /// </summary>
 public static class PanelTextFormatter
 {
@@ -210,4 +210,19 @@ public static class PanelTextFormatter
         return string.Create(CultureInfo.InvariantCulture,
             $"{notice.Text}\n\n{ends}From Claude Code, read at {read:HH:mm}");
     }
+
+    /// <summary>
+    /// Why an update check came back empty when GitHub throttled it (OVI-98). Worded
+    /// independently from <c>O-view.Tray</c>'s notice (ADR-0003) — same two facts (the limit
+    /// is per-network, not per-device, and the retry time is only stated when GitHub actually
+    /// sent one), different phrasing.
+    /// </summary>
+    public static string RateLimitedNotice(DateTimeOffset? retryAfterUtc, TimeZoneInfo local) =>
+        "GitHub throttles anonymous update checks, and the limit applies per network rather "
+        + "than per device, so it can trip even if this is the only app checking. O-view "
+        + "will retry "
+        + (retryAfterUtc is { } at
+            ? string.Create(CultureInfo.InvariantCulture, $"at {TimeZoneInfo.ConvertTime(at, local):HH:mm}.")
+            : "on its next scheduled check.")
+        + " Your connection and install are fine.";
 }

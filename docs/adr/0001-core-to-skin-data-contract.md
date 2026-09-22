@@ -546,6 +546,41 @@ not a silent rewrite) as extraction work actually lands.
     this split, per the OVI-29 escalation this and the prior amendments have been resolving
     one sub-slice at a time.
 
+- **2026-09-22 update — `RateLimitedNotice` (the GitHub rate-limit notice) extracted (Kit
+  the Builder, Phase 1 slice 3.4, OVI-98).** Redoes OVI-80/closed PR #12: that extraction
+  was correct and passed review (OVI-81), but its branch was reconciled twice and the
+  second reconciliation hit a real code-level conflict with the since-merged OVI-92
+  (`BoostChip`/`BoostCard`). Rather than force a third reconciliation of an unreviewed
+  `.cs` diff, the board closed PR #12 and this slice redoes the extraction fresh against
+  main at `80d3913` (which already includes OVI-92). The design is unchanged from OVI-80/
+  OVI-81 — this entry carries that reviewed design forward, not a new one.
+  - **Confirms, and carries forward, OVI-80's correction to the original OVI-29 signature
+    survey.** `RateLimitedNotice(DateTimeOffset? retryAfterUtc, TimeZoneInfo local) ->
+    string` never took a `UsageSnapshot` — only two raw scalars the caller already holds —
+    so extracting it needed **no new Core contract row and no new Core type at all**, same
+    as OVI-80 established. Nothing about this signature changed between OVI-80's original
+    landing and this redo.
+  - `O-view.Tray.Presentation.PanelTextFormatter.RateLimitedNotice` and
+    `O-view.Linux.Presentation.PanelTextFormatter.RateLimitedNotice` each state, in their
+    own wording: the limit is shared by the caller's network (not their device alone), the
+    retry time only when GitHub actually sent one (never fabricated — the standing
+    no-fabrication rule), and a reassurance that nothing is wrong with the user's own
+    connection or install — worded identically to OVI-80's original landing, since the
+    reviewed wording was never in question, only the branch's mergeability. Confirmed by
+    test in both skins' `Presentation/PanelTextFormatterTests.cs`.
+  - Landed against the **current, post-OVI-92 shape** of both skins'
+    `Presentation/PanelTextFormatter.cs` — `RateLimitedNotice` is appended after
+    `BoostChip`/`BoostCard`, and each class's doc comment now lists all three sub-slices
+    (3.1, 3.3, 3.4) landed so far, rather than reintroducing OVI-80's pre-BoostChip doc
+    comment wording.
+  - The cross-skin golden-master harness (ADR-0003) gained a sixth fixture family,
+    `RateLimitedNoticeFixture`, parallel to `GoldenMasterFixture`/`UsageStatisticsFixture`/
+    `FreshnessFixture`/`PanelTextResetFixture`/`BoostNoticeFixture` rather than a change to
+    any of them — see the ADR-0003 amendment below.
+  - **Not part of this slice, per its own explicit boundary:** `BoostChip`/`BoostCard`
+    (already merged by OVI-92, untouched here), the usage-tile caveat/rate-card fields, and
+    the off-plan banner remain not yet extracted.
+
 ## Alternatives considered
 
 **Leave the contract implicit, described only by whatever Core's C# types
