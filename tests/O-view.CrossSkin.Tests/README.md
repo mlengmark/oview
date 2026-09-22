@@ -57,6 +57,21 @@ closes over which member a given fixture exercises rather than needing two
 near-identical trios. See ADR-0003's 2026-09-21 (OVI-82/OVI-92) amendments
 for the sign-off trail and the fixture set.
 
+**2026-09-22 update (OVI-98) — a sixth family, for `RateLimitedNotice`.**
+`Fixtures/RateLimitedNoticeFixture.cs`, `Fixtures/RateLimitedNoticeSkinUnderTest.cs`,
+`Fixtures/RateLimitedNoticeFixtures.cs`, and `RateLimitedNoticeGoldenMasterCrossSkinTests.cs`
+mirror `FreshnessFixture`'s single-member fixed-field shape, not
+`PanelTextResetFixture`'s or `BoostNoticeFixture`'s member-selecting-`Render` shape:
+`RateLimitedNotice` is a single fixed two-scalar shape (`DateTimeOffset?`,
+`TimeZoneInfo`) and the only member of its own family, so there was no
+multi-member closure to build. This reuses an already-reviewed shape rather
+than introducing a new one, so it did not need a fresh Chief Gary II/Quinn
+sign-off under ADR-0003's "third differently-shaped family" rule. Two
+fixtures pin: the formatted retry time when GitHub sent one, that no clock
+time is rendered when it did not, and — in both cases — that the notice
+reassures the reader their own connection/install is not at fault. See
+ADR-0003's 2026-09-22 (OVI-98) amendment.
+
 ## Why this project targets `net10.0-windows`
 
 `O-view.Tray` only builds as `net10.0-windows`. A `net10.0-windows` project
@@ -70,17 +85,18 @@ workflow, this project must run on whatever runner already builds
 
 ## How to add a fixture
 
-Five fixture families exist so far: `GoldenMasterFixture` (`UsageSnapshot`,
+Six fixture families exist so far: `GoldenMasterFixture` (`UsageSnapshot`,
 the tooltip's slice), `UsageStatisticsFixture` (`UsageStatistics`, the
 usage-figures/history-coverage slice, OVI-27), `FreshnessFixture`
 (`UsageSnapshot` plus `UtcNow`, OVI-29), `PanelTextResetFixture` (four
-raw-scalar members, OVI-29), and `BoostNoticeFixture` (`BoostNotice` plus
+raw-scalar members, OVI-29), `BoostNoticeFixture` (`BoostNotice` plus
 one `DateTimeOffset` and one `TimeZoneInfo`, shared by `BoostChip` and
-`BoostCard`, OVI-92). Add to whichever family already matches the shape
-your fixture needs; only add a new parallel family for a genuinely new
-shape, and read ADR-0003's amendments first — a new family is the point
-that ADR flags as worth Chief Gary II's and Quinn's sign-off rather than a
-unilateral call.
+`BoostCard`, OVI-92), and `RateLimitedNoticeFixture` (one
+`DateTimeOffset?`/`TimeZoneInfo` raw-scalar member, OVI-98). Add to
+whichever family already matches the shape your fixture needs; only add a
+new parallel family for a genuinely new shape, and read ADR-0003's
+amendments first — a new family is the point that ADR flags as worth
+Chief Gary II's and Quinn's sign-off rather than a unilateral call.
 
 1. **Add the fixture** as a new `GoldenMasterFixture` entry in
    `Fixtures/GoldenMasterFixtures.cs`'s `All` list. A fixture is:

@@ -13,11 +13,11 @@ namespace OView.Tray.Presentation;
 /// own phrasing (ADR-0003).
 ///
 /// <para>Covers the <c>Freshness</c>/<c>Countdown</c>/<c>SessionReset</c>/
-/// <c>WeeklyReset</c>/<c>WeeklyResetConflict</c> family (Phase 1 slice 3.1, OVI-29) and, as
-/// of Phase 1 slice 3.3 (OVI-92), <c>BoostChip</c>/<c>BoostCard</c>. The remaining
-/// <c>PanelText.cs</c> members — the usage-tile caveat, the off-plan banner, the GitHub
-/// rate-limit notice — are separate, differently-shaped sub-slices with their own Core
-/// surface, not yet extracted.</para>
+/// <c>WeeklyReset</c>/<c>WeeklyResetConflict</c> family (Phase 1 slice 3.1, OVI-29), as of
+/// Phase 1 slice 3.3 (OVI-92) <c>BoostChip</c>/<c>BoostCard</c>, and as of Phase 1 slice 3.4
+/// (OVI-98) <c>RateLimitedNotice</c>. The remaining <c>PanelText.cs</c> members — the
+/// usage-tile caveat and the off-plan banner — are separate, differently-shaped sub-slices
+/// with their own new Core surface, not yet extracted.</para>
 /// </summary>
 public static class PanelTextFormatter
 {
@@ -236,4 +236,25 @@ public static class PanelTextFormatter
         return string.Create(CultureInfo.InvariantCulture,
             $"{notice.Text}\n\n{ends}reported by Claude Code, read {read:HH:mm}");
     }
+
+    /// <summary>
+    /// Why an update check came back empty when GitHub throttled it (source app issue #176,
+    /// OVI-98). Takes the raw <paramref name="retryAfterUtc"/>/<paramref name="local"/>
+    /// scalars directly rather than a <see cref="UsageSnapshot"/> field — this notice is not
+    /// part of the usage data contract at all, so extracting it needed no new Core surface
+    /// (confirmed by the OVI-29 signature survey this slice's issue cites).
+    ///
+    /// <para>States the limit is shared by the caller's network, not blamed on their own
+    /// connection: GitHub's unauthenticated rate limit is counted per IP address, so an
+    /// office or VPN exit node reaches it without this user doing anything unusual. The retry
+    /// time is stated only when GitHub actually sent one — inventing "try again in an hour"
+    /// would be a fabricated number (the standing no-fabrication rule).</para>
+    /// </summary>
+    public static string RateLimitedNotice(DateTimeOffset? retryAfterUtc, TimeZoneInfo local) =>
+        "GitHub limits how often it answers without an account, and that limit is shared by "
+        + "everyone on your network. O-view will try again "
+        + (retryAfterUtc is { } at
+            ? string.Create(CultureInfo.InvariantCulture, $"after {TimeZoneInfo.ConvertTime(at, local):HH:mm}.")
+            : "on its next check.")
+        + " Nothing is wrong with your connection or your install.";
 }

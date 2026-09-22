@@ -316,6 +316,33 @@ code, to keep the two heads honest against each other.
     `O-view.Tray.Tests`, `O-view.Linux.Tests`, `O-view.CrossSkin.Tests`) pass after the
     revert, confirmed by `dotnet test O-view.slnx`.
 
+- **2026-09-22 update — a sixth fixture family, `RateLimitedNoticeFixture`, landed (Kit
+  the Builder, Phase 1 slice 3.4, OVI-98).** Redoes OVI-80/closed PR #12's fixture family
+  fresh against main at `80d3913` (post-OVI-92); the design itself was reviewed and
+  accepted under OVI-81 and is unchanged here — only the branch it lands on is new.
+  `PanelText.cs`'s `RateLimitedNotice` (`DateTimeOffset? retryAfterUtc, TimeZoneInfo local
+  -> string`) is a single fixed shape that does not take a `UsageSnapshot` at all, and —
+  unlike the `BoostNotice` family — is the only member of its own shape, so there is no
+  multi-member `Render`-closure to build. This lands as `RateLimitedNoticeFixture`/
+  `RateLimitedNoticeSkinUnderTest`/`RateLimitedNoticeFixtures`/
+  `RateLimitedNoticeGoldenMasterCrossSkinTests`, mirroring `FreshnessFixture`'s fixed-field
+  shape (not `PanelTextResetFixture`'s or `BoostNoticeFixture`'s closure shape), following
+  `GoldenMasterCrossSkinTests`' existing "every skin satisfies every pinned content fact"
+  test structure unchanged.
+  - **This reuses an already-reviewed fixture shape, so it does not trigger this ADR's
+    "third differently-shaped family needs Chief Gary II's and Quinn's sign-off" rule** —
+    `RateLimitedNoticeFixture` is structurally identical to `FreshnessFixture`, not a new
+    shape. OVI-80's original landing reached the same conclusion; this redo carries that
+    conclusion forward rather than re-litigating it.
+  - Two fixtures pin: the formatted retry time when GitHub sent one, that no clock time is
+    rendered when it did not (mirroring `PanelTextResetFixtures.SessionResetUnknown`'s "does
+    not render a clock time" predicate), and — in both cases — that the notice reassures the
+    reader their own connection/install is not at fault.
+  - Confirmed locally with the same worked example as prior amendments: deliberately
+    changing the `"14:30"` content fact to `"14:31"` made both skins fail with a clear
+    per-fixture, per-skin message; reverting passed again. `GoldenMasterFixture`/
+    `SkinUnderTest` were not touched or widened.
+
 ## Alternatives considered
 
 **Shared non-Core text-resource module, consumed by both skins.**

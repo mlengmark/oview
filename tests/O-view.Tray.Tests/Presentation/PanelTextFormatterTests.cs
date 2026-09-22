@@ -227,4 +227,26 @@ public class PanelTextFormatterTests
         Assert.Contains("09:05", result);
         Assert.DoesNotContain("Ends", result);
     }
+
+    [Fact]
+    public void RateLimitedNoticeStatesTheRetryTimeWhenGitHubSentOne()
+    {
+        var retryAfterUtc = new DateTimeOffset(2026, 9, 21, 14, 30, 0, TimeSpan.Zero);
+
+        var result = PanelTextFormatter.RateLimitedNotice(retryAfterUtc, Utc);
+
+        Assert.Contains("14:30", result);
+        Assert.Contains("shared", result);
+        Assert.Contains("Nothing is wrong with your connection", result);
+    }
+
+    [Fact]
+    public void RateLimitedNoticeDoesNotInventARetryTimeWhenGitHubSentNone()
+    {
+        var result = PanelTextFormatter.RateLimitedNotice(null, Utc);
+
+        Assert.DoesNotContain(":", result);
+        Assert.Contains("next check", result);
+        Assert.Contains("Nothing is wrong with your connection", result);
+    }
 }

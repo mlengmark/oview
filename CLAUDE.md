@@ -86,6 +86,19 @@ in this repository to measure a rendered row against. The usage-tile
 caveat, the off-plan banner, and the GitHub rate-limit notice remain the
 last not-yet-extracted `PanelText.cs` members.
 
+**2026-09-22 update (OVI-98) — `PanelText.cs`'s GitHub rate-limit notice
+extracted: `RateLimitedNotice`.** Redoes OVI-80/closed PR #12 fresh
+against main at `80d3913` (post-`BoostChip`/`BoostCard`); the reviewed
+design (OVI-81) is unchanged, only the branch is new — see
+[ADR-0001](docs/adr/0001-core-to-skin-data-contract.md)'s 2026-09-22 entry
+for why PR #12 was closed rather than reconciled a third time. Like OVI-80
+established, this member needed **no new Core surface at all**: its
+confirmed signature (`DateTimeOffset?`, `TimeZoneInfo` -> `string`) never
+took a `UsageSnapshot`, only two raw scalars, so it lives directly in each
+skin's existing `Presentation/PanelTextFormatter.cs`, alongside
+`BoostChip`/`BoostCard`. The usage-tile caveat and the off-plan banner are
+the last not-yet-extracted `PanelText.cs` members.
+
 **Do not assume this repository contains working code.** If you are looking
 for the current, running implementation, that is
 [`mlengmark/O-view`](https://github.com/mlengmark/O-view) — read-only,
