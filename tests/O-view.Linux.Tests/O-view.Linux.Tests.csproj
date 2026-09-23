@@ -1,7 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <!-- Follows O-view.Linux: net10.0, must run on a non-Windows runner. -->
+    <!-- Follows O-view.Linux: net10.0, intended to run on a non-Windows
+         runner. No CI exists in this repository yet, so no such run has ever
+         happened (ADR-0003, CLAUDE.md). -->
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>OView.Linux.Tests</RootNamespace>
     <ImplicitUsings>enable</ImplicitUsings>
