@@ -1,8 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <!-- Follows O-view.Core: must run on a non-Windows runner, or Core's
-         platform-neutrality has no enforcement mechanism. -->
+    <!-- Follows O-view.Core: intended to run on a non-Windows runner, since
+         that is the enforcement mechanism Core's platform-neutrality is meant
+         to rest on. No CI exists in this repository yet, so no such run has
+         ever happened (ADR-0003, CLAUDE.md). -->
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>OView.Core.Tests</RootNamespace>
     <ImplicitUsings>enable</ImplicitUsings>

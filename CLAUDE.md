@@ -198,14 +198,38 @@ slice. For code:
 
 - Build and test with the solution file: `dotnet build O-view.slnx` and
   `dotnet test O-view.slnx`. `O-view.Core` and its test project target
-  `net10.0` and must build and test on a non-Windows runner — that is
-  Core's platform-neutrality enforcement mechanism, not a formality.
+  `net10.0` and are *intended* to build and test on a non-Windows runner —
+  that is the enforcement mechanism Core's platform-neutrality is meant to
+  rest on, not a formality. **No such run has ever happened.** This
+  repository has no CI workflow — no `.github/`, no `.circleci/`, no
+  `.gitlab-ci.yml`, `azure-pipelines.yml`, `.travis.yml`, `appveyor.yml`
+  or `Jenkinsfile` (CONFIRMED by directory listing, 2026-09-23) — and
+  nothing has built or tested this rebuild's code on non-Windows hardware.
+  Until CI exists, the layering rule is held by review and by the
+  structural tests in `O-view.Core.Tests`, not by a green non-Windows
+  build. [ADR-0003](docs/adr/0003-paneltext-anti-drift-mechanism.md)'s
+  2026-09-10 amendment records the same thing ("this repository has no CI
+  workflow yet"); whether to add CI, and what it would cover, is an open
+  board decision, not something to settle in passing.
   `O-view.Tray` and its test project target `net10.0-windows` and only
   build on Windows. `O-view.Linux` and its test project also target
-  `net10.0` and build on any runner, same as Core. `O-view.CrossSkin.Tests`
-  (the [ADR-0003](docs/adr/0003-paneltext-anti-drift-mechanism.md)
-  golden-master harness) targets `net10.0-windows` because it references
-  `O-view.Tray` directly, so it only builds and runs on Windows too.
+  `net10.0` and build on any runner, same as Core.
+- **The anti-drift harness can only ever run on Windows.**
+  `O-view.CrossSkin.Tests` (the
+  [ADR-0003](docs/adr/0003-paneltext-anti-drift-mechanism.md) golden-master
+  harness) targets `net10.0-windows` because it references `O-view.Tray`
+  directly (CONFIRMED —
+  `tests/O-view.CrossSkin.Tests/O-view.CrossSkin.Tests.csproj`). It is the
+  one mechanism that proves the Linux skin's strings match the Windows
+  skin's, and its target framework means **adding CI would not change
+  this**: a non-Windows runner cannot build this project at all, so a
+  Linux CI job would silently skip the very harness that covers the Linux
+  skin. Anyone adding CI should read that as a stated constraint, not
+  discover it from a red build — and should not assume a `ubuntu-latest`
+  job covers the Linux skin's wording. This is a documented structural
+  ceiling, not a defect to fix by changing a target framework; see
+  [`tests/O-view.CrossSkin.Tests/README.md`](tests/O-view.CrossSkin.Tests/README.md)'s
+  "Why this project targets `net10.0-windows`" for the mechanics.
 - Follow the layering rule from the section above absolutely:
   `O-view.Core` gains no display strings, formatting, locale-sensitive
   formats, platform-imposed limits, OS-conditional branches, or platform
