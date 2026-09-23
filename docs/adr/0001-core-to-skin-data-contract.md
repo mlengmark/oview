@@ -81,6 +81,12 @@ render this as an explicit gap, never as zero or blank).
 | `WeeklyBoostNotice` | `BoostNotice?` (nullable; see row below) | — | real / unavailable | the promo notice, if any, for the 7-day meter; added 2026-09-21 (OVI-82) |
 | `BoostNotice` (nested type) | `{text: string, percent: int32?, endsOn: date, ISO-8601 (YYYY-MM-DD)?}` | — | fields inherit the parent `Session`/`WeeklyBoostNotice` field's real/unavailable status | `text` is the promo sentence, relayed verbatim, never reworded, truncated, or re-punctuated by Core; `percent`/`endsOn` are independently nullable and their absence is itself a real fact (the source sentence didn't state one), not a separate unavailable state — added 2026-09-21 (OVI-82) |
 | `BoostNoticesFetchedAtUtc` | timestamp, UTC, ISO-8601 | instant | real / unavailable | when the upstream promo-flag cache was last refreshed; distinct from `LastIngestAt` (O-view's own ingest time) — this is provenance for the promo message itself, needed to word how recently it was read; added 2026-09-21 (OVI-82) |
+| `UnpricedModels` | `UnpricedModels` (nested type; see row below) | — | real / unavailable | vendor model ids seen in the 31-day window that Core could not price, relayed verbatim and never reworded; added 2026-09-23 (OVI-100) — see that amendment below |
+| `UnpricedModels` (nested type) | `{modelIds: string[], status}` | — | real / unavailable | an **empty** list is `real` ("Core priced everything in the window"), not `unavailable`; `unavailable` means Core could not establish the set at all. A **non-empty** list changes what the neighbouring `EstimatedValueWindow31d` means — that figure is then a priced *subtotal*, not a total, and a skin must not render it as a complete figure without saying so; added 2026-09-23 (OVI-100) |
+| `TtlUnrecordedCacheWritesWindow31d` | `TokenCount` (the existing int64 + status type — no new type) | tokens | real / unavailable | cache-write tokens in the 31-day window whose TTL Core never recorded, so they could only be priced under an assumption; `0` is a **real** value meaning "nothing to qualify", not an absent one; added 2026-09-23 (OVI-100) |
+| `Rates` | `RateCardStamp?` (nullable; see row below) | — | real / unavailable | which rate table priced the `Estimated*` figures **in this same snapshot** — carried beside them so a skin cannot caveat one set of figures with another set's provenance; added 2026-09-23 (OVI-100) |
+| `RateCardStamp` (nested type) | `{source: RateCardSource?, asOf: date, ISO-8601 (YYYY-MM-DD)?, isStale: bool}` | — | fields inherit the parent `Rates` field's real/unavailable status | `isStale` is decided **by Core**, against the same "today" the figures beside it were built for — a skin must never re-derive it, or the caveat can end up qualifying a different day from the figures it sits under. The staleness *threshold* stays Core policy, not a contract field (same rule as `LastIngestAt`'s freshness threshold). `asOf` is a bare calendar date, never a formatted one; added 2026-09-23 (OVI-100) |
+| `RateCardSource` | enum {`Bundled`, `UserFile`} | — | real | where the rate table came from — an enum, never a display label: `"bundled"`/`"user file"` are skin wording. `UserFile` is carried forward though unimplemented, because the moment it exists the panel must name it (source repo issue [#255](https://github.com/mlengmark/O-view/issues/255)); added 2026-09-23 (OVI-100) |
 
 **What Core must never emit, by contract:** a pre-formatted display
 sentence, a field separator, a locale-bound date/time string, or any
@@ -580,6 +586,169 @@ not a silent rewrite) as extraction work actually lands.
   - **Not part of this slice, per its own explicit boundary:** `BoostChip`/`BoostCard`
     (already merged by OVI-92, untouched here), the usage-tile caveat/rate-card fields, and
     the off-plan banner remain not yet extracted.
+
+- **2026-09-23 amendment (OVI-100) — the usage-tile caveat's rate-card and pricing-gap
+  surface decided and added to the contract table above (Adrian II the Architect, closing
+  the same kind of gap for sub-slice 4 that the 2026-09-21 (OVI-82) amendment closed for
+  sub-slice 3, per the board's 2026-09-11T02:28Z reply on [OVI-29](/OVI/issues/OVI-29)).**
+
+  **Source re-read, re-confirmed against the same pinned commit this ADR already cites,
+  `897777b`** (verified current for this amendment: `gh api repos/mlengmark/O-view/commits/main`
+  returns the same SHA — the source repo has not moved since OVI-82). Read-only, as always.
+
+  **CONFIRMED** by direct read of three source files:
+
+  - `PanelText.Caveat(PanelStatistics stats) -> string`
+    (`src/O-view.Core/Models/PanelText.cs`, lines 406–432) reads exactly **five** members of
+    `PanelStatistics` and nothing else: `CoverageNote`, `UnpricedModels`,
+    `TtlUnrecordedCacheWrites`, `RatesAreStale`, and `Rates`. It joins the parts that apply
+    with `" · "` and returns `""` when none do. It also calls two other members —
+    `PanelText.RateAge(RateCard)` (line 443) and `UsageFormatter.Tokens(...)` (line 422).
+  - `PanelStatistics` (`src/O-view.Core/Models/PanelStatistics.cs`): `UnpricedModels` is
+    `IReadOnlyList<string>` (line 58), `TtlUnrecordedCacheWrites` is `long` (line 118),
+    `RatesAreStale` is `bool` (line 107), `Rates` is a `RateCard` (line 97), and
+    `CoverageNote` is the leaked sentence this ADR's `HistoryCoverage` row **already
+    replaced** in OVI-27.
+  - `RateCard`/`RateCardSource` (`src/O-view.Core/Pricing/RateCard.cs`, lines 9–112):
+    `RateCard` is a record of `AsOf` (`DateOnly`), `Source` (`RateCardSource`), `Models`
+    (`IReadOnlyList<ModelEntry>` — the whole rate table), and `UsInferenceMultiplier`
+    (`decimal`), plus `StaleAfter` (a static 90-day `TimeSpan`), `IsStaleOn(DateOnly)`,
+    `SourceLabel`, `Find(string)`, and `RatesFor(string, UsageModifiers)`. `RateCardSource`
+    is `{Bundled, UserFile}`, with `UserFile` declared and documented as not implemented.
+
+  **Decision 1 — `RateCard` itself does not go on the contract; a narrow projection of it
+  does, named `RateCardStamp`.** The source's `RateCard` is a *pricing engine* — a rate
+  table plus the lookup methods that price against it. A skin needs three facts out of it
+  and no others: where the table came from, what date it was read, and whether Core judged
+  it old enough to be worth saying so. Putting the whole type on the contract would hand
+  every skin the pricing table and the lookup surface as well, which is a far larger
+  boundary than the caveat needs and an open invitation for a skin to price something
+  itself.
+
+  **Rejected: reusing the source's `RateCard` name for the projection.** The name would
+  survive while ~five of its eight members did not, so a future provider port would reach
+  for `RateCard.RatesFor(...)` on the contract type, find nothing, and have to discover by
+  reading that this `RateCard` is not that one. A different name (`RateCardStamp`) costs one
+  word and removes the trap. The task that scoped this work named `RateCard` as the likely
+  shape and explicitly allowed "whatever the confirmed shape turns out to be"; this is that
+  deviation, recorded rather than assumed.
+
+  **Decision 2 — `isStale` stays a Core decision, and the 90-day threshold stays out of the
+  contract entirely.** This is not a style preference; the source states the reason and it is
+  a correctness one. `PanelStatistics.RatesAreStale`'s own doc comment (lines 100–106) says it
+  is "decided in `Build`, which is the only place that knows both the card and the reader's
+  own today — so the caveat cannot be rendered against a different day from the figures it
+  qualifies." A skin handed `asOf` + `staleAfter` and left to compare against its own clock
+  can word a caveat for a different day from the one the figures beside it were built for.
+  Core does the comparison once, against the same `today` it built the window from, and hands
+  over the answer. The threshold itself (90 days) is Core policy, kept off the contract for
+  the same reason the OVI-16 amendment kept the per-provider freshness threshold off it.
+
+  **Decision 3 — `SourceLabel` does not travel; the enum does.** `RateCard.SourceLabel`
+  returns `"bundled"` or `"user file"` — a display string built inside the platform-neutral
+  layer, the same leak class this whole ADR exists to remove. Core hands the skin
+  `RateCardSource`; each skin words it. `UserFile` is carried forward even though nothing
+  emits it today, because the source's own reasoning for recording it applies unchanged:
+  a user-editable pricing file whose provenance is not on screen is a fabricated-number
+  vector (source repo issue #255). Dropping the member now would mean the contract silently
+  loses the distinction on the day it starts to matter.
+
+  **Decision 4 — `asOf` is a bare calendar date, not a formatted one.** The source renders
+  it `{card.AsOf:d MMM yyyy}` under `CultureInfo.InvariantCulture` (line 445) — a
+  locale-bound date string, already banned by this ADR's "what Core must never emit" rule,
+  and the same call this ADR's 2026-09-21 amendment made for `BoostNotice.EndsOn`.
+
+  **Decision 5 — `TtlUnrecordedCacheWritesWindow31d` reuses the existing `TokenCount` type;
+  no new type is added for it.** It is a token count with a trust status, which is exactly
+  what `TokenCount(long? Value, UsageValueStatus Status)` already is, and each skin's own
+  `Presentation/UsageFormatter.Tokens(TokenCount)` already renders that type — so the field
+  arrives at the skin already renderable, with no new formatter surface. The field name
+  carries the window (`...Window31d`) to match `OutputTokensWindow31d`/
+  `EstimatedValueWindow31d`, because the source's sum is scoped to the 31-day window
+  specifically (`PanelStatistics.Build`, line 247) and an unscoped name would invite a skin
+  to caveat the "today" tiles with a 31-day figure.
+
+  **Decision 6 — `0` and the empty list are `real` values, not `unavailable` ones.** Both
+  of these fields describe *conditions that clear*: `TtlUnrecordedCacheWritesWindow31d`
+  falls to zero as the affected history ages out of the window, and `UnpricedModels` empties
+  when every model in the window has a published rate. "Core checked and there is nothing to
+  qualify" is a measured fact and must not render as a gap. `unavailable` on either field
+  means only one thing — Core could not establish the value at all — and a skin seeing it
+  must not imply the opposite by staying silent.
+
+  **Decision 7 — a non-empty `UnpricedModels` changes what the figure beside it means, and
+  the contract says so out loud.** This is the "never fabricate a number" rule biting at the
+  level of *composition* rather than of a single field: `EstimatedValueWindow31d` is a
+  perfectly real `estimated` decimal, and it is also not the whole window. The source app
+  learned this the hard way in the other direction — one unrecognised model used to blank
+  both Est. tiles entirely (`PanelStatistics` lines 54–56, 279–286), which traded an
+  understated total for no total at all. The contract's answer is neither: hand over the
+  subtotal *and* the exclusions, and oblige the skin to render both together.
+
+  **`UnpricedModels` carries vendor model ids, not display names — and "unpriced" does not
+  mean "unrecognised".** Two separate points, both CONFIRMED:
+  - The source joins the raw ids into the sentence (`PanelText.cs` line 417), and does *not*
+    route them through `ModelDisplayName.For(...)` the way `PanelStatistics.SliceByModel`
+    does for its priced slices (line 273). The contract carries the id, verbatim. Mapping ids
+    to display names is a concern the future `ModelBreakdown[]` port will have to settle for
+    itself; pre-empting it here would decide that slice's question inside this one.
+  - A model lands in `UnpricedModels` whenever `CostEstimator.EstimateUsd(...)` returns null,
+    and `RateCard.RatesFor` (lines 97–111) returns null for **three** distinct causes: an
+    unrecognised model id, an unrecognised modifier value, or fast mode on a model that has
+    no published fast-mode row. The source's own caveat wording ("no published rate") is true
+    of all three, but the contract does not currently carry *which* — and this amendment
+    deliberately does not add a reason code. Distinguishing them needs the pricing/provider
+    port to exist first; flagged here so a future slice raises it explicitly rather than
+    discovering it.
+
+  **What this amendment does *not* add, because the existing contract already covers it:**
+  the coverage part of the caveat. `stats.CoverageNote` is the first of `Caveat`'s four
+  parts, and `HistoryCoverage.RecordedDays`/`WindowDays` replaced it in OVI-27 — the sentence
+  already lives in each skin's own `Presentation/PanelStatisticsFormatter.CoverageNote`. The
+  rebuild's `Caveat` composes that existing skin-side sentence with the three new parts; it
+  does not re-derive it, and Core gains nothing for it.
+
+  **Composition — these fields join the existing `UsageStatistics` record, rather than a new
+  parallel one.** They qualify precisely the 31-day figures `UsageStatistics` already
+  carries, and the source's own reason for hanging the card off the result applies unchanged
+  (`PanelStatistics.Build`, lines 242–245: "the tiles and the caveat beneath them have to
+  describe the same rates"). Two build-side constraints follow from that and are stated here
+  because they are contract consequences, not implementation taste:
+  - They are added as `init`-only properties with defaults, **not** as new positional
+    constructor parameters. `UsageStatistics`'s positional constructor is already called by
+    both skins' tests and by `UsageStatisticsFixtures`; widening it would churn merged,
+    reviewed code for no contract gain. This mirrors how the source's own `PanelStatistics`
+    declares these same three members (lines 58, 97, 118).
+  - `Rates`'s default must be an explicitly **unavailable** stamp, never a bundled stamp
+    dated "now". A defaulted provenance that asserts a source and a date Core never
+    established would be a fabricated number wearing a type — the precise failure this
+    contract's status flags exist to prevent.
+
+  **Out of scope for this amendment, named explicitly so it isn't assumed decided:**
+  - **The provider and pricing code that populate these fields** — porting `ModelCatalog`,
+    `CostEstimator`, `RateCardFeed`, and `RateCardDrift` is separate, future work, exactly as
+    the OVI-82 amendment left `BoostNotices.TryRead`/`.Parse`/`.For` for a later slice. This
+    amendment defines only the shape the formatter's input needs. **INFERRED, not confirmed:**
+    a greenfield store in this rebuild would likely always emit `0` for
+    `TtlUnrecordedCacheWritesWindow31d`, since the source's non-zero case exists only for rows
+    a pre-issue-#255 build ingested. The field is on the contract regardless, because a ported
+    store may inherit such rows and because a skin must be told the assumption was made, not
+    left to assume it wasn't.
+  - **`RateCardDrift`** — the source's value-comparison check that caught a rate row which was
+    wrong on the day it was written (`RateCard.cs` lines 56–59, source issue #256). Age is
+    necessary and not sufficient; `isStale` answers only the age half. Whether drift detection
+    produces its own contract field is a question for the pricing port, not this amendment.
+  - **`PanelText.TokenScopeCaveat`** (line 474) and **`PanelText.RateAge`** (line 443) are in
+    sub-slice 4's *build* scope but need no Core surface decided here: `RateAge` renders from
+    the `RateCardStamp` this amendment adds, and `TokenScopeCaveat` is a bare `const string`
+    with no input at all — the same "no new Core surface" case `RateLimitedNotice` was
+    (OVI-80/OVI-98). Named so the build slice does not silently drop `TokenScopeCaveat`: the
+    source's own doc comment (lines 463–466) argues it must render *always*, because a caveat
+    that appears only sometimes teaches a reader that its absence means full coverage — and
+    here that would be false every time.
+  - **The harness fixture-family shape for testing this sub-slice** is decided in
+    [ADR-0003](0003-paneltext-anti-drift-mechanism.md)'s 2026-09-23 (OVI-100) amendment, not
+    here — this amendment is the Core-contract half of that sub-slice's sign-off only.
 
 ## Alternatives considered
 
