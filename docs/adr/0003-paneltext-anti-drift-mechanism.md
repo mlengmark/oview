@@ -343,6 +343,104 @@ code, to keep the two heads honest against each other.
     per-fixture, per-skin message; reverting passed again. `GoldenMasterFixture`/
     `SkinUnderTest` were not touched or widened.
 
+- **2026-09-23 amendment (OVI-100) — sub-slice 4's harness shape, PROPOSED; Quinn's
+  sign-off requested, not yet recorded (Adrian II the Architect).** Mirrors the
+  2026-09-21 (OVI-82) amendment's structure for sub-slice 3: the proposal is written
+  down first, the sign-off outcome is recorded in its own dated entry afterwards. **No
+  slice may build against this shape until that second entry exists.**
+
+  **The fixture families so far, for count:** `GoldenMasterFixture` (tooltip,
+  `UsageSnapshot`), `UsageStatisticsFixture` (OVI-27, `UsageStatistics`),
+  `FreshnessFixture` (OVI-29 item 1, `UsageSnapshot` + `utcNow` + zone),
+  `PanelTextResetFixture` (OVI-29 item 2, four raw-scalar members sharing one fixture type
+  via a member-selecting `Render`), `BoostNoticeFixture` (OVI-82/OVI-92, `BoostNotice` +
+  `DateTimeOffset` + zone, member-selecting `Render`), and `RateLimitedNoticeFixture`
+  (OVI-98, a single fixed raw-scalar shape). This proposal is a seventh.
+
+  **Signatures, confirmed by direct source read (same pinned commit, `897777b`) —
+  see [ADR-0001](0001-core-to-skin-data-contract.md)'s 2026-09-23 amendment for the full
+  citation:** `Caveat(PanelStatistics stats) -> string` (`PanelText.cs` line 406),
+  `RateAge(RateCard card) -> string` (line 443), and `TokenScopeCaveat`, a
+  `public const string` with no input at all (line 474). Under ADR-0001's 2026-09-23
+  amendment these become, in each skin, `Caveat(UsageStatistics) -> string`,
+  `RateAge(RateCardStamp) -> string`, and a constant.
+
+  **The question this proposal actually has to answer, and why it is not obvious.**
+  `Caveat`'s input shape is `UsageStatistics` — *exactly* the shape
+  `UsageStatisticsFixture`/`UsageStatisticsSkinUnderTest` already carry
+  (`Func<UsageStatistics, string> Render`). No prior sub-slice has hit that: every new
+  family so far was new because its input shape was new. So the honest options are two,
+  not one, and this is the first time this ADR has had to choose between them.
+
+  **Rejected: fold `Caveat` into the existing `UsageStatisticsFixture` family.** It fits
+  the type signature perfectly, and that is the whole of the argument for it. Against it:
+  `UsageStatisticsSkinUnderTest` carries a *single* `Render` delegate, wired in
+  `UsageStatisticsGoldenMasterCrossSkinTests` to a test-only composite of `Tokens`, `Usd`,
+  and `CoverageNote`. Adding `Caveat` to that composite silently widens what its three
+  merged, reviewed fixtures assert — `Unavailable`'s "never renders a fabricated $0.00"
+  predicate would begin policing caveat text it was never written for — and a failure
+  message would no longer name which member produced the offending string. Giving the
+  family a second delegate instead means changing an already-landed family's *shape*,
+  which is the move this ADR's standing principle exists to stop. Either way the cost
+  lands on merged code rather than on new code, which is the wrong way round.
+
+  **Proposal: a seventh parallel family, `UsageCaveatFixture` /
+  `UsageCaveatSkinUnderTest` / `UsageCaveatFixtures` /
+  `UsageCaveatGoldenMasterCrossSkinTests`,** following `BoostNoticeFixture`'s and
+  `PanelTextResetFixture`'s already-reviewed member-selecting shape rather than inventing
+  a new one: `UsageCaveatSkinUnderTest` exposes both entry points
+  (`Func<UsageStatistics, string> Caveat` and `Func<RateCardStamp, string> RateAge`), and
+  `UsageCaveatFixture.Render` closes over which one a given fixture exercises. Two entry
+  points with *different* input shapes is precisely what that closure shape is for.
+  `ContentFact` is reused unchanged, as every family since OVI-27 has.
+  `GoldenMasterFixture`/`SkinUnderTest` — and now also `UsageStatisticsFixture`/
+  `UsageStatisticsSkinUnderTest` — remain untouched, per this ADR's standing principle.
+
+  **Why `RateAge` is pinned as its own entry point rather than only through `Caveat`.**
+  `Caveat` invokes the rate line only when `isStale` is true, so a family that reached it
+  solely that way would leave the source's stated rule — that the *provenance* is named
+  alongside the date, because "a date says how likely the table is to have moved; a source
+  says whose table it is" (`PanelText.RateAge` doc comment, source issue #255) — checked
+  only incidentally. A skin could drop the source word entirely and still pass. Pinning
+  `RateAge` directly makes that a first-class content fact.
+
+  **Fixtures this family should carry (five; the build slice may add, not drop).** Each
+  is a *content fact*, not an exact sentence — both skins must state the fact, in whatever
+  wording each chooses (this ADR's standing rule):
+  1. **No caveat at all** — full coverage, nothing unpriced, zero TTL-unrecorded writes,
+     rates not stale. Pins that neither skin invents a qualifier when there is nothing to
+     qualify, the mirror of the source's own "a caveat that is always on says nothing".
+  2. **Unpriced models present** — pins that every excluded model id appears, *and* that
+     the 31-day estimate beside it is not presented as a complete total (ADR-0001's
+     2026-09-23 amendment, decision 7).
+  3. **TTL-unrecorded cache writes non-zero** — pins that the count is stated and that the
+     assumption behind it (priced at the shorter cache-write rate) is named, not implied.
+  4. **Stale rates** — pins that both the source *and* the date reach the reader, via
+     `RateAge`.
+  5. **`Rates` unavailable** — the hardest case and the one most likely to be got wrong:
+     pins that neither skin renders a rate-age line at all, and that neither implies the
+     rates are current by simply falling silent.
+
+  Fixtures 2–4 exercise conditions that *clear*, so each should also be represented in its
+  cleared state by fixture 1 rather than only in isolation.
+
+  **Not authorized yet.** Per this ADR's OVI-27, OVI-45 and OVI-82 amendments, a
+  differently-shaped fixture family needs Quinn's explicit sign-off before a slice may
+  build against it — not another slice's unilateral call. It is arguable that the OVI-98
+  precedent exempts this one (the *shape* here is `BoostNoticeFixture`'s, already
+  reviewed, and that amendment held that reusing a reviewed shape does not re-trigger the
+  gate). This amendment does not rely on that exemption, for a specific reason: the
+  genuinely new question here is not the shape but the **"why not extend an existing
+  family"** choice above, which no prior amendment has had to make and which a second
+  reader should rule on rather than an author. Chief Gary II's OVI-45 pre-authorization of
+  "Adrian decides, conditional on looping Quinn in" is treated as standing, as it was for
+  OVI-82, so the request went to Quinn directly rather than re-escalating to Gary.
+
+  Sign-off requested from Quinn the Reviewer on 2026-09-23 (Paperclip interaction on
+  [OVI-100](/OVI/issues/OVI-100)). **The outcome will be recorded in its own dated entry
+  below, exactly as OVI-82's was — until that entry exists, this proposal is not
+  authorized and Kit's sub-slice 4 build task must not start against it.**
+
 ## Alternatives considered
 
 **Shared non-Core text-resource module, consumed by both skins.**
