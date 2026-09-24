@@ -210,7 +210,11 @@ slice. For code:
   build. [ADR-0003](docs/adr/0003-paneltext-anti-drift-mechanism.md)'s
   2026-09-10 amendment records the same thing ("this repository has no CI
   workflow yet"); whether to add CI, and what it would cover, is an open
-  board decision, not something to settle in passing.
+  board decision, not something to settle in passing. **Read
+  [ADR-0004](docs/adr/0004-what-non-windows-ci-could-and-could-not-prove.md)
+  before proposing or adding CI** — it sets out, project by project, what a
+  non-Windows run would and would not prove, why the anti-drift harness is
+  not being restructured, and the recommendation put to the board.
   `O-view.Tray` and its test project target `net10.0-windows` and only
   build on Windows. `O-view.Linux` and its test project also target
   `net10.0` and build on any runner, same as Core.
