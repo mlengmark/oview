@@ -74,14 +74,26 @@ ADR-0003's 2026-09-22 (OVI-98) amendment.
 
 ## Why this project targets `net10.0-windows`
 
-`O-view.Tray` only builds as `net10.0-windows`. A `net10.0-windows` project
+`O-view.Tray` targets `net10.0-windows`. A `net10.0-windows` project
 can reference a `net10.0` project (`O-view.Linux`, `O-view.Core`) without
 issue, so targeting `net10.0-windows` here is what lets one project — and
 one `dotnet test` run — invoke both skins' code. The consequence, flagged
-by ADR-0003 itself: this harness only builds and runs on Windows, same as
-`O-view.Tray` and `O-view.Tray.Tests`. When this repository gets a CI
-workflow, this project must run on whatever runner already builds
-`O-view.Tray` — not a Linux-only runner, or it will not build at all.
+by ADR-0003 itself: this harness is declared Windows-only, same as
+`O-view.Tray` and `O-view.Tray.Tests`.
+
+"Declared" is the precise word today. This section used to say the
+harness "only builds and runs on Windows" and that a Linux-only runner
+"will not build [it] at all". **That was wrong** (corrected 2026-09-24,
+OVI-126). `dotnet test O-view.slnx` on `ubuntu-latest` (.NET SDK
+10.0.401) built this project and passed all 6 of its tests, alongside
+`O-view.Tray` and `O-view.Tray.Tests` (CONFIRMED:
+[run 35984892283](https://github.com/mlengmark/oview/actions/runs/35984892283),
+step "Probe (temporary)"). The likely reason is that no `-windows`
+project sets `UseWPF` or `UseWindowsForms` yet (INFERRED; not isolated).
+Once the Tray skin gains real Windows UI code, a Linux build of this
+project is expected to fail with NETSDK1100 (INFERRED). So this project
+must still run on a Windows runner in CI. Do not make a Linux runner its
+only home.
 
 ## How to add a fixture
 
