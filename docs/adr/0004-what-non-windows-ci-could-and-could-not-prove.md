@@ -79,9 +79,9 @@ the three `net10.0-windows` projects too, and fail (INFERRED from SDK
 behaviour, error NETSDK1100; nothing was run on Linux). The Linux job
 must name the four `net10.0` projects explicitly, or use a solution
 filter (`.slnf`) that lists only them. No such filter exists yet
-(CONFIRMED: no `.slnf` file anywhere in the repository). Whichever is chosen goes
-into the slice spec if the board approves (a′), so the slice does not
-start from a red build.
+(CONFIRMED: no `.slnf` file anywhere in the repository). Whichever is
+chosen goes into the slice spec if the board approves (a′), so the
+slice does not start from a red build.
 
 **Note on the "No" rows.** By default the .NET SDK refuses to build a
 `-windows` target framework on a non-Windows machine unless the project
@@ -277,8 +277,9 @@ To be precise about what that job adds: a Linux *build* adds very little
 over a Windows build. Target-framework resolution and the CA1416
 platform-compatibility analyzer behave the same on either operating
 system (INFERRED). CA1416 fails the build on both, because Core, Linux
-and Tray set `TreatWarningsAsErrors` (CONFIRMED: each `.csproj`), and a `DllImport` in Core would compile on Linux just as it does
-on Windows (INFERRED from SDK knowledge; not run). The Linux job's real
+and Tray set `TreatWarningsAsErrors` (CONFIRMED: each `.csproj`). A
+`DllImport` in Core would compile on Linux just as it does on Windows
+(INFERRED from SDK knowledge; not run). The Linux job's real
 value is **test execution on the Linux runtime**. So a green Linux badge
 is not, by itself, proof that Core is platform-neutral. Core's
 neutrality at compile time is held by its `net10.0` target, the
