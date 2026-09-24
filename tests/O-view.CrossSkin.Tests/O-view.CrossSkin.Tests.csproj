@@ -6,9 +6,13 @@
          run that invokes both skins' string-construction code. A net10.0-windows
          project can reference net10.0 projects (O-view.Linux, O-view.Core) without
          issue, so this single project covers both. The consequence, flagged by
-         ADR-0003 itself: this harness only builds and runs on Windows, same as
-         O-view.Tray and O-view.Tray.Tests — a future CI setup must run it on the
-         same Windows runner the Tray build already needs, not a Linux runner. -->
+         ADR-0003 itself: this harness is declared Windows-only, same as
+         O-view.Tray and O-view.Tray.Tests, and CI must run it on a Windows
+         runner. It does currently build and pass on Linux too (CONFIRMED,
+         2026-09-24, CI run 35984892283), because no project sets UseWPF or
+         UseWindowsForms yet (INFERRED). Expect that to stop once O-view.Tray
+         gains Windows UI code. See README.md, "Why this project targets
+         net10.0-windows". -->
     <TargetFramework>net10.0-windows</TargetFramework>
     <RootNamespace>OView.CrossSkin.Tests</RootNamespace>
     <ImplicitUsings>enable</ImplicitUsings>

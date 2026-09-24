@@ -211,23 +211,34 @@ slice. For code:
   2026-09-10 amendment records the same thing ("this repository has no CI
   workflow yet"); whether to add CI, and what it would cover, is an open
   board decision, not something to settle in passing.
-  `O-view.Tray` and its test project target `net10.0-windows` and only
-  build on Windows. `O-view.Linux` and its test project also target
-  `net10.0` and build on any runner, same as Core.
-- **The anti-drift harness can only ever run on Windows.**
-  `O-view.CrossSkin.Tests` (the
+  `O-view.Tray` and its test project target `net10.0-windows`: they are
+  Windows-only by declaration. Today they also build and pass on Linux
+  (see the next bullet), but nothing should rely on that. `O-view.Linux`
+  and its test project also target `net10.0` and build on any runner,
+  same as Core.
+- **The anti-drift harness is Windows-only by declaration, not yet by
+  necessity.** `O-view.CrossSkin.Tests` (the
   [ADR-0003](docs/adr/0003-paneltext-anti-drift-mechanism.md) golden-master
   harness) targets `net10.0-windows` because it references `O-view.Tray`
   directly (CONFIRMED —
   `tests/O-view.CrossSkin.Tests/O-view.CrossSkin.Tests.csproj`). It is the
   one mechanism that proves the Linux skin's strings match the Windows
-  skin's, and its target framework means **adding CI would not change
-  this**: a non-Windows runner cannot build this project at all, so a
-  Linux CI job would silently skip the very harness that covers the Linux
-  skin. Anyone adding CI should read that as a stated constraint, not
-  discover it from a red build — and should not assume a `ubuntu-latest`
-  job covers the Linux skin's wording. This is a documented structural
-  ceiling, not a defect to fix by changing a target framework; see
+  skin's. This bullet previously said a non-Windows runner "cannot build
+  this project at all". **That was wrong** (corrected 2026-09-24, OVI-126).
+  A one-off probe ran `dotnet test O-view.slnx` on `ubuntu-latest` (.NET
+  SDK 10.0.401): all seven projects built, including this one, and all
+  124 tests passed, including this project's 6 (CONFIRMED:
+  [run 35984892283](https://github.com/mlengmark/oview/actions/runs/35984892283),
+  step "Probe (temporary)"). It builds because no `-windows` project sets
+  `UseWPF` or `UseWindowsForms`, so nothing pulls in the Windows desktop
+  framework (INFERRED; not isolated). **Expect that to stop** the moment
+  the Tray skin gains real Windows UI code (INFERRED). So anyone adding
+  CI should still run this harness on a Windows runner, and should not
+  assume a `ubuntu-latest` job covers the Linux skin's wording unless
+  that job runs this project by name. Its Windows-only status is a
+  declared boundary that becomes a hard one once the Tray skin gains
+  Windows UI. It is not a defect to fix by changing a target framework;
+  see
   [`tests/O-view.CrossSkin.Tests/README.md`](tests/O-view.CrossSkin.Tests/README.md)'s
   "Why this project targets `net10.0-windows`" for the mechanics.
 - Follow the layering rule from the section above absolutely:
