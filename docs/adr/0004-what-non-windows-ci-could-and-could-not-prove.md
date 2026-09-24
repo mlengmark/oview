@@ -18,7 +18,7 @@
   Core.Tests 13, Linux.Tests 52, Tray.Tests 53, CrossSkin.Tests 6
   (CONFIRMED: [run 35984892283](https://github.com/mlengmark/oview/actions/runs/35984892283),
   step "Probe (temporary)", read from the run log). The sections below
-  are corrected in place: the table, "How the Linux job has to invoke
+  are corrected in place: the table, "How the Linux job should invoke
   them", "What it would not verify" point 1, R1's benefit, and R3. The
   recommendation does not change; "Why the Linux job still excludes the
   harness" says why.
