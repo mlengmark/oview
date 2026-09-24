@@ -255,3 +255,11 @@ to add.
 - R1 remains open as a future option. If the Tray skin's formatters
   ever need to run somewhere Windows is unavailable, this record is the
   starting point, and it should be amended rather than re-derived.
+
+**Records this one supersedes in part:**
+- ADR-0003's "Consequences" sentence saying the combined cross-skin test
+  "likely needs to run on the same Windows CI runner the Tray build
+  already uses" assumed a CI runner that does not exist (CONFIRMED: no CI
+  configuration on `main`). ADR-0003 carries a dated 2026-09-24 amendment
+  under that sentence pointing here. This record now owns the CI-runner
+  question that ADR-0003 left open.

@@ -495,6 +495,18 @@ strings is why this ADR's mechanism checks facts, not bytes.
   authorizes**. Per this role's boundaries, that cost is flagged to Chief
   Gary II for scoping into Kit the Builder's extraction slice, rather than
   decided unilaterally here.
+  - **2026-09-24 amendment (OVI-111) — the CI-runner sentence above is
+    superseded by [ADR-0004](0004-what-non-windows-ci-could-and-could-not-prove.md).**
+    It assumed "the same Windows CI runner the Tray build already uses".
+    No such runner exists: this repository has no CI configuration of any
+    kind (CONFIRMED: no CI config on `main` at `a2a5556`, per Quinn the
+    Reviewer on OVI-112, and the directory listing recorded in
+    `CLAUDE.md`). This record's own 2026-09-10 amendment already said so.
+    The only surviving part of the sentence is that the harness needs a
+    Windows runner (CONFIRMED: `O-view.CrossSkin.Tests` targets
+    `net10.0-windows`). Whether any CI is added, which runners it uses,
+    and what each job would and would not prove are now covered by
+    ADR-0004. Read that record, not this sentence.
 - The fixture set needs initial content (a representative set of Core
   snapshots covering ordinary usage, near-limit usage, estimated/fallback
   data, and unavailable data) before the test can catch anything. Building
