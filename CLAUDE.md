@@ -218,7 +218,9 @@ slice. For code:
   `O-view.Tray` and its test project target `net10.0-windows` and only
   build on Windows. `O-view.Linux` and its test project also target
   `net10.0` and build on any runner, same as Core.
-- **The anti-drift harness can only ever run on Windows.**
+- **The anti-drift harness runs only on Windows as currently
+  structured.** [ADR-0004](docs/adr/0004-what-non-windows-ci-could-and-could-not-prove.md)
+  route R1 records the route to change that and why it is not taken.
   `O-view.CrossSkin.Tests` (the
   [ADR-0003](docs/adr/0003-paneltext-anti-drift-mechanism.md) golden-master
   harness) targets `net10.0-windows` because it references `O-view.Tray`

@@ -73,6 +73,16 @@ A Linux job would therefore build two source projects and run two test
 projects: `O-view.Core.Tests` (13 tests) and `O-view.Linux.Tests` (52
 tests).
 
+**How the Linux job has to invoke them.** It cannot run
+`dotnet test O-view.slnx`. At solution level the SDK would try to build
+the three `net10.0-windows` projects too, and fail (INFERRED from SDK
+behaviour, error NETSDK1100; nothing was run on Linux). The Linux job
+must name the four `net10.0` projects explicitly, or use a solution
+filter (`.slnf`) that lists only them. No such filter exists yet
+(CONFIRMED: no `.slnf` file anywhere in the repository). Whichever is chosen goes
+into the slice spec if the board approves (a′), so the slice does not
+start from a red build.
+
 **Note on the "No" rows.** By default the .NET SDK refuses to build a
 `-windows` target framework on a non-Windows machine unless the project
 sets `EnableWindowsTargeting=true` (INFERRED from SDK behaviour; not run
@@ -118,15 +128,36 @@ recommend setting that flag. See "Alternatives considered", R3.
 
 **Is the anti-drift guarantee weaker than ADR-0003 claims? No.** ADR-0003
 promises that both skins' wording is checked against the same pinned
-content facts in one test run. It already said that run needs a Windows
-runner (CONFIRMED: ADR-0003, "Consequences"). The harness runs the Linux
-skin's code on Windows, not on Linux. For the code that exists today, that
-loses nothing, because that code is pure, uses invariant culture, and
-every fixture runs in UTC (CONFIRMED, per point 4). Whether the output
-would be byte-identical on a Linux runtime is INFERRED, not observed. So
-there is nothing to escalate as a finding about shipped work. The one
-real gap is that no machine runs the harness automatically. That is a
-CI question, which is this ADR's question.
+content facts in one test run. Its "Consequences" section said that run
+"likely needs to run on the same Windows CI runner the Tray build already
+uses". That was hedged prose, not a verified fact. The fact itself is
+CONFIRMED by the project file: `O-view.CrossSkin.Tests` targets
+`net10.0-windows` (CONFIRMED:
+`tests/O-view.CrossSkin.Tests/O-view.CrossSkin.Tests.csproj`, and
+ADR-0003's 2026-09-24 amendment under that sentence). The harness runs
+the Linux skin's code on Windows, not on Linux. For the code that exists
+today, that loses nothing, because that code is pure, uses invariant
+culture, and every fixture runs in UTC (CONFIRMED, per point 4). Whether
+the output would be byte-identical on a Linux runtime is INFERRED, not
+observed. So there is nothing to escalate as a finding about shipped
+work. The one real gap is that no machine runs the harness
+automatically. That is a CI question, which is this ADR's question.
+
+**When this conclusion must be revisited.** "Not weaker" holds only
+while the Linux skin's code behaves the same on every runtime. Because
+the harness runs that code on the Windows runtime, the moment the Linux
+skin gains OS- or runtime-sensitive behaviour, the cross-skin guarantee
+for Linux holds only under Windows runtime conditions. Examples:
+- the `displayZone ?? TimeZoneInfo.Local` default at
+  `src/O-view.Linux/Presentation/TooltipFormatter.cs:20` being exercised
+  rather than overridden by a pinned zone (CONFIRMED the default exists;
+  every harness fixture passes `TimeZoneInfo.Utc` today, per point 4);
+- Avalonia text measurement or layout feeding into any string;
+- anything culture-, ICU- or time-zone-database-dependent.
+
+When any of these lands, revisit this conclusion and route R1 below.
+The Linux job in option (a′) does not cover this gap on its own: it runs
+`O-view.Linux.Tests` on Linux, but not the cross-skin comparison.
 
 ## Could the anti-drift harness be restructured to run platform-neutrally?
 
@@ -189,7 +220,9 @@ fix for that is a Windows job, not a restructured harness.
   - *Not recommended on its own.*
 - **(a′) Add CI with two jobs.** A Windows job builds and tests the whole
   solution, including the anti-drift harness and the Tray skin. A Linux
-  job builds and tests the four `net10.0` projects.
+  job builds and tests the four `net10.0` projects, named explicitly or
+  through a solution filter (see "How the Linux job has to invoke
+  them").
   - *Covers:* everything that exists, automatically, on every PR.
   - *Cost:* one small workflow slice for Kit, plus runner time. Windows
     runners cost more per minute than Linux runners on GitHub-hosted
@@ -240,6 +273,18 @@ Core's platform-neutrality is meant to rest on. Leaving it out would make
 that documented intent permanently hypothetical, and the job costs little
 to add.
 
+To be precise about what that job adds: a Linux *build* adds very little
+over a Windows build. Target-framework resolution and the CA1416
+platform-compatibility analyzer behave the same on either operating
+system (INFERRED). CA1416 fails the build on both, because Core, Linux
+and Tray set `TreatWarningsAsErrors` (CONFIRMED: each `.csproj`), and a `DllImport` in Core would compile on Linux just as it does
+on Windows (INFERRED from SDK knowledge; not run). The Linux job's real
+value is **test execution on the Linux runtime**. So a green Linux badge
+is not, by itself, proof that Core is platform-neutral. Core's
+neutrality at compile time is held by its `net10.0` target, the
+analyzer, review, and `O-view.Core.Tests`'s structural tests, on either
+runner.
+
 ## Consequences
 
 **Positive:**
@@ -252,9 +297,14 @@ to add.
 **Negative:**
 - (a′) spends Windows runner time on every PR. The Linux job's value is
   mostly deferred until OS-sensitive code lands (INFERRED, per point 4).
-- R1 remains open as a future option. If the Tray skin's formatters
-  ever need to run somewhere Windows is unavailable, this record is the
-  starting point, and it should be amended rather than re-derived.
+- R1 remains open as a future option. The trigger that matters most is
+  **when the Linux skin gains OS- or runtime-sensitive formatting**
+  (see "When this conclusion must be revisited"). At that point the
+  harness's Windows-only run stops being a complete check of the Linux
+  skin, and this conclusion and R1 must be revisited. A second, weaker
+  trigger is the Tray skin's formatters needing to run somewhere Windows
+  is unavailable. Either way, this record is the starting point, and it
+  should be amended rather than re-derived.
 
 **Records this one supersedes in part:**
 - ADR-0003's "Consequences" sentence saying the combined cross-skin test
