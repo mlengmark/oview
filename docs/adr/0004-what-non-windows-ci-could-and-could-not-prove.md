@@ -10,6 +10,18 @@
   (review); the board (decision, carried by Chief Gary II).
 - **Origin:** OVI-111, from Rae II's cross-platform claim ledger (OVI-104),
   row 2a.
+- **Corrected 2026-09-24 (OVI-126), before merge, while still Proposed.**
+  The first draft said a Linux runner *cannot build* the three
+  `net10.0-windows` projects and would fail with NETSDK1100. A one-off
+  probe refuted that: `dotnet test O-view.slnx` on `ubuntu-latest` (.NET
+  SDK 10.0.401) built all seven projects and passed all 124 tests —
+  Core.Tests 13, Linux.Tests 52, Tray.Tests 53, CrossSkin.Tests 6
+  (CONFIRMED: [run 35984892283](https://github.com/mlengmark/oview/actions/runs/35984892283),
+  step "Probe (temporary)", read from the run log). The sections below
+  are corrected in place: the table, "How the Linux job has to invoke
+  them", "What it would not verify" point 1, R1's benefit, and R3. The
+  recommendation does not change; "Why the Linux job still excludes the
+  harness" says why.
 
 Every factual claim below carries an evidence label. **CONFIRMED** means
 read in the source at this branch, grepped, or run. **INFERRED** means
@@ -20,8 +32,11 @@ reasoned, not verified.
 O-view has two "skins": a Windows one and a Linux one. Each writes its own
 on-screen wording. One test suite, the anti-drift harness, checks that
 both skins say the same thing about the same number. That suite needs the
-Windows skin's code, so it can only run on Windows. Adding an automated
-Linux build would therefore **not** check that the two skins agree. Today
+Windows skin's code. Today that code happens to build on Linux too, but
+it is declared Windows-only and is expected to stop building on Linux
+once the Windows skin gains real Windows screens. So the suite belongs on
+Windows, and an automated Linux build should **not** be relied on to check
+that the two skins agree. Today
 it would add very little at all, because all of the code that exists is
 pure text formatting with no operating-system behaviour to test. What this
 repository actually lacks is any automated test run, on any operating
@@ -54,49 +69,58 @@ Source: `O-view.slnx` and each `.csproj`, read at this branch (CONFIRMED).
 Execution evidence: `dotnet test O-view.slnx` was run on the Windows
 agent runner on 2026-09-24 (.NET SDK 10.0.302). All four test projects
 passed: Core.Tests 13, Tray.Tests 53, Linux.Tests 52, CrossSkin.Tests 6
-(CONFIRMED on Windows). **No run has been made on Linux.** Every "would
-execute on Linux" cell below is therefore INFERRED from the target
-framework and references. None of them has been observed on a Linux
-machine.
+(CONFIRMED on Windows). The same four passed on `ubuntu-latest` in the
+OVI-124 probe (CONFIRMED: run 35984892283; see the correction note at the
+top). That is one run, at one SDK version, of the code as it stands on
+2026-09-24.
 
 | Project | Target framework | References | Builds and runs on a Linux runner? |
 |---|---|---|---|
-| `src/O-view.Core` | `net10.0` (CONFIRMED) | none (CONFIRMED) | **Yes** (INFERRED; plain `net10.0`, no Windows reference) |
-| `tests/O-view.Core.Tests` | `net10.0` (CONFIRMED) | Core (CONFIRMED) | **Yes** (INFERRED) |
-| `src/O-view.Linux` | `net10.0` (CONFIRMED) | Core (CONFIRMED) | **Yes** (INFERRED) |
-| `tests/O-view.Linux.Tests` | `net10.0` (CONFIRMED) | Linux (CONFIRMED) | **Yes** (INFERRED) |
-| `src/O-view.Tray` | `net10.0-windows` (CONFIRMED) | Core (CONFIRMED) | **No** (INFERRED; see the note below) |
-| `tests/O-view.Tray.Tests` | `net10.0-windows` (CONFIRMED) | Tray (CONFIRMED) | **No** (INFERRED; follows Tray) |
-| `tests/O-view.CrossSkin.Tests` | `net10.0-windows` (CONFIRMED) | Core, Tray, Linux (CONFIRMED) | **No** (INFERRED; follows Tray) |
+| `src/O-view.Core` | `net10.0` (CONFIRMED) | none (CONFIRMED) | **Yes** (CONFIRMED by the probe) |
+| `tests/O-view.Core.Tests` | `net10.0` (CONFIRMED) | Core (CONFIRMED) | **Yes** (CONFIRMED by the probe) |
+| `src/O-view.Linux` | `net10.0` (CONFIRMED) | Core (CONFIRMED) | **Yes** (CONFIRMED by the probe) |
+| `tests/O-view.Linux.Tests` | `net10.0` (CONFIRMED) | Linux (CONFIRMED) | **Yes** (CONFIRMED by the probe) |
+| `src/O-view.Tray` | `net10.0-windows` (CONFIRMED) | Core (CONFIRMED) | **Yes today** (CONFIRMED by the probe); **expected No** once Tray gains Windows UI (INFERRED; see the note below) |
+| `tests/O-view.Tray.Tests` | `net10.0-windows` (CONFIRMED) | Tray (CONFIRMED) | **Yes today** (CONFIRMED by the probe); follows Tray (INFERRED) |
+| `tests/O-view.CrossSkin.Tests` | `net10.0-windows` (CONFIRMED) | Core, Tray, Linux (CONFIRMED) | **Yes today** (CONFIRMED by the probe); follows Tray (INFERRED) |
 
-A Linux job would therefore build two source projects and run two test
-projects: `O-view.Core.Tests` (13 tests) and `O-view.Linux.Tests` (52
-tests).
+The Linux job recommended below builds two source projects and runs two
+test projects: `O-view.Core.Tests` (13 tests) and `O-view.Linux.Tests`
+(52 tests). That is a choice of scope, not a technical limit. See "Why
+the Linux job still excludes the harness".
 
-**How the Linux job has to invoke them.** It cannot run
-`dotnet test O-view.slnx`. At solution level the SDK would try to build
-the three `net10.0-windows` projects too, and fail (INFERRED from SDK
-behaviour, error NETSDK1100; nothing was run on Linux). The Linux job
-must name the four `net10.0` projects explicitly, or use a solution
-filter (`.slnf`) that lists only them. No such filter exists yet
-(CONFIRMED: no `.slnf` file anywhere in the repository). Whichever is
-chosen goes into the slice spec if the board approves (a′), so the
-slice does not start from a red build.
+**How the Linux job should invoke them.** It *could* run
+`dotnet test O-view.slnx` today; the probe did exactly that. It should
+not. It should name the four `net10.0` projects explicitly, or use a
+solution filter (`.slnf`) that lists only them. No such filter exists yet
+(CONFIRMED: no `.slnf` file anywhere in the repository). A solution-level
+Linux run would start failing, with no change to the workflow, the day
+Tray gains Windows UI (INFERRED; see the note below). It would also pull
+in projects whose Linux result the design does not rely on. PR #20 (the
+OVI-124 CI slice) already names the four projects.
 
-**Note on the "No" rows.** By default the .NET SDK refuses to build a
-`-windows` target framework on a non-Windows machine unless the project
-sets `EnableWindowsTargeting=true` (INFERRED from SDK behaviour; not run
-here, because no Linux machine was available). This ADR does not
-recommend setting that flag. See "Alternatives considered", R3.
+**Note on the `net10.0-windows` rows.** They build on Linux today because
+no project sets `UseWPF` or `UseWindowsForms`. Without those, nothing
+references the Windows desktop framework, and the SDK check behind
+NETSDK1100 has nothing to reject (INFERRED; consistent with the probe but
+not isolated). Once Tray sets either property, a Linux build of Tray,
+Tray.Tests and CrossSkin.Tests is expected to fail with NETSDK1100 unless
+`EnableWindowsTargeting=true` is set (INFERRED from SDK behaviour, not
+yet observed here). ADR-0002 expects that Windows UI code (WPF,
+`NotifyIcon`, `Shell_NotifyIconGetRect`). This ADR does not recommend
+setting the flag. See "Alternatives considered", R3.
 
 ## What it would not verify
 
 1. **The ADR-0003 anti-drift harness.** `O-view.CrossSkin.Tests` is the
    only mechanism that proves the Linux skin's wording states the same
-   content facts as the Windows skin's. A Linux job cannot build it
-   (INFERRED, per the table). A Linux-only CI setup would leave the
-   cross-skin guarantee exactly where it is today: held only by someone
-   running `dotnet test` on Windows by hand.
+   content facts as the Windows skin's. A Linux job *can* build and run
+   it today (CONFIRMED by the probe), but the recommended Linux job does
+   not, and no Linux job could once Tray gains Windows UI (INFERRED, per
+   the note above). A Linux-only CI setup would therefore leave the
+   cross-skin guarantee on a footing due to expire: it would hold today
+   and silently stop holding later. The durable home for the harness is a
+   Windows job.
 2. **The Windows skin and its own tests.** `O-view.Tray` and
    `O-view.Tray.Tests` (53 tests) carry the Windows-only presentation
    facts, including the 127-character `NotifyIcon.Text` cap (CONFIRMED:
@@ -137,9 +161,12 @@ CONFIRMED by the project file: `O-view.CrossSkin.Tests` targets
 ADR-0003's 2026-09-24 amendment under that sentence). The harness runs
 the Linux skin's code on Windows, not on Linux. For the code that exists
 today, that loses nothing, because that code is pure, uses invariant
-culture, and every fixture runs in UTC (CONFIRMED, per point 4). Whether
-the output would be byte-identical on a Linux runtime is INFERRED, not
-observed. So there is nothing to escalate as a finding about shipped
+culture, and every fixture runs in UTC (CONFIRMED, per point 4). The
+OVI-124 probe also ran the harness on a Linux runtime, and all six
+fixture families passed there (CONFIRMED: run 35984892283). So, for
+today's code and fixtures, the output matches on both runtimes: observed
+once, not guarded by any standing job. So there is nothing to escalate
+as a finding about shipped
 work. The one real gap is that no machine runs the harness
 automatically. That is a CI question, which is this ADR's question.
 
@@ -180,8 +207,12 @@ considered:
     type, and that rule would need its own enforcement. It does not
     change the Core data contract (CONFIRMED: only skin and test projects
     would move), so it is not scope growth under the escalation rule.
-  - *Benefit:* the harness could run on Linux. For the reasons in point 4
-    above, that run proves nothing the Windows run does not (INFERRED).
+  - *Benefit:* the harness would keep building on Linux after Tray gains
+    Windows UI. It already builds there today by accident of the current
+    code (CONFIRMED by the probe). R1 would make that a guarantee by
+    design. For the reasons in point 4 above, a Linux run proves nothing
+    the Windows run does not while the Linux skin stays runtime-neutral
+    (INFERRED).
 - **R2: replace direct skin references with serialized expected output.**
   Each skin's own test project would check its strings against a shared,
   checked-in fixture file, and the harness would stop referencing skin
@@ -193,19 +224,52 @@ considered:
     guarantee holds only if CI runs on both operating systems. That is
     weaker than today's single-run design, not stronger.
 - **R3: leave the target framework alone and set
-  `EnableWindowsTargeting=true`** so the harness at least builds on
+  `EnableWindowsTargeting=true`** so the harness keeps building on
   Linux.
-  - *Rejected:* it hides the boundary rather than removing it. When the
-    Tray skin gains real Windows UI code (WPF, `NotifyIcon`,
-    `Shell_NotifyIconGetRect`, all expected by ADR-0002), a Linux build
-    that references it becomes fragile or meaningless (INFERRED). It
-    also runs against OVI-109's recorded position that the harness's
-    Windows-only status is "a documented structural ceiling, not a
-    defect to fix by changing a target framework."
+  - *Today the flag would do nothing:* the harness already builds on
+    Linux without it (CONFIRMED by the probe). The first draft of this
+    ADR assumed otherwise.
+  - *Rejected for later:* once the Tray skin gains real Windows UI code
+    (WPF, `NotifyIcon`, `Shell_NotifyIconGetRect`, all expected by
+    ADR-0002), the flag is what would keep a Linux build going. At that
+    point it hides the boundary rather than removing it: a Linux build
+    that references Windows UI code becomes fragile or meaningless
+    (INFERRED). The harness's Windows-only status is a declared boundary
+    today and becomes a hard one when Tray gains Windows UI. It is not a
+    defect to fix by changing a target framework or setting a flag
+    (OVI-109's position, as corrected by OVI-126 in `CLAUDE.md`).
 
 The honest answer: the harness's Windows-only status costs nothing while
 a Windows CI job runs it. It only matters if CI runs on Linux alone. The
 fix for that is a Windows job, not a restructured harness.
+
+### Why the Linux job still excludes the harness
+
+The probe raised the question of whether the Linux job should also run
+the harness (and Tray.Tests) while it still can. **Decided: no** (Adrian
+II, OVI-126). The recommendation below is unchanged. Reasons:
+
+- **It is a guarantee due to expire.** It stops working the day Tray
+  sets `UseWPF` or `UseWindowsForms` (INFERRED). The job would go red on
+  a PR that did nothing wrong, and the fix would be to take the harness
+  back out. Nobody should build a check that is expected to be removed
+  under pressure.
+- **It adds little today.** Point 4 still holds: the code is pure,
+  invariant-culture and pinned to UTC. The probe has already recorded
+  the one thing a Linux harness run shows, that output matches on the
+  Linux runtime for today's fixtures.
+- **Its real value arrives when it can no longer be had cheaply.** A
+  Linux harness run matters once the Linux skin gains runtime-sensitive
+  formatting (see "When this conclusion must be revisited"). That is
+  likely to land alongside or after Tray's Windows UI, when the build
+  no longer works on Linux (INFERRED; the order is not known). The
+  durable way to get that value is R1, decided when that trigger fires,
+  not a temporary job step now.
+
+If the board wants cross-runtime evidence for the harness before R1, the
+harness can be added to the Linux job as a step **explicitly marked
+temporary**, to be removed when Tray gains Windows UI. This record does
+not recommend it.
 
 ## Options for the board, with costs
 
@@ -221,8 +285,8 @@ fix for that is a Windows job, not a restructured harness.
 - **(a′) Add CI with two jobs.** A Windows job builds and tests the whole
   solution, including the anti-drift harness and the Tray skin. A Linux
   job builds and tests the four `net10.0` projects, named explicitly or
-  through a solution filter (see "How the Linux job has to invoke
-  them").
+  through a solution filter (see "How the Linux job should invoke
+  them" and "Why the Linux job still excludes the harness").
   - *Covers:* everything that exists, automatically, on every PR.
   - *Cost:* one small workflow slice for Kit, plus runner time. Windows
     runners cost more per minute than Linux runners on GitHub-hosted
