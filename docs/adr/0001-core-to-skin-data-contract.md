@@ -1063,6 +1063,43 @@ not a silent rewrite) as extraction work actually lands.
   and has not landed.** Until it does, the current code does **not** conform to this
   amendment.
 
+- **2026-09-25 update — the code now conforms to the OVI-146 amendment (Kit the Builder,
+  OVI-149).** The sentence above, "until it does, the current code does **not** conform to
+  this amendment", is superseded by this entry and left in place as the record of what was
+  true before it. All **CONFIRMED** by direct read, grep and a local `dotnet test
+  O-view.slnx` run on Windows:
+  - `UsagePercent`, `UsageInstant`, `TokenCount` and `EstimatedUsd` are still positional
+    `readonly record struct`s, but each now declares its own get-only `Value` and `Status`.
+    The initializer for `Value` calls the new internal `UsageValueRule.NoValueWhenUnavailable`
+    (`src/O-view.Core/Models/UsageValueRule.cs`). It throws `ArgumentException` when
+    `Status == Unavailable` and `Value` is non-null, a zero value included.
+  - **Every route is covered.** Neither property has an `init` or `set` accessor, so a
+    `with` expression or an object initializer that names `Value` or `Status` is a compile
+    error. The checked constructor is the only way to put a value into an instance, so no
+    `with` assignment order can bypass it. An empty `with { }` still compiles and copies a
+    pair that is already well-formed. One consequence: the amendment's example
+    `new UsagePercent(null, Unavailable) with { Value = 5, Status = Real }` does not
+    compile. The equivalent is `new UsagePercent(5, Real)`. Grep found no `with` or object
+    initializer on these four types under `src/` or `tests/`, so no caller had to change.
+  - `default(T)` still constructs (`Real`, `null`). The converse, `null` with `Real` or
+    `Estimated`, is still allowed and is not checked. Equality, `ToString` and
+    `Deconstruct` are still generated.
+  - `tests/O-view.Core.Tests/Models/UsageValueRuleTests.cs` pins the rule for all four
+    types. It includes a reflection test that neither property is settable (the `with`
+    route). Its six rule-pinning tests fail against `62fc3ce`. The other 21 Core tests,
+    which check that well-formed pairs still construct, pass there too.
+  - The four skin tests that built the ill-formed pair now assert that the constructor
+    throws, then check the skin against the well-formed `(null, Unavailable)` pair. They
+    were renamed. `UnavailableResetsAreOmittedEvenWhenAValueIsPresent` became
+    `AnUnavailableResetCannotCarryAValueSoTheTooltipNeverShowsOne` (both skins). The
+    OVI-139 panel test became `AnUnavailableSessionResetCannotCarryAValueSoThePanelSaysUnknown`
+    (Tray) and `…SoThePanelSaysNoResetObserved` (Linux). Grep found no other test, and no
+    CrossSkin fixture, that builds the pair.
+  - **No skin change.** The OVI-139/OVI-144 `Status: not Unavailable` guards stay, as the
+    amendment allows.
+  - Not verified: the Linux skin was built and tested on Windows only, as a `net10.0`
+    library. No Linux runner and no Linux hardware exercised it.
+
 ## Alternatives considered
 
 **Leave the contract implicit, described only by whatever Core's C# types

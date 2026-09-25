@@ -47,15 +47,23 @@ public class TooltipFormatterTests
     /// same pair as "no reset observed" (OVI-144).
     /// </summary>
     [Fact]
-    public void UnavailableResetsAreOmittedEvenWhenAValueIsPresent()
+    public void AnUnavailableResetCannotCarryAValueSoTheTooltipNeverShowsOne()
     {
+        // OVI-144 built an Unavailable reset with a value and proved the tooltip omitted it.
+        // OVI-146 makes that pair unbuildable in Core, which pins the same guarantee at the
+        // one place that can make it: an unavailable reset never reaches the skin with a value.
+        Assert.Throws<ArgumentException>(() =>
+            new UsageInstant(new DateTimeOffset(2026, 9, 8, 20, 59, 0, TimeSpan.Zero), UsageValueStatus.Unavailable));
+        Assert.Throws<ArgumentException>(() =>
+            new UsageInstant(new DateTimeOffset(2026, 9, 7, 23, 0, 0, TimeSpan.Zero), UsageValueStatus.Unavailable));
+
         var snapshot = new UsageSnapshot(
             DataSourceKind.Live,
             new DateTimeOffset(2026, 9, 8, 20, 45, 0, TimeSpan.Zero),
             new UsagePercent(47, UsageValueStatus.Real),
-            new UsageInstant(new DateTimeOffset(2026, 9, 8, 20, 59, 0, TimeSpan.Zero), UsageValueStatus.Unavailable),
+            new UsageInstant(null, UsageValueStatus.Unavailable),
             new UsagePercent(20, UsageValueStatus.Real),
-            new UsageInstant(new DateTimeOffset(2026, 9, 7, 23, 0, 0, TimeSpan.Zero), UsageValueStatus.Unavailable),
+            new UsageInstant(null, UsageValueStatus.Unavailable),
             UsageLevel.Green);
 
         var tooltip = TooltipFormatter.Format(snapshot, Utc);
