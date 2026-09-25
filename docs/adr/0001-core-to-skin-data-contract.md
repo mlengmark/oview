@@ -976,6 +976,17 @@ not a silent rewrite) as extraction work actually lands.
   - Not verified: the Linux skin was built and tested on Windows only, as a `net10.0`
     library. No Linux runner and no Linux hardware exercised it.
 
+- **2026-09-25 update — `unavailable` wins over a present value, in the tooltip too (Kit
+  the Builder, OVI-144).** The entry above overstated the agreement. Both tooltips still
+  rendered a `SessionResetAt` or `WeeklyResetAt` that carried a value flagged
+  `unavailable`, with no marker, while the panel said the reset was unknown. Both skins'
+  `TooltipFormatter` now omit either reset clause when its `Status == Unavailable`,
+  whatever the value. For these two instant rows, `unavailable` means "absent": a skin
+  never renders the value. **CONFIRMED** by read and a new test per skin
+  (`UnavailableResetsAreOmittedEvenWhenAValueIsPresent`). No `src/` producer constructs
+  such a pair today (grep), so this was not reachable on screen. No Core change, no
+  marker wording change.
+
 ## Alternatives considered
 
 **Leave the contract implicit, described only by whatever Core's C# types
