@@ -949,6 +949,33 @@ not a silent rewrite) as extraction work actually lands.
   **This needs no code change now.** `RateLimitedNotice` already takes the raw value, and
   nothing in this repository ports the update check yet.
 
+- **2026-09-25 update — the code now conforms to D2 (Kit the Builder, OVI-139).** The
+  sentence above, "until it lands, the current codebase does **not** conform to this row",
+  is superseded by this entry and left in place as the record of what was true before it.
+  All **CONFIRMED** by direct read, grep and a local `dotnet test O-view.slnx` run on
+  Windows:
+  - Both skins' `PanelTextFormatter.SessionReset` now take the Core `UsageInstant` —
+    `SessionReset(UsageInstant resetAt, DateTimeOffset utcNow, TimeZoneInfo displayZone)` —
+    in place of `(DateTimeOffset? resetAtUtc, …, TimeSpan? uncertainty = null)`. Each marks
+    the time approximate (`~` on Windows, ` (approx.)` on Linux) exactly when
+    `Status == Estimated`. `Unavailable` renders the skin's "no reset observed" copy, even if
+    a value is present; a null value is treated the same way.
+  - `ApproximateThreshold` and `IsApproximate` are deleted from both skins. `grep` for
+    either name under `src/` and `tests/` returns no match, and neither skin's
+    `PanelTextFormatter` reads an uncertainty width.
+  - The panel and the tooltip now read the same signal for this value. Each skin's test
+    project pins that they agree on **whether** it is marked, for `Real`, `Estimated` and
+    `Unavailable` (`SessionResetAndTheTooltipAgreeOnWhetherTheResetIsMarked`). The tests
+    compare the yes/no answer, not the marker text: Linux writes `(approx.)` in the panel
+    and ` (est.)` in the tooltip. Neither tooltip's marker changed.
+  - **No Core change.** `UsageInstant` already existed, and nothing in this repository
+    constructs an `Estimated` `SessionResetAt` yet (grep: the only `SessionResetAt` producer
+    under `src/` is `UsageSnapshot.Unavailable`). The 15-minute threshold still arrives with
+    the provider port, as D2 says. D2's tooltip consequence therefore stays **INFERRED**:
+    nothing on screen has yet shown a provider-set `estimated` reset.
+  - Not verified: the Linux skin was built and tested on Windows only, as a `net10.0`
+    library. No Linux runner and no Linux hardware exercised it.
+
 ## Alternatives considered
 
 **Leave the contract implicit, described only by whatever Core's C# types
