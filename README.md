@@ -23,6 +23,11 @@ documentation trail from the first commit.
 > `Freshness`/`Countdown`/`SessionReset`/`WeeklyReset`/`WeeklyResetConflict`
 > — into each skin's own `PanelTextFormatter`, with `DataSourceKind.Stale`
 > and a required `UsageSnapshot.LastIngestAt` now in the contract.
+> Phase 1 slice 3.3 (OVI-92) has since extracted the boost chip
+> (`BoostChip`/`BoostCard`) against a new `BoostNotice` contract type, and
+> slice 3.4 (OVI-98) the GitHub rate-limit notice (`RateLimitedNotice`),
+> which needed no new Core surface. The usage-tile caveat and the off-plan
+> banner are the last not-yet-extracted `PanelText.cs` members.
 > `O-view.App` does not exist yet. See
 > [`docs/adr/`](docs/adr/) for the
 > Core-to-skin data contract, the cross-platform capability matrix, and the
@@ -150,9 +155,11 @@ construction is extracted out of the platform-neutral layer. `O-view.Core`
 status-flagged values; `O-view.Tray` (`net10.0-windows`) owns turning those
 values into tooltip text, including the 127-character `NotifyIcon.Text`
 cap. Build and test with `dotnet build O-view.slnx` / `dotnet test
-O-view.slnx`. `PanelText.cs` and `O-view.App` are separate, later slices
-and do not exist here yet; `UsageFormatter.cs`'s and `PanelStatistics.cs`'s
-presentation leaks were extracted in Phase 1 slice 2 (OVI-27), below.
+O-view.slnx`. `O-view.App` is a separate, later slice and does not exist
+here yet. `UsageFormatter.cs`'s and `PanelStatistics.cs`'s presentation
+leaks were extracted in Phase 1 slice 2 (OVI-27), and `PanelText.cs` is
+being extracted member-family by member-family in slices 3.1, 3.3 and 3.4
+— all below.
 
 **2026-09-10 — `O-view.Linux` scaffolded (OVI-30).** `src/O-view.Linux`
 (`net10.0`) exists with its own minimal `Presentation/TooltipFormatter.cs`,
@@ -208,5 +215,38 @@ families, `FreshnessFixture` and `PanelTextResetFixture`, parallel to the
 existing ones — see
 [ADR-0003](docs/adr/0003-paneltext-anti-drift-mechanism.md)'s matching
 entry. The remaining `PanelText.cs` members (boost chip, usage-tile
-caveat, off-plan banner, GitHub rate-limit notice) are separate,
-differently-shaped sub-slices, not yet extracted.
+caveat, off-plan banner, GitHub rate-limit notice) were separate,
+differently-shaped sub-slices, not yet extracted as of this entry; the
+boost chip and the GitHub rate-limit notice have since been extracted in
+slices 3.3 and 3.4, below.
+
+**2026-09-21 — `PanelText.cs`'s boost chip extracted: `BoostChip`/`BoostCard`
+(Phase 1 slice 3.3, OVI-92, PR #15).** `O-view.Core` gains `BoostNotice`
+(`Text`, `Percent`, `EndsOn` — a bare calendar date, not a timestamp). Each
+skin's own `Presentation/PanelTextFormatter.cs` gains `BoostChip`/`BoostCard`,
+independently worded per ADR-0003, and a fifth parallel fixture family in
+`O-view.CrossSkin.Tests` (`BoostNoticeFixture`) checks both skins against
+five fixtures. `UsageSnapshot` was **not** changed by this slice —
+`SessionBoostNotice`/`WeeklyBoostNotice` wait on the future slice that ports
+the provider populating them (see
+[ADR-0001](docs/adr/0001-core-to-skin-data-contract.md)'s 2026-09-21 entry).
+The source app's 281px Windows panel-width budget is skin-side only, and is
+*not* implemented as an actual measure-and-truncate step here: no
+`O-view.App` panel window exists yet in this repository to measure a
+rendered row against.
+
+**2026-09-22 — `PanelText.cs`'s GitHub rate-limit notice extracted:
+`RateLimitedNotice` (Phase 1 slice 3.4, OVI-98, PR #16).** Redoes OVI-80's
+closed PR #12 fresh against `main` after slice 3.3; the reviewed design
+(OVI-81) is unchanged, only the branch is new — see
+[ADR-0001](docs/adr/0001-core-to-skin-data-contract.md)'s 2026-09-22 entry
+for why PR #12 was closed rather than reconciled again. This member needed
+**no new Core surface**: its signature (`DateTimeOffset?`, `TimeZoneInfo` ->
+`string`) never took a `UsageSnapshot`, only two raw scalars, so it lives
+directly in each skin's existing `Presentation/PanelTextFormatter.cs`,
+alongside `BoostChip`/`BoostCard`. A sixth parallel fixture family
+(`RateLimitedNoticeFixture`, two fixtures: retry-after known and unknown)
+was added to `O-view.CrossSkin.Tests` — see
+[ADR-0003](docs/adr/0003-paneltext-anti-drift-mechanism.md)'s matching
+entry. The usage-tile caveat and the off-plan banner are the last
+not-yet-extracted `PanelText.cs` members.
