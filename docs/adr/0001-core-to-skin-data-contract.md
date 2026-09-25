@@ -56,10 +56,12 @@ render this as an explicit gap, never as zero or blank).
 | Value | Type | Unit | Status flag | Notes |
 |---|---|---|---|---|
 | `SessionUtilizationPercent` | float64, 0–100 | percent | real / estimated / unavailable | 5-hour rolling window |
-| `SessionResetAt` | timestamp, UTC, ISO-8601 | instant | real / estimated / unavailable | skin owns locale/format rendering |
+| `SessionResetAt` | timestamp, UTC, ISO-8601 | instant | real / estimated / unavailable | skin owns locale/format rendering. `estimated` **is** the "approximate" signal: Core sets it when the reset was derived from a sampling bracket wider than Core's precision threshold, and a skin marks the value approximate from this flag alone — no uncertainty width or threshold crosses the contract; amended 2026-09-25 (OVI-135, D2) — see that amendment below |
 | `WeeklyUtilizationPercent` | float64, 0–100 | percent | real / estimated / unavailable | 7-day rolling window |
-| `WeeklyResetAt` | timestamp, UTC, ISO-8601 | instant | real / estimated / unavailable | sourced from cached exact reset (source repo ADR-0014) when present, else derived — see `WeeklyResetSource` |
-| `WeeklyResetSource` | enum {`CachedExact`, `Derived`} | — | real | transparency flag distinguishing the two reset-detection paths (source repo ADR-0007/0014) |
+| `WeeklyResetAt` | timestamp, UTC, ISO-8601 | instant | real / estimated / unavailable | the reported instant (source repo ADR-0014), projected forward in whole weeks, when Core has one; else the user's entered reset — see `WeeklyResetSource`. No source path produces `estimated` for this field (the derivation was deleted by source ADR-0014); amended 2026-09-25 (OVI-135, D3) |
+| `WeeklyResetSource` | enum {`CachedExact`, `UserEntered`} | — | real | provenance of the `WeeklyResetAt` value in this same snapshot — not of whether an entry exists. `Derived` retired and `UserEntered` added 2026-09-25 (OVI-135, D3); a skin must say so when it renders a `UserEntered` value (source repo issue #186) |
+| `WeeklyResetUserEntry` | `{day: weekday enum Mon–Sun, localTime: time-of-day HH:mm}?` (nullable) | wall-clock, reader's local zone | real / unavailable | the weekly reset the user typed in, read off Claude's own Settings → Usage. Deliberately **not** a UTC instant: the user entered a wall-clock time, and only a wall-clock time survives a daylight-saving change. `null` with `real` = nothing entered; added 2026-09-25 (OVI-135, D3) |
+| `WeeklyResetConflict` | `{reportedAtUtc: timestamp, UTC, ISO-8601}?` (nullable) | instant | real | non-null when **Core** has detected that a reported reset disproves the user's entry by more than Core's contradiction slack (a Core policy value, not a contract field). Core has already set the entry aside when this is non-null; the skin decides how, and how often, to say so; added 2026-09-25 (OVI-135, D3) |
 | `UsageLevel` | enum {`Green`, `Amber`, `Red`} | — | real (or unavailable if inputs are) | threshold bands; derivation stays in Core |
 | `DataSourceKind` | enum {`Live`, `Stale`, `JsonlFallback`, `Estimate`, `Unavailable`} | — | real | tells the skin which confidence tier produced the other values in this snapshot; `Stale` added 2026-09-09 (OVI-16) — authoritative data older than a per-provider freshness threshold, still trusted above `JsonlFallback`/`Estimate` but no longer current; see the OVI-16 amendment below for source behaviour and migration note |
 | `AccountDisplayName` | string | — | real / unavailable | from account cache |
@@ -87,6 +89,8 @@ render this as an explicit gap, never as zero or blank).
 | `Rates` | `RateCardStamp?` (nullable; see row below) | — | real / unavailable | which rate table priced the `Estimated*` figures **in this same snapshot** — carried beside them so a skin cannot caveat one set of figures with another set's provenance; added 2026-09-23 (OVI-100) |
 | `RateCardStamp` (nested type) | `{source: RateCardSource?, asOf: date, ISO-8601 (YYYY-MM-DD)?, isStale: bool}` | — | fields inherit the parent `Rates` field's real/unavailable status | `isStale` is decided **by Core**, against the same "today" the figures beside it were built for — a skin must never re-derive it, or the caveat can end up qualifying a different day from the figures it sits under. The staleness *threshold* stays Core policy, not a contract field (same rule as `LastIngestAt`'s freshness threshold). `asOf` is a bare calendar date, never a formatted one; added 2026-09-23 (OVI-100) |
 | `RateCardSource` | enum {`Bundled`, `UserFile`} | — | real | where the rate table came from — an enum, never a display label: `"bundled"`/`"user file"` are skin wording. `UserFile` is carried forward though unimplemented, because the moment it exists the panel must name it (source repo issue [#255](https://github.com/mlengmark/O-view/issues/255)); added 2026-09-23 (OVI-100) |
+| `UpdateCheckOutcome` | enum {`UpToDate`, `UpdateAvailable`, `Unknown`, `RateLimited`} | — | real | what the shared update check concluded. `Unknown` ("could not tell") is never collapsed into `UpToDate`, and `RateLimited` is never collapsed into `Unknown` (source repo issue #176). Produced by the shared, platform-neutral layer, not by a skin; added 2026-09-25 (OVI-135, D4) — see that amendment below |
+| `UpdateRetryAfterUtc` | timestamp, UTC, ISO-8601, nullable | instant | real / unavailable | when GitHub's rate limit lifts, for `RateLimited` only. `unavailable` = GitHub sent no usable header; a skin must then say it does not know, never invent a time. The value `RateLimitedNotice` already takes as its raw `retryAfterUtc` argument; added 2026-09-25 (OVI-135, D4) |
 
 **What Core must never emit, by contract:** a pre-formatted display
 sentence, a field separator, a locale-bound date/time string, or any
@@ -749,6 +753,201 @@ not a silent rewrite) as extraction work actually lands.
   - **The harness fixture-family shape for testing this sub-slice** is decided in
     [ADR-0003](0003-paneltext-anti-drift-mechanism.md)'s 2026-09-23 (OVI-100) amendment, not
     here — this amendment is the Core-contract half of that sub-slice's sign-off only.
+
+- **2026-09-25 amendment (OVI-135) — three values the skins already render had no
+  contract row: the session-reset uncertainty (D2), the user-entered weekly reset and its
+  conflict (D3), and the update check's retry time (D4) (Adrian II the Architect, from the
+  OVI-133 documentation drift check).** Each of the three is a value a skin's
+  `PanelTextFormatter` takes as input today without this table saying what it is, who
+  decides it, or whether it can be trusted.
+
+  **Source re-read, re-confirmed against the same pinned commit this ADR already cites,
+  `897777b`** (verified current for this amendment: `gh api repos/mlengmark/O-view/commits/main`
+  returns the same SHA). Read-only, as always. This repository was read at `origin/main`
+  `a2a5556`.
+
+  **D2 — session-reset uncertainty: decided (a). `SessionResetAt`'s `estimated` status is
+  the "approximate" signal, and Core owns the threshold behind it.**
+
+  What the code does today, all **CONFIRMED** by direct read:
+  - In this repository, both skins' `PanelTextFormatter.SessionReset(DateTimeOffset?
+    resetAtUtc, DateTimeOffset utcNow, TimeZoneInfo, TimeSpan? uncertainty = null)` take a
+    raw uncertainty width. Each decides for itself whether to mark the time approximate
+    (`~` on Windows, `(approx.)` on Linux), by comparing that width to its own
+    `ApproximateThreshold = TimeSpan.FromMinutes(30)`. The constant is declared twice,
+    once per skin (`src/O-view.Tray/Presentation/PanelTextFormatter.cs` line 136,
+    `src/O-view.Linux/Presentation/PanelTextFormatter.cs` line 119).
+  - Both skins' `TooltipFormatter` mark the **same** session-reset value from a different
+    signal: `SessionResetAt.Status == Estimated` (the OVI-15 fix, 2026-09-09 update above).
+    The panel and the tooltip can therefore disagree about one value today. A 45-minute
+    bracket carried with status `Real` gets `~` in the panel and nothing in the tooltip. An
+    `Estimated` value passed with no uncertainty gets `~` in the tooltip and nothing in the
+    panel.
+  - **The rebuild's threshold differs from the source's.** The source's threshold is
+    **15 minutes** (`WeeklyWindow.PreciseBracket`,
+    `src/O-view.Core/Providers/PlanHistory/WeeklyWindow.cs` line 50, applied by
+    `PanelText.IsApproximate` at line 169). It lives in **Core**, beside the provider that
+    measures the bracket (`SessionWindowStart.Uncertainty`, `ResetDetector.cs` line 15).
+    A 20-minute bracket earns `~` in the source and would not earn one here. Nothing
+    caught this, because the two rebuild skins carry the same wrong constant, so the
+    cross-skin harness sees them agree.
+  - Where the source's width comes from: `PlanHistoryProvider` sets it from the observed
+    bracket (line 346). `CachedUtilizationProvider` and `UsageEngine.WithReportedResets`
+    set it to `TimeSpan.Zero` when Claude reported the instant exactly (lines 97 and 1053).
+    The source's `TooltipFormatter.Approx` is declared but never called (`git grep`, no call
+    site), so the source tooltip never marked the session reset. Only its panel did.
+
+  **Decision.** Core decides whether a session reset is approximate, and says so through
+  the status flag this row already has:
+  - `estimated` means the reset was derived from a sampling bracket **wider than** Core's
+    precision threshold.
+  - `real` means Claude reported the instant, or the bracket is at or under the threshold.
+    Read `real` on this row as "exact to within the vendor's own sampling cadence". It
+    does not mean "reported by the vendor". That is the source's own reading, and this
+    note says so explicitly so no one mistakes one for the other.
+  - The threshold is Core policy and stays **off** the contract, under the same rule as
+    `RateCardStamp.isStale`'s 90 days and `LastIngestAt`'s freshness threshold. Its
+    source value is 15 minutes. The provider port carries that value, not 30.
+  - A skin reads `SessionResetAt.Status` and nothing else. The raw uncertainty width does
+    not cross the contract.
+
+  **Rejected: (b), a separate uncertainty field, with the threshold owned by Core.**
+  1. It puts two trust signals on one value. That is the disagreement the current code
+     already exhibits between the panel and the tooltip (above).
+  2. Once Core owns the threshold, all a skin needs from the width is a yes/no answer,
+     and the status flag already is that answer. A separate `isApproximate` would be a
+     second status flag. Handing over the raw width instead invites each skin to
+     re-derive the threshold, which the OVI-100 amendment rules out for `isStale`.
+  3. No skin renders the width itself. The source never did either: its conflict copy
+     dropped "between X and Y" ranges once resets were reported exactly (`PanelText.cs`
+     line 196).
+
+  If a future skin wants to show the bracket as a range, it adds its own row then, e.g.
+  `SessionResetBracket`, a provenance range. It is not a second trust flag.
+
+  **Consequence for the tooltip (INFERRED from the code above, not observed):** once a
+  provider sets `estimated` for wide brackets, the rebuild's tooltip will mark those
+  resets `~`, which the source tooltip never did. That is consistent with the OVI-15
+  decision that every `estimated` field is marked, and is accepted, not accidental.
+
+  **This needs a code change.** Both skins' `SessionReset` still take the raw width and
+  apply a 30-minute threshold. The build slice is described in the OVI-135 closing
+  comment. Until it lands, the current codebase does **not** conform to this row.
+
+  **D3 — the user-entered weekly reset and its conflict: decided to add the rows now, not
+  defer them.** Rows `WeeklyResetUserEntry` and `WeeklyResetConflict` are added above, and
+  `WeeklyResetSource` is amended.
+
+  What the source does, all **CONFIRMED** by direct read:
+  - `UsageEngine.WithWeeklyReset` (`src/O-view.App/UsageEngine.cs` lines 895–945) has
+    exactly **two** sources for the weekly reset: a stored reported anchor, projected
+    forward in whole weeks, or else the user's entry. There is no derived path.
+    `WeeklyResetAtUtc` is assigned in one place in `src/` (line 942; `PlanHistoryProvider`
+    passes `null`, line 340). The derivation was deleted by source ADR-0014 (2026-08-25),
+    which superseded ADR-0011 on measured evidence.
+  - The conflict is decided in the platform-neutral layer, not a head: `WithWeeklyReset`
+    sets `_weeklyResetConflict` when `ManualWeeklyReset.IsContradictedBy(...)` finds a
+    stored anchor outside the entry's `ContradictionSlack` of 2 hours (`ManualWeeklyReset.cs`
+    line 40). Both heads only render it.
+  - The entry is a weekday plus a local wall-clock time (`ManualWeeklyReset(DayOfWeek Day,
+    TimeOnly LocalTime)`), resolved in the user's zone, not UTC, so it survives
+    daylight-saving changes (`NextAfter`, same file).
+  - **A source quirk this contract deliberately does not reproduce:** the source panel
+    labels the weekly reset "you set this" whenever an entry exists
+    (`PopupWindow.xaml.cs` line 525, `userSupplied = _lastSettings?.WeeklyReset is not
+    null`). That includes when an anchor exists, agrees within the 2-hour slack, and is
+    the value actually on screen. The label can therefore sit beside a time up to two
+    hours from the one the user typed. `WeeklyResetSource` labels the provenance of the
+    **displayed** value instead. `WeeklyResetUserEntry` is carried separately, so a skin
+    that wants to mention the entry can still do so honestly.
+
+  **Decision.**
+  - **`WeeklyResetSource` becomes {`CachedExact`, `UserEntered`}.**
+  - **`WeeklyResetUserEntry`** carries the typed value. It stays wall-clock, which is a
+    deliberate exception to this table's UTC-instant rule for the reason the source gives
+    (daylight saving).
+  - **`WeeklyResetConflict`** carries the reported instant Core found to disprove the
+    entry. It is non-null only when Core detected a conflict, so the question "who
+    decides a conflict exists" now has a written answer: **Core**. The 2-hour slack is
+    Core policy, off the contract.
+  - **`WeeklyResetAt`'s status** is `real` for both sources. A user-entered reset is read
+    off Claude's own settings and is exact to the minute. **Provenance lives in
+    `WeeklyResetSource`, precision lives in the status flag**, and D2 above uses the
+    status flag the same way. A skin must say so when it renders a `UserEntered` value.
+
+  **Rejected: deferring these rows along with the `WeeklyResetUserSupplied*` sub-slice.**
+  Both skins already render `WeeklyResetConflict` today (OVI-29), so the input already has
+  a consumer. Deferring would leave a skin consuming a value this table does not
+  document, which is what this ADR's Consequences section forbids. Deferral was also
+  rejected for `Stale` (2026-09-09 amendment above) for the same reason.
+
+  **Rejected: keeping `Derived` alongside `UserEntered`.** Nothing produces it at
+  `897777b`, and nothing in this repository reads `WeeklyResetSource` (grep: no match
+  under `src/` or `tests/`). A dead enum member invites a provider port to rebuild a
+  derivation the source deleted on measured evidence. Retiring it is documentation-only.
+
+  **Rejected: `estimated` for a user-entered reset.** It would print `~` in the tooltip
+  (OVI-15) and imply an imprecision the value does not have. It would also mix provenance
+  into the precision flag.
+
+  **This needs no code change now.** `WeeklyResetConflict(DateTimeOffset reportedUtc, …)`
+  already takes exactly `WeeklyResetConflict.reportedAtUtc`, and nothing in this repository
+  constructs a weekly-reset source or entry yet. These rows sit ahead of the code, like
+  `BoostNotice` (OVI-82) and `RateCardStamp` (OVI-100) did.
+
+  **Named, still not extracted:** the **`WeeklyResetUserSupplied*` sub-slice**. It extracts
+  `PanelText.WeeklyResetUnknown`, `WeeklyResetUserSupplied` and
+  `WeeklyResetUserSuppliedHint` (source `PanelText.cs` lines 177–183 and 221–252,
+  with `WeeklyResetUnknownHint`/`WeeklyResetUnknownAction`), the copy the
+  2026-09-11 (OVI-29) update above left out. It will consume `WeeklyResetSource` and
+  `WeeklyResetUserEntry`. It is not scheduled by this amendment.
+
+  **Out of scope, named so it isn't assumed decided:**
+  - **Notify-once bookkeeping for a conflict.** The source persists which conflict instant
+    the user has already been told about (`WeeklyResetConflictNoticed`, `UsageEngine.cs`
+    lines 354–362). Whether that is Core state or a skin preference is for the slice that
+    ports the entry dialog. By analogy with `NotificationThresholdCrossed` (Core detects,
+    the skin decides whether to notify), the default is skin-side (INFERRED).
+  - **A gap in how the source handles an unreadable entry.** `ManualWeeklyReset.Parse`
+    returns `null`, meaning "not set", when the stored entry is unreadable. That collapses
+    `unavailable` into "nothing entered", the same gap the OVI-82 amendment flagged for
+    `BoostNotices.TryReadAny`. The port must keep the two apart.
+
+  **D4 — who owns the update check and `retryAfterUtc`: the shared, platform-neutral layer,
+  not each skin. The OVI-133 label ("INFERRED: owned by the skin") is refuted.**
+
+  What the source does, all **CONFIRMED** by direct read:
+  - **Core** holds the pure rules, with no HTTP:
+    - `RateLimitResponse.IsRateLimited` (`src/O-view.Core/Updates/RateLimitResponse.cs`)
+      turns the status code and GitHub's `x-ratelimit-*`/`retry-after` headers into
+      `retryAfterUtc`.
+    - `UpdateCheck.Evaluate` (`src/O-view.Core/Updates/UpdateCheck.cs`) produces
+      `UpdateCheckResult(UpdateOutcome, AvailableUpdate?, DateTimeOffset? RetryAfterUtc)`.
+  - **`O-view.App`**, the shared project both heads use, holds the fetch and the cooldown:
+    `ReleaseFeed.CheckAsync` (`src/O-view.App/Updates/ReleaseFeed.cs`). Its doc comment
+    says why: "Shared because the endpoint is one decision … restating that in each head is
+    how the two quietly come to check different things". The cooldown is "held here rather
+    than in either head" (source issue #176).
+  - The heads own only what to **do** with a result: download and self-replace
+    (`O-view.Tray/Updates/UpdateService.cs`) or notify only
+    (`O-view.Linux/Updates/LinuxUpdateNotice.cs`). That is ADR-0002's Self-update row, and
+    it is unchanged.
+
+  **Decision.** The update check belongs to the shared layer, and its result is contract
+  data, so it gets rows (`UpdateCheckOutcome` and `UpdateRetryAfterUtc`, above) rather
+  than being left implicit. OVI-80/OVI-98 were right that `RateLimitedNotice` needs no new
+  Core *type* to be extracted. What was missing is that its input comes from Core and
+  therefore needs a row. Where the rebuild puts the HTTP fetch is for the porting slice to
+  decide: `O-view.App` does not exist in this repository (`ls src`, CONFIRMED). The two
+  constraints are that the pure rules stay in BCL-only Core, and that the fetch is not
+  duplicated per skin. ADR-0002's Self-update row carries a matching dated note.
+
+  **Rejected: each skin's Self-update capability owns the check.** The per-OS difference
+  is in acting on an update, not in detecting one. A per-skin check is the duplication the
+  source consolidated after issue #176 retried straight back into GitHub's limit.
+
+  **This needs no code change now.** `RateLimitedNotice` already takes the raw value, and
+  nothing in this repository ports the update check yet.
 
 ## Alternatives considered
 
