@@ -33,7 +33,8 @@ public class UsageValueRuleTests
     public void AZeroValueIsStillAValueAndStillThrows()
     {
         Assert.Throws<ArgumentException>(() => new UsagePercent(0, UsageValueStatus.Unavailable));
-        Assert.Throws<ArgumentException>(() => new TokenCount(0, UsageValueStatus.Unavailable));
+        Assert.Throws<ArgumentException>(() => new UsageInstant(default(DateTimeOffset), UsageValueStatus.Unavailable));
+        Assert.Throws<ArgumentException>(() => new TokenCount(0,UsageValueStatus.Unavailable));
         Assert.Throws<ArgumentException>(() => new EstimatedUsd(0m, UsageValueStatus.Unavailable));
     }
 

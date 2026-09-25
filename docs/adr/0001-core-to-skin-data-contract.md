@@ -1086,8 +1086,9 @@ not a silent rewrite) as extraction work actually lands.
     `Deconstruct` are still generated.
   - `tests/O-view.Core.Tests/Models/UsageValueRuleTests.cs` pins the rule for all four
     types. It includes a reflection test that neither property is settable (the `with`
-    route). Its six rule-pinning tests fail against `62fc3ce`. The other 21 Core tests,
-    which check that well-formed pairs still construct, pass there too.
+    route). Its six rule-pinning tests fail against `62fc3ce`. Its other eight tests,
+    which check that well-formed pairs still construct, pass there, as do the 13
+    pre-existing Core tests.
   - The four skin tests that built the ill-formed pair now assert that the constructor
     throws, then check the skin against the well-formed `(null, Unavailable)` pair. They
     were renamed. `UnavailableResetsAreOmittedEvenWhenAValueIsPresent` became
