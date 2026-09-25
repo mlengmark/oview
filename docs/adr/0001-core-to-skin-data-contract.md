@@ -1101,6 +1101,35 @@ not a silent rewrite) as extraction work actually lands.
   - Not verified: the Linux skin was built and tested on Windows only, as a `net10.0`
     library. No Linux runner and no Linux hardware exercised it.
 
+- **2026-09-25 update — the tooltip percent rows get the same redundant skin guard as the
+  resets (Kit the Builder, OVI-148, rebased onto OVI-149 by OVI-154).** The OVI-146
+  amendment above found that both tooltips' percent clauses, and the `Estimate` fallback
+  check, keyed on `Value` alone. Since OVI-149, Core cannot build a `UsagePercent` that
+  pairs `Unavailable` with a value, so no percent reaching a skin can take that path, and
+  the amendment says these clauses "need no skin edit". OVI-148 was built in parallel,
+  before OVI-149 landed. It adds the guard anyway, matching the OVI-139/OVI-144 reset
+  guards the amendment calls "redundant, but … not wrong". Both skins' `TooltipFormatter`
+  read each percent through a `Present()` helper that returns `null` when
+  `Status == Unavailable`, and the session, weekly and `Estimate`-fallback checks use it.
+  **CONFIRMED** by read. It changes no output for any value Core can construct.
+  - The two tests OVI-148 first wrote per skin built `UsagePercent(47, Unavailable)` and
+    `UsagePercent(20, Unavailable)`, which throw under OVI-149. They are rewritten the way
+    OVI-149 rewrote the OVI-144 tests. Each now asserts that the constructor throws, then
+    checks the skin against the well-formed `(null, Unavailable)` pair:
+    `AnUnavailablePercentCannotCarryAValueSoTheTooltipNeverShowsOne` and
+    `AnUnavailablePercentCannotCarryAValueSoTheEstimateFallbackStillFires`, both skins.
+  - **What they add — CONFIRMED by read.** Nothing that is not already pinned. The throw is
+    covered by `UsageValueRuleTests.UnavailableWithAValueThrowsForEveryStatusPairedType`.
+    The rendered strings match the existing
+    `UnknownPercentagesWithALiveSourceDoNotClaimToBeALocalEstimate` and
+    `UnknownPercentagesAdmitTheGapRatherThanGuessing` (Tray), and
+    `UnknownPercentagesWithALiveSourceDoNotClaimToBeAnEstimatedReading` and
+    `UnknownPercentagesAdmitTheGapRatherThanGuessing` (Linux). The rewritten tests keep the OVI-148 record next to the guard they
+    describe. They are not new coverage.
+  - No Core change and no marker wording change.
+  - Not verified: the Linux skin was built and tested on Windows only, as a `net10.0`
+    library. No Linux runner and no Linux hardware exercised it.
+
 ## Alternatives considered
 
 **Leave the contract implicit, described only by whatever Core's C# types

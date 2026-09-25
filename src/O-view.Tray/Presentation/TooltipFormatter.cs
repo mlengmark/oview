@@ -25,18 +25,24 @@ public static class TooltipFormatter
             return Cap("O-view · no usage data");
         }
 
+        // A percent Core flags Unavailable is absent even if it carries a value — the same
+        // rule the reset clauses below follow, so a number the contract says does not
+        // exist is never shown unmarked (ADR-0001, OVI-148).
+        var sessionPercent = Present(snapshot.SessionUtilizationPercent);
+        var weeklyPercent = Present(snapshot.WeeklyUtilizationPercent);
+
         // Only the Estimate confidence tier gets the "local estimate" fallback copy — a
         // snapshot merely lacking percentages (e.g. Live with nothing sampled yet) must
         // not be mislabelled as an estimate it isn't.
         if (snapshot.DataSourceKind == DataSourceKind.Estimate
-            && snapshot.SessionUtilizationPercent.Value is null
-            && snapshot.WeeklyUtilizationPercent.Value is null)
+            && sessionPercent is null
+            && weeklyPercent is null)
         {
             return Cap("O-view · local estimate · usage % unknown");
         }
 
-        var session = snapshot.SessionUtilizationPercent.Value is { } sessionPercent
-            ? string.Create(CultureInfo.InvariantCulture, $"5h: {Marker(snapshot.SessionUtilizationPercent.Status)}{FormatPercent(sessionPercent)}%")
+        var session = sessionPercent is { } sessionValue
+            ? string.Create(CultureInfo.InvariantCulture, $"5h: {Marker(snapshot.SessionUtilizationPercent.Status)}{FormatPercent(sessionValue)}%")
             : "5h: ?";
 
         // A reset Core flags Unavailable is absent even if it carries a value — the same
@@ -46,8 +52,8 @@ public static class TooltipFormatter
             ? string.Create(CultureInfo.InvariantCulture, $" · resets {Marker(snapshot.SessionResetAt.Status)}{ToLocal(sessionReset, zone):HH:mm}")
             : "";
 
-        var weekly = snapshot.WeeklyUtilizationPercent.Value is { } weeklyPercent
-            ? string.Create(CultureInfo.InvariantCulture, $" · 7d: {Marker(snapshot.WeeklyUtilizationPercent.Status)}{FormatPercent(weeklyPercent)}%")
+        var weekly = weeklyPercent is { } weeklyValue
+            ? string.Create(CultureInfo.InvariantCulture, $" · 7d: {Marker(snapshot.WeeklyUtilizationPercent.Status)}{FormatPercent(weeklyValue)}%")
             : "";
 
         var weeklyReset = snapshot.WeeklyResetAt is { Status: not UsageValueStatus.Unavailable, Value: { } weeklyResetAt }
@@ -67,6 +73,16 @@ public static class TooltipFormatter
     /// attests it as <see cref="UsageValueStatus.Real"/>.
     /// </summary>
     private static string Marker(UsageValueStatus status) => status == UsageValueStatus.Estimated ? "~" : "";
+
+    /// <summary>
+    /// The percent's value, or null when Core flags it <see cref="UsageValueStatus.Unavailable"/>
+    /// — whatever value it carries. <see cref="Marker"/> has no mark for Unavailable, so a
+    /// value paired with it would otherwise render as if it were real (OVI-148). OVI-149
+    /// made Core refuse that pair at construction, so this guard is now redundant; it stays,
+    /// like the reset guards, as ADR-0001's OVI-146 amendment allows.
+    /// </summary>
+    private static double? Present(UsagePercent percent) =>
+        percent.Status == UsageValueStatus.Unavailable ? null : percent.Value;
 
     private static int FormatPercent(double value) => (int)Math.Round(value, MidpointRounding.AwayFromZero);
 

@@ -71,6 +71,60 @@ public class TooltipFormatterTests
         Assert.Equal("Session 47% / Week 20%", tooltip);
     }
 
+    /// <summary>
+    /// A percent flagged <see cref="UsageValueStatus.Unavailable"/> is never shown. OVI-148
+    /// proved the skin's own guard by building the pair with a value; since OVI-149 Core
+    /// refuses that pair, so it can only reach the skin as <c>(null, Unavailable)</c>.
+    /// </summary>
+    [Fact]
+    public void AnUnavailablePercentCannotCarryAValueSoTheTooltipNeverShowsOne()
+    {
+        // OVI-148 built an Unavailable percent with a value and proved the tooltip dropped it.
+        // OVI-146 makes that pair unbuildable in Core, which pins the same guarantee at the
+        // one place that can make it: an unavailable percent never reaches the skin with a value.
+        Assert.Throws<ArgumentException>(() => new UsagePercent(47, UsageValueStatus.Unavailable));
+        Assert.Throws<ArgumentException>(() => new UsagePercent(20, UsageValueStatus.Unavailable));
+
+        var snapshot = new UsageSnapshot(
+            DataSourceKind.Live,
+            new DateTimeOffset(2026, 9, 8, 20, 45, 0, TimeSpan.Zero),
+            new UsagePercent(null, UsageValueStatus.Unavailable),
+            new UsageInstant(null, UsageValueStatus.Unavailable),
+            new UsagePercent(null, UsageValueStatus.Unavailable),
+            new UsageInstant(null, UsageValueStatus.Unavailable),
+            UsageLevel.Green);
+
+        var tooltip = TooltipFormatter.Format(snapshot, Utc);
+
+        Assert.Equal("Session unknown", tooltip);
+    }
+
+    /// <summary>
+    /// The Estimate fallback copy fires when both percents are unavailable. OVI-148 proved
+    /// it did so even when they carried values; since OVI-149 Core refuses that pair.
+    /// </summary>
+    [Fact]
+    public void AnUnavailablePercentCannotCarryAValueSoTheEstimateFallbackStillFires()
+    {
+        // As above: the pair OVI-148 built now throws, so the fallback is checked against the
+        // only unavailable percent Core can construct.
+        Assert.Throws<ArgumentException>(() => new UsagePercent(47, UsageValueStatus.Unavailable));
+        Assert.Throws<ArgumentException>(() => new UsagePercent(20, UsageValueStatus.Unavailable));
+
+        var snapshot = new UsageSnapshot(
+            DataSourceKind.Estimate,
+            new DateTimeOffset(2026, 9, 8, 20, 45, 0, TimeSpan.Zero),
+            new UsagePercent(null, UsageValueStatus.Unavailable),
+            new UsageInstant(null, UsageValueStatus.Unavailable),
+            new UsagePercent(null, UsageValueStatus.Unavailable),
+            new UsageInstant(null, UsageValueStatus.Unavailable),
+            UsageLevel.Green);
+
+        var tooltip = TooltipFormatter.Format(snapshot, Utc);
+
+        Assert.Equal("O-view: estimated reading, percentages not yet known", tooltip);
+    }
+
     [Fact]
     public void UnavailableSnapshotSaysSoRatherThanShowingZero()
     {
