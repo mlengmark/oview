@@ -76,7 +76,7 @@ render this as an explicit gap, never as zero or blank).
 | `UsageHistorySeries[]` | array of `{date: ISO-8601 date, utilizationPercent: float64 \| null}` | percent | real / estimated / unavailable per point | 31-day graph; `null` = no sample that day |
 | `HistoryCoverage.RecordedDays` | int32 | days | real | replaces the leaked `PanelStatistics.CoverageNote` sentence — Core hands the two counts, the skin writes the sentence |
 | `HistoryCoverage.WindowDays` | int32 | days | real | |
-| `OffPlanUsageAmount` | int64 (tokens) or decimal (USD) | tokens or USD | estimated / unavailable | |
+| `OffPlanUsageAmount` | `EstimatedUsd` (the existing decimal + status type) | USD, 2dp | estimated / unavailable | estimated spend, in the 31-day window, for work the plan meter did not account for. **Narrowed 2026-09-27 (OVI-168)** from the original "int64 (tokens) or decimal (USD)", which was not a type a skin could consume: the source app's field is `PanelStatistics.EstOffPlanUsd`, `decimal?`, USD only — no tokens variant exists or is planned. `unavailable` is the right flag when the window is not off-plan at all; a skin renders no figure then, never `$0.00` |
 | `NotificationThresholdCrossed` | `{crossed: bool, thresholdPercent: int32}` | percent | real | Core detects the crossing event; the skin decides how (or whether) to notify |
 | `LastIngestAt` | timestamp, UTC, ISO-8601 | instant | real | freshness diagnostic; not necessarily surfaced by every skin. Serves the same role as the source repo's `UsageSnapshot.CapturedAtUtc` — the capture time a skin would read to word a `Stale` value's age (OVI-16 amendment below); the freshness *threshold* itself stays provider-owned config, not a contract field |
 | `SessionBoostNotice` | `BoostNotice?` (nullable; see row below) | — | real / unavailable | the promo notice, if any, for the 5-hour meter; added 2026-09-21 (OVI-82) — see that amendment below |
@@ -91,6 +91,14 @@ render this as an explicit gap, never as zero or blank).
 | `RateCardSource` | enum {`Bundled`, `UserFile`} | — | real | where the rate table came from — an enum, never a display label: `"bundled"`/`"user file"` are skin wording. `UserFile` is carried forward though unimplemented, because the moment it exists the panel must name it (source repo issue [#255](https://github.com/mlengmark/O-view/issues/255)); added 2026-09-23 (OVI-100) |
 | `UpdateCheckOutcome` | enum {`UpToDate`, `UpdateAvailable`, `Unknown`, `RateLimited`} | — | real | what the shared update check concluded. `Unknown` ("could not tell") is never collapsed into `UpToDate`, and `RateLimited` is never collapsed into `Unknown` (source repo issue #176). Produced by the shared, platform-neutral layer, not by a skin; added 2026-09-25 (OVI-135, D4) — see that amendment below |
 | `UpdateRetryAfterUtc` | timestamp, UTC, ISO-8601, nullable | instant | real / unavailable | when GitHub's rate limit lifts, for `RateLimited` only. `unavailable` = GitHub sent no usable header; a skin must then say it does not know, never invent a time. The value `RateLimitedNotice` already takes as its raw `retryAfterUtc` argument; added 2026-09-25 (OVI-135, D4) |
+| `Divergence` | `DivergenceReading?` (nullable; see row below) | — | real / unavailable | what the plan meter and local activity say about each other, for the current 5-hour window. Lives on `UsageStatistics`. `null` + `unavailable` = Core could not run the comparison; added 2026-09-27 (OVI-168) — see that amendment below |
+| `DivergenceReading` (nested type) | `{state: DivergenceState, outputTokensInWindow: TokenCount, planRisePoints: int32?}` | tokens, percentage points | fields inherit the parent `Divergence` field's real/unavailable status | `planRisePoints` is **nullable and is `null` whenever no rise was measurable** — the source app reports `0` there, which is a fabricated zero a skin cannot tell from a meter that genuinely held still. `IsOffPlan` (`state` is `Diverging` or `PlanLimitReached`) is a Core-derived property of this type, not a skin test — same rule as `UsageLevel`'s banding; added 2026-09-27 (OVI-168) |
+| `DivergenceState` | enum {`InsufficientActivity`, `Consistent`, `Diverging`, `PlanLimitReached`, `MeterNotReporting`, `RiseNotMeasurable`} | — | real | six states, carried across unmerged: the last three are three different ways of saying "cannot tell" and the source app needed all three separately (its issue #268). No member is a display label |
+| `ExtraUsage` | `ExtraUsageReading?` (nullable; see row below) | — | real / unavailable | whether extra usage is switched on for this account, as **relayed** from Claude Code's own cache. Lives on `UsageSnapshot` — an account setting, not a 31-day statistic. `null` + `unavailable` = the cache did not say, or said something Core does not understand; added 2026-09-27 (OVI-168) |
+| `ExtraUsageReading` (nested type) | `{state: ExtraUsageState, fetchedAtUtc: timestamp, UTC, ISO-8601}` | instant | fields inherit the parent `ExtraUsage` field's real/unavailable status | `fetchedAtUtc` is **required, non-nullable**: a relayed setting Core cannot stamp is one Core must not hand over at all (see the amendment). It is provenance for the setting, not for O-view's own ingest — distinct from `LastIngestAt`, same role `BoostNoticesFetchedAtUtc` plays for the promo notice; added 2026-09-27 (OVI-168) |
+| `ExtraUsageState` | enum {`Disabled`, `Enabled`} | — | real | two members only. The source app's third member, `Unknown`, is **not** carried: "the cache did not say" is the parent field's `unavailable` status, and encoding it twice is the ill-formed pair OVI-146 closed; added 2026-09-27 (OVI-168) |
+| `HasCreditUsage` | bool | — | real / unavailable | whether any credit-billed model was recorded in the 31-day window. Lives on `UsageStatistics`. `false` + `real` means "Core looked and found none" and is a different fact from `unavailable`; added 2026-09-27 (OVI-168) |
+| `CreditBilledModelIds` | `string[]` — a Core-owned static set, **not** a snapshot field | — | real | the vendor model ids billed as extra usage. Core owns the set, verbatim; a skin owns how it is joined into a sentence. Replaces the source app's `CreditBilledModels.DisplayList`, which was a pre-joined display string; added 2026-09-27 (OVI-168) |
 
 **What Core must never emit, by contract:** a pre-formatted display
 sentence, a field separator, a locale-bound date/time string, or any
@@ -1125,6 +1133,111 @@ not a silent rewrite) as extraction work actually lands.
     amendment allows.
   - Not verified: the Linux skin was built and tested on Windows only, as a `net10.0`
     library. No Linux runner and no Linux hardware exercised it.
+
+- **2026-09-27 amendment (OVI-168) — the off-plan banner's Core shape decided:
+  `Divergence`, `ExtraUsage`, `HasCreditUsage`, `CreditBilledModelIds`, and
+  `OffPlanUsageAmount` narrowed to a real type (Adrian II the Architect, answering Kit
+  the Builder's escalation on OVI-168).**
+
+  **Why this amendment exists.** OVI-168 was written as "extract the off-plan banner out
+  of `O-view.Core`". Kit checked and the premise does not hold in this repository: there
+  is no banner code here to extract, because no slice has ever added the Core surface it
+  would need. The only trace was the `OffPlanUsageAmount` row above, and that row named
+  no usable type. So this is not an extraction, it is a **first-time contract decision**,
+  which by the issue's own escalation rule is mine. The build slice can follow once this
+  and the ADR-0003 amendment are signed off.
+
+  **Source re-read. CONFIRMED by direct read at source HEAD `1106d69`** (`gh`-cloned
+  2026-09-27). **Note the pin moved:** this ADR's earlier amendments cite `897777b`, which
+  is no longer the source repo's HEAD. These readings are confirmed at `1106d69` only; I
+  did **not** diff the two commits, so whether these particular members changed between
+  them is **not** established either way.
+  - `PanelText.OffPlanTitle(DivergenceState state, ExtraUsageState extraUsage) -> string`
+    (`src/O-view.Core/Models/PanelText.cs`:693) — the three-state heading. Its own doc
+    comment records why the states are three headings rather than one hedge: the single
+    old heading asserted a charge at every reader with an exhausted window, including
+    those who had extra usage switched off and could not be billed (source issue #259).
+  - `PanelText.OffPlanDetail(DivergenceResult, ExtraUsageState, DateTimeOffset?
+    fetchedAtUtc, DateTimeOffset utcNow, TimeZoneInfo) -> string` (:722), with
+    `PlanLimitReachedDetail` (:661), `DivergenceDetail(long, int)` (:651) and the internal
+    `ReadStamp(DateTimeOffset, DateTimeOffset, TimeZoneInfo)` (:753).
+  - `PanelText.OffPlanNote(bool offPlan)` (:765), `PanelText.EstTodayLabel(bool offPlan)`
+    (:488) — the tile sub-label and the label that flips from "Est. value today" to
+    "Est. spend today" off-plan — and `PanelText.OffPlanHint(bool hasCreditUsage)` (:778),
+    the hover explanation, which interpolates `CreditBilledModels.DisplayList`.
+  - `DivergenceResult(DivergenceState State, long OutputTokensInWindow, int
+    PlanRisePoints)` with `IsOffPlan => State is Diverging or PlanLimitReached`, and the
+    six-member `DivergenceState` (`src/O-view.Core/Models/DivergenceDetector.cs`:6, :45).
+  - `ExtraUsageState { Unknown, Disabled, Enabled }` and `ExtraUsageStatus`
+    (`src/O-view.Core/Providers/CachedUsage/ExtraUsageStatus.cs`:15, :72).
+  - `PanelStatistics.EstOffPlanUsd` is `decimal?`, and is populated **only when the window
+    is actually off-plan** (`PanelStatistics.cs`:50, :167).
+
+  **Decision — four new contract entries and one narrowed row, all specified in the table
+  above.** Three of them are judgment calls worth stating on their own, because each one
+  makes the new repository's contract deliberately *different* from the source app's
+  types rather than a port of them:
+
+  1. **`planRisePoints` is nullable, and is `null` when no rise was measurable.** The
+     source returns `0` in that case, and its own doc comment admits the problem —
+     "0 here because that is what subtracting a value from itself gives, not because the
+     meter held still". A skin handed `0` writes "the plan meter moved 0 points", which is
+     a fabricated observation under product principle 1. Core knows which it is (the
+     `state` says so); the contract makes Core say it.
+  2. **`ExtraUsageState` has no `Unknown` member.** The source's `Unknown` means exactly
+     what this contract's `unavailable` status already means — "no source produced a
+     value". Carrying both gives two encodings of one fact, and therefore an ill-formed
+     pair (`ExtraUsage` non-null, state `Unknown`) that says "available, and unknown".
+     The 2026-09-25 OVI-146 amendment closed that class at construction; this row must not
+     reopen it. A skin reads `ExtraUsage is null` for "the cache did not say".
+  3. **`ExtraUsageReading.fetchedAtUtc` is required, not nullable.** The source's
+     `OffPlanDetail` already discards a known setting when it has no timestamp to stamp it
+     with, and its doc comment gives the reason: this is a cached answer from another
+     application that can be days old while looking current, so relaying it unstamped
+     would be "a guess wearing a fact's clothes". That is currently a skin-side `if`. The
+     contract makes it structural — Core cannot hand over a setting it cannot date, so no
+     skin can render one.
+
+  **What this slice moves into the skins.** All of it is wording, and each skin words it
+  independently per ADR-0003: the three headings (`OffPlanTitle`), the detail line and its
+  sentence assembly (`OffPlanDetail`, `PlanLimitReachedDetail`, `DivergenceDetail`), the
+  read stamp (`ReadStamp`, including the date-when-not-today rule — a locale-bound format,
+  skin-owned by this ADR's "what Core must never emit"), the tile sub-label and flipping
+  label (`OffPlanNote`, `EstTodayLabel`), and the hover explanation (`OffPlanHint`,
+  including joining `CreditBilledModelIds` into a list).
+
+  **`UsageSettingsUrl` and its link label are not added to Core.** The label is plainly
+  wording. The URL is arguably vendor data, but it is a constant, not a per-reading value,
+  and no row in this table is a constant. Both stay skin-side for now. The cost is a URL
+  duplicated in two skins, which is exactly the drift ADR-0003's harness exists to catch —
+  so the fixture family below pins that both skins use the same URL. If a third consumer
+  ever needs it, that is the point to promote it to a Core constant, not before.
+
+  **Scope — this finishes `PanelText.cs`.** Every remaining `OffPlan*` member is in this
+  slice, not only the banner proper. Splitting the hover hint or the tile labels into a
+  sixth sub-slice would leave Phase 1 "complete" with wording still unextracted, and the
+  hint's one extra input (`HasCreditUsage` plus the model-id set) is small enough that
+  separating it buys nothing.
+
+  **Rejected: reuse `UsageStatistics` alone and put `ExtraUsage` there too.** It would
+  keep the banner's inputs in one object. Rejected because the setting is an account fact
+  read from `~/.claude.json`, not a 31-day statistic derived from usage; filing it under
+  statistics would make the first provider port put it in the wrong place. A skin
+  composing one banner from the snapshot and the statistics of the same render pass is
+  ordinary, and does not breach the "snapshots are chosen whole" rule — nothing here
+  merges two sources' readings of the same meter.
+
+  **Rejected: a single Core-computed `OffPlanBannerState` enum** collapsing divergence and
+  extra usage into the four cases the headings distinguish. It would be less for a skin to
+  get wrong, and it is how a skin-first design would draw the line. Rejected because it
+  bakes one skin's wording structure into Core: the moment a skin decides to say something
+  different for `Disabled` than for the unknown case, or to merge two of them, Core has to
+  change. Core states what was observed; how many sentences that becomes is the skin's
+  call. This is the same reasoning that kept `DivergenceState` at six members.
+
+  **Not verified by execution.** This is a documentation-only amendment. No build or test
+  is claimed, and no C# exists yet for any row added here. Until the build slice lands,
+  the code does **not** contain this surface.
 
 ## Alternatives considered
 
