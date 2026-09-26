@@ -839,7 +839,7 @@ not a silent rewrite) as extraction work actually lands.
   `WeeklyResetSource` is amended.
 
   What the source does, all **CONFIRMED** by direct read:
-  - `UsageEngine.WithWeeklyReset` (`src/O-view.App/UsageEngine.cs` lines 895–945) has
+  - `UsageEngine.WithWeeklyReset` (`src/O-view.App/UsageEngine.cs` lines 896–947) has
     exactly **two** sources for the weekly reset: a stored reported anchor, projected
     forward in whole weeks, or else the user's entry. There is no derived path.
     `WeeklyResetAtUtc` is assigned in one place in `src/` (line 942; `PlanHistoryProvider`
@@ -948,6 +948,28 @@ not a silent rewrite) as extraction work actually lands.
 
   **This needs no code change now.** `RateLimitedNotice` already takes the raw value, and
   nothing in this repository ports the update check yet.
+
+  **2026-09-26 (OVI-140): the cooldown must last for the whole process.** "Held in the
+  shared layer" is not enough on its own. The source's own Windows head shows why.
+  **CONFIRMED** by direct read at `897777b`:
+  - The cooldown is an **instance** field: `private DateTimeOffset? _rateLimitedUntilUtc`
+    (`src/O-view.App/Updates/ReleaseFeed.cs` line 38, checked at line 74).
+  - Windows builds a new feed on every check: `new ReleaseFeed(_log).CheckAsync(...)`
+    (`src/O-view.Tray/Updates/UpdateService.cs` lines 98–99). Each check starts with no
+    cooldown, so the one the last check recorded is thrown away.
+  - Linux keeps one feed for the notice's lifetime (`_feed`,
+    `src/O-view.Linux/Updates/LinuxUpdateNotice.cs` lines 29 and 48).
+
+  **INFERRED (not run):** on Windows, a check after `RateLimited` goes back to GitHub
+  before `retryAfterUtc`. That is the retry pattern source issue #176 was meant to stop.
+  The source doc comment quoted above states the intent correctly; the Windows head does
+  not meet it.
+
+  **Decision:** the porting slice keeps **one feed, or one cooldown holder, per process**,
+  never one per call, and every skin's check goes through it. The source's Windows head
+  (`UpdateService.CheckAsync`) is the counter-example: do not copy it. **Rejected:** a
+  cooldown persisted to disk. A restart losing the cooldown costs one extra request; a
+  file adds state to migrate and clean up for no evidenced benefit.
 
 - **2026-09-25 update — the code now conforms to D2 (Kit the Builder, OVI-139).** The
   sentence above, "until it lands, the current codebase does **not** conform to this row",
