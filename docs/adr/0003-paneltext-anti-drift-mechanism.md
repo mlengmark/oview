@@ -348,6 +348,9 @@ code, to keep the two heads honest against each other.
   2026-09-21 (OVI-82) amendment's structure for sub-slice 3: the proposal is written
   down first, the sign-off outcome is recorded in its own dated entry afterwards. **No
   slice may build against this shape until that second entry exists.**
+  **Amended 2026-09-26: that entry now exists — see the 2026-09-26 sign-off entry
+  below. Quinn accepted this proposal as written, so everything in this entry is
+  authorized and the "not authorized yet" wording below is superseded.**
 
   **The fixture families so far, for count:** `GoldenMasterFixture` (tooltip,
   `UsageSnapshot`), `UsageStatisticsFixture` (OVI-27, `UsageStatistics`),
@@ -440,6 +443,8 @@ code, to keep the two heads honest against each other.
   [OVI-100](/OVI/issues/OVI-100)). **The outcome will be recorded in its own dated entry
   below, exactly as OVI-82's was — until that entry exists, this proposal is not
   authorized and Kit's sub-slice 4 build task must not start against it.**
+  *(Superseded 2026-09-26: the sign-off entry below records Quinn's acceptance. This
+  proposal is authorized.)*
 
 - **2026-09-25 note — `PanelTextResetFixture`'s `SessionReset` entry takes a `UsageInstant`
   (Kit the Builder, OVI-139, implementing [ADR-0001](0001-core-to-skin-data-contract.md)'s
@@ -469,6 +474,45 @@ code, to keep the two heads honest against each other.
   - Verified locally: making the Windows panel mark `Real` instead of `Estimated` failed
     four `O-view.Tray.Tests` cases, including both agreement cases; reverting passed again.
     `GoldenMasterFixture`/`SkinUnderTest` were not touched.
+
+- **2026-09-26 amendment (OVI-100) — sub-slice 4's harness shape, DECIDED, Quinn's
+  sign-off recorded (Adrian II the Architect).** This is the second dated entry the
+  2026-09-23 amendment above said it was waiting for, in the same two-step shape OVI-82
+  used for sub-slice 3.
+
+  **Quinn the Reviewer accepted the proposal as written, without changes or caveats**
+  (Paperclip `request_confirmation` interaction `d3004df4-fd97-47ff-a90e-b60ad85ff984` on
+  [OVI-100](/OVI/issues/OVI-100), raised 2026-09-23T20:03Z, resolved
+  2026-09-26T21:16Z, outcome `accepted`, no decline reason and no requested changes).
+  The sign-off covers both things the request put to a second reader:
+  1. **The Option A vs. Option B choice** — do *not* fold `Caveat` into the merged
+     `UsageStatisticsFixture` family; add a parallel one instead. This is the first time
+     this ADR has faced a new member whose input shape an existing family already carried,
+     and the ruling is that a matching type signature alone does not justify reopening a
+     merged, reviewed family.
+  2. **The shape itself** — the seventh parallel family `UsageCaveatFixture` /
+     `UsageCaveatSkinUnderTest` / `UsageCaveatFixtures` /
+     `UsageCaveatGoldenMasterCrossSkinTests`, reusing `BoostNoticeFixture`'s
+     member-selecting `Render` closure over two entry points
+     (`Caveat(UsageStatistics)` and `RateAge(RateCardStamp)`), with `ContentFact`
+     unchanged and `GoldenMasterFixture`/`SkinUnderTest` and
+     `UsageStatisticsFixture`/`UsageStatisticsSkinUnderTest` all untouched.
+
+  **What this authorizes, and what it does not.** Kit's sub-slice 4 build task may now be
+  created and may build against the 2026-09-23 amendment's shape and its five specified
+  fixtures (the build slice may add fixtures, not drop them). The sign-off is on the
+  *shape and the A-vs-B choice only* — exact C# type declarations, naming of individual
+  fixture constants, and the wording each skin chooses remain Kit's calls, reviewed on the
+  build PR in the normal way. Sub-slice 5 (the off-plan three-state banner) stays out of
+  scope and stays held until sub-slice 4's build and review land.
+
+  **Not verified by execution.** No build or test result is claimed by this entry: it is a
+  documentation-only amendment, and the runner's .NET toolchain was unavailable for
+  `dotnet build`/`dotnet test` when it was written (see OVI-110, Finding B). That is
+  expected for a docs entry and blocks nothing — the harness verification for this family
+  is Kit's to perform and record on the build PR, in the worked-example form every prior
+  family's amendment used (INFERRED that it will be possible by then; CONFIRMED only that
+  it was not possible here).
 
 ## Alternatives considered
 
