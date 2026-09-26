@@ -514,6 +514,47 @@ code, to keep the two heads honest against each other.
   family's amendment used (INFERRED that it will be possible by then; CONFIRMED only that
   it was not possible here).
 
+- **2026-09-27 amendment (OVI-168) — sub-slice 5, the off-plan banner, is released from
+  hold, and its fixture family is specified (Adrian II the Architect).**
+
+  The 2026-09-23 entry above says "sub-slice 5 (the off-plan three-state banner) stays out
+  of scope and stays held until sub-slice 4's build and review land". **Sub-slice 4 landed**
+  (OVI-165, PR #29, merged; `main` at `aebaeeb`), so that condition is met and this entry
+  releases the hold. The Core shape sub-slice 5 needs is decided in
+  [ADR-0001](0001-core-to-skin-data-contract.md)'s 2026-09-27 amendment — read that first;
+  this entry only decides the harness side.
+
+  **The family — an eighth parallel one, not a merge.** `OffPlanFixture` /
+  `OffPlanSkinUnderTest` / `OffPlanFixtures` / `OffPlanGoldenMasterCrossSkinTests`, reusing
+  `BoostNoticeFixture`'s member-selecting `Render` closure — here over five entry points
+  (`OffPlanTitle`, `OffPlanDetail`, `OffPlanNote`, `EstTodayLabel`, `OffPlanHint`), with
+  `ContentFact` unchanged and every existing family untouched. The 2026-09-23 ruling
+  applies again and for the same reason: a new member whose inputs an existing family
+  partly carries does not justify reopening a merged, reviewed family.
+
+  **Six fixtures at minimum** (the build slice may add, not drop):
+  1. Plan limit reached, extra usage **on**, stamp read **today** — the heading asserts the
+     charge, the detail carries the setting sentence and a time-only stamp.
+  2. Plan limit reached, extra usage **off**, stamp read **on an earlier day** — the heading
+     says extra usage is switched off, and the stamp **must** carry the date. A skin that
+     renders a bare `HH:mm` here fails, because that is the one thing the clause exists to
+     disclose (source `PanelText.cs`:714).
+  3. Plan limit reached, `ExtraUsage` **unavailable** — heading is the bare observation, no
+     setting sentence, and **no stamp at all**. Pins that neither skin invents a reading.
+  4. Diverging, extra usage on, `planRisePoints` present — the two-number observation.
+  5. A non-off-plan state (`Consistent`) — **no banner content from any entry point**,
+     `OffPlanNote` empty, and `EstTodayLabel` in its "value", not "spend", form.
+  6. A state with `planRisePoints` **null** (`RiseNotMeasurable`) — no rise wording from
+     either skin. Nothing may render "0 points"; the whole reason ADR-0001 made the field
+     nullable is undone if a skin substitutes a zero.
+
+  Fixtures 1–3 also pin that both skins use the **same** `UsageSettingsUrl` string, since
+  ADR-0001's amendment deliberately leaves that URL skin-owned and duplicated.
+
+  **Not verified by execution.** Documentation only; no build or test result is claimed.
+  The harness verification is the build slice's to perform and record on its PR, in the
+  worked-example form every prior family's amendment used.
+
 ## Alternatives considered
 
 **Shared non-Core text-resource module, consumed by both skins.**
