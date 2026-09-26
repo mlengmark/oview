@@ -91,6 +91,10 @@ moved. **Rejected:** a per-skin check. It duplicates the one piece that is genui
 same on every OS, and a per-head check is the pattern that let the source retry straight
 back into GitHub's limit before issue #176 moved the cooldown into the shared layer.
 
+**2026-09-26 (OVI-140):** the shared cooldown must also last for the whole process. The
+source's Windows head builds a new `ReleaseFeed` per check and so drops it (CONFIRMED at
+`897777b`). See ADR-0001's D4 amendment, same date, for the evidence and the rule.
+
 ### Reading the Linux column honestly
 
 Per OVI-4 (2026-09-08), Linux's evidence base is **two hardware reports,
