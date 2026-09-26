@@ -106,10 +106,14 @@ public class PanelTextFormatterTests
     }
 
     [Fact]
-    public void SessionResetSaysNoResetObservedYetForAnUnavailableStatusEvenIfAValueIsPresent()
+    public void AnUnavailableSessionResetCannotCarryAValueSoThePanelSaysNoResetObserved()
     {
+        // OVI-139 built an Unavailable reset with a value and proved the panel ignored it.
+        // OVI-146 makes that pair unbuildable in Core, so the guarantee is pinned there.
+        Assert.Throws<ArgumentException>(() => new UsageInstant(SessionResetInstant, UsageValueStatus.Unavailable));
+
         var result = PanelTextFormatter.SessionReset(
-            new UsageInstant(SessionResetInstant, UsageValueStatus.Unavailable), SessionUtcNow, Utc);
+            new UsageInstant(null, UsageValueStatus.Unavailable), SessionUtcNow, Utc);
 
         Assert.Equal("No reset observed yet", result);
     }
