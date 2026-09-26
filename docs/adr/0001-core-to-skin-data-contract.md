@@ -753,6 +753,9 @@ not a silent rewrite) as extraction work actually lands.
   - **The harness fixture-family shape for testing this sub-slice** is decided in
     [ADR-0003](0003-paneltext-anti-drift-mechanism.md)'s 2026-09-23 (OVI-100) amendment, not
     here — this amendment is the Core-contract half of that sub-slice's sign-off only.
+    *(Update 2026-09-26: Quinn signed that shape off unchanged; recorded in ADR-0003's
+    2026-09-26 (OVI-100) entry. Both halves of sub-slice 4's sign-off are now complete, so
+    the build slice is authorized against the rows above.)*
 
 - **2026-09-25 amendment (OVI-135) — three values the skins already render had no
   contract row: the session-reset uncertainty (D2), the user-entered weekly reset and its
