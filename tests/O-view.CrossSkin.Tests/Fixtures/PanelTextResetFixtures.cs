@@ -1,3 +1,5 @@
+using OView.Core.Models;
+
 namespace OView.CrossSkin.Tests.Fixtures;
 
 /// <summary>
@@ -31,7 +33,24 @@ public static class PanelTextResetFixtures
 
     public static readonly PanelTextResetFixture SessionResetKnownAndExact = new(
         Name: "session-reset-known-and-exact",
-        Render: skin => skin.SessionReset(SessionResetAt, UtcNow, TimeZoneInfo.Utc, null),
+        Render: skin => skin.SessionReset(new UsageInstant(SessionResetAt, UsageValueStatus.Real), UtcNow, TimeZoneInfo.Utc),
+        ContentFacts: new[]
+        {
+            ContentFact.Contains("12:14"),
+            ContentFact.Contains("2h"),
+        });
+
+    /// <summary>
+    /// An <see cref="UsageValueStatus.Estimated"/> reset still states its time and countdown —
+    /// the approximate marker qualifies the time, it never replaces it. The marker itself is
+    /// not pinned here: each skin words it differently (<c>~</c> / <c>(approx.)</c>), and
+    /// whether it appears is checked per skin, against that skin's own tooltip, in
+    /// <c>O-view.{Tray,Linux}.Tests</c>' <c>SessionResetAndTheTooltipAgreeOnWhetherTheResetIsMarked</c>
+    /// (ADR-0003, 2026-09-25 note).
+    /// </summary>
+    public static readonly PanelTextResetFixture SessionResetEstimatedStillStatesTheTime = new(
+        Name: "session-reset-estimated-still-states-the-time",
+        Render: skin => skin.SessionReset(new UsageInstant(SessionResetAt, UsageValueStatus.Estimated), UtcNow, TimeZoneInfo.Utc),
         ContentFacts: new[]
         {
             ContentFact.Contains("12:14"),
@@ -40,7 +59,7 @@ public static class PanelTextResetFixtures
 
     public static readonly PanelTextResetFixture SessionResetUnknown = new(
         Name: "session-reset-unknown",
-        Render: skin => skin.SessionReset(null, UtcNow, TimeZoneInfo.Utc, null),
+        Render: skin => skin.SessionReset(new UsageInstant(null, UsageValueStatus.Unavailable), UtcNow, TimeZoneInfo.Utc),
         ContentFacts: new[]
         {
             new ContentFact("does not render a clock time", rendered => !rendered.Contains(':')),
@@ -68,6 +87,7 @@ public static class PanelTextResetFixtures
         CountdownOverAnHour,
         CountdownUnderAMinute,
         SessionResetKnownAndExact,
+        SessionResetEstimatedStillStatesTheTime,
         SessionResetUnknown,
         WeeklyResetIncludesWeekday,
         WeeklyResetConflictStatesTheReportedTime,

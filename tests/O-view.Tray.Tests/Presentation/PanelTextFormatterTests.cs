@@ -93,45 +93,72 @@ public class PanelTextFormatterTests
         Assert.Equal(expected, PanelTextFormatter.Countdown(TimeSpan.FromMinutes(minutes)));
     }
 
+    private static readonly DateTimeOffset SessionUtcNow = new(2026, 9, 11, 10, 0, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset SessionResetInstant = new(2026, 9, 11, 12, 14, 0, TimeSpan.Zero);
+
     [Fact]
-    public void SessionResetSaysUnknownWhenNoResetHasBeenObserved()
+    public void SessionResetSaysUnknownWhenTheResetIsUnavailable()
     {
-        var result = PanelTextFormatter.SessionReset(null, DateTimeOffset.UtcNow, Utc);
+        var result = PanelTextFormatter.SessionReset(
+            new UsageInstant(null, UsageValueStatus.Unavailable), DateTimeOffset.UtcNow, Utc);
 
         Assert.Equal("Reset time unknown (no reset observed yet)", result);
     }
 
     [Fact]
-    public void SessionResetRendersTheCountdownAndTimeWithNoApproximateMarkerByDefault()
+    public void SessionResetSaysUnknownForAnUnavailableStatusEvenIfAValueIsPresent()
     {
-        var utcNow = new DateTimeOffset(2026, 9, 11, 10, 0, 0, TimeSpan.Zero);
-        var reset = new DateTimeOffset(2026, 9, 11, 12, 14, 0, TimeSpan.Zero);
+        var result = PanelTextFormatter.SessionReset(
+            new UsageInstant(SessionResetInstant, UsageValueStatus.Unavailable), SessionUtcNow, Utc);
 
-        var result = PanelTextFormatter.SessionReset(reset, utcNow, Utc);
-
-        Assert.Equal("Resets in 2h 14m · 12:14", result);
+        Assert.Equal("Reset time unknown (no reset observed yet)", result);
     }
 
     [Fact]
-    public void SessionResetMarksABracketedResetWithATilde()
+    public void SessionResetMarksAnEstimatedResetWithATilde()
     {
-        var utcNow = new DateTimeOffset(2026, 9, 11, 10, 0, 0, TimeSpan.Zero);
-        var reset = new DateTimeOffset(2026, 9, 11, 12, 14, 0, TimeSpan.Zero);
-
-        var result = PanelTextFormatter.SessionReset(reset, utcNow, Utc, TimeSpan.FromHours(1));
+        var result = PanelTextFormatter.SessionReset(
+            new UsageInstant(SessionResetInstant, UsageValueStatus.Estimated), SessionUtcNow, Utc);
 
         Assert.Equal("Resets in 2h 14m · ~12:14", result);
     }
 
     [Fact]
-    public void SessionResetLeavesANarrowUncertaintyUnmarked()
+    public void SessionResetLeavesARealResetUnmarked()
     {
-        var utcNow = new DateTimeOffset(2026, 9, 11, 10, 0, 0, TimeSpan.Zero);
-        var reset = new DateTimeOffset(2026, 9, 11, 12, 14, 0, TimeSpan.Zero);
-
-        var result = PanelTextFormatter.SessionReset(reset, utcNow, Utc, TimeSpan.FromMinutes(5));
+        var result = PanelTextFormatter.SessionReset(
+            new UsageInstant(SessionResetInstant, UsageValueStatus.Real), SessionUtcNow, Utc);
 
         Assert.Equal("Resets in 2h 14m · 12:14", result);
+    }
+
+    /// <summary>
+    /// The panel and the tooltip must agree on <i>whether</i> one session-reset value is
+    /// marked approximate (ADR-0001, 2026-09-25 amendment, D2). The snapshot's other fields
+    /// are all <see cref="UsageValueStatus.Real"/> (weekly reset unavailable), so any
+    /// <c>~</c> in the tooltip can only have come from the session reset.
+    /// </summary>
+    [Theory]
+    [InlineData(UsageValueStatus.Real, false)]
+    [InlineData(UsageValueStatus.Estimated, true)]
+    [InlineData(UsageValueStatus.Unavailable, false)]
+    public void SessionResetAndTheTooltipAgreeOnWhetherTheResetIsMarked(UsageValueStatus status, bool marked)
+    {
+        var instant = new UsageInstant(status == UsageValueStatus.Unavailable ? null : SessionResetInstant, status);
+        var snapshot = new UsageSnapshot(
+            DataSourceKind.Live,
+            SessionUtcNow,
+            new UsagePercent(57, UsageValueStatus.Real),
+            instant,
+            new UsagePercent(14, UsageValueStatus.Real),
+            new UsageInstant(null, UsageValueStatus.Unavailable),
+            UsageLevel.Amber);
+
+        var panel = PanelTextFormatter.SessionReset(instant, SessionUtcNow, Utc);
+        var tooltip = TooltipFormatter.Format(snapshot, Utc);
+
+        Assert.Equal(marked, panel.Contains('~'));
+        Assert.Equal(marked, tooltip.Contains('~'));
     }
 
     [Fact]

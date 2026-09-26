@@ -1,3 +1,5 @@
+using OView.Core.Models;
+
 namespace OView.CrossSkin.Tests.Fixtures;
 
 /// <summary>
@@ -8,10 +10,14 @@ namespace OView.CrossSkin.Tests.Fixtures;
 /// same signature either (Kit's OVI-29 signature survey; Quinn's OVI-45 sign-off). Rather
 /// than force four incompatible shapes into one shared delegate, each
 /// <see cref="PanelTextResetFixture"/> closes over whichever one member it exercises.
+///
+/// <para>As of OVI-139, <see cref="SessionReset"/> takes the Core <see cref="UsageInstant"/>
+/// (value + status) rather than a raw <c>DateTimeOffset?</c> and uncertainty width
+/// (ADR-0001, 2026-09-25 amendment, D2).</para>
 /// </summary>
 public sealed record PanelTextResetSkinUnderTest(
     string Name,
     Func<TimeSpan, string> Countdown,
-    Func<DateTimeOffset?, DateTimeOffset, TimeZoneInfo, TimeSpan?, string> SessionReset,
+    Func<UsageInstant, DateTimeOffset, TimeZoneInfo, string> SessionReset,
     Func<DateTimeOffset, DateTimeOffset, TimeZoneInfo, string> WeeklyReset,
     Func<DateTimeOffset, TimeZoneInfo, string> WeeklyResetConflict);

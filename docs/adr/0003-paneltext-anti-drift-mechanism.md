@@ -441,6 +441,35 @@ code, to keep the two heads honest against each other.
   below, exactly as OVI-82's was — until that entry exists, this proposal is not
   authorized and Kit's sub-slice 4 build task must not start against it.**
 
+- **2026-09-25 note — `PanelTextResetFixture`'s `SessionReset` entry takes a `UsageInstant`
+  (Kit the Builder, OVI-139, implementing [ADR-0001](0001-core-to-skin-data-contract.md)'s
+  2026-09-25 D2 amendment).**
+  - `PanelTextResetSkinUnderTest.SessionReset` changes type from
+    `Func<DateTimeOffset?, DateTimeOffset, TimeZoneInfo, TimeSpan?, string>` to
+    `Func<UsageInstant, DateTimeOffset, TimeZoneInfo, string>`, following the skins'
+    signature change. This is the same member with a new input type. The family's shape is
+    unchanged (one fixture type, member-selecting `Render`), so this ADR's sign-off rule for
+    a new shape does not apply. `session-reset-known-and-exact` now passes `Real`, and
+    `session-reset-unknown` passes `Unavailable`.
+  - One fixture added: **`session-reset-estimated-still-states-the-time`**. It pins that an
+    `Estimated` reset still renders its time and countdown in both skins, so the approximate
+    marker qualifies the time and never replaces it. The marker is **not** pinned here,
+    because the skins word it differently (`~` / `(approx.)`) and this ADR pins facts, not
+    wording.
+  - **Where the "panel and tooltip agree" check lives, and why it is not a cross-skin
+    fixture.** OVI-139 asked for one fixture showing that the panel and the tooltip agree on
+    whether a given `UsageInstant` is marked. That is a comparison between two formatters
+    **inside one skin**, and the predicate ("is this text marked?") depends on the skin's
+    own wording. It therefore lives in each skin's own test project, as
+    `SessionResetAndTheTooltipAgreeOnWhetherTheResetIsMarked` (a theory over `Real`,
+    `Estimated`, `Unavailable`), and compares yes/no, not text. Putting it in this harness
+    would need a new family with a per-skin marker predicate. That is a new shape, which
+    needs Quinn's sign-off under this ADR's OVI-27/OVI-45/OVI-82 rule. If a reviewer wants
+    it cross-skin, that is the route, and it is a follow-up rather than part of this slice.
+  - Verified locally: making the Windows panel mark `Real` instead of `Estimated` failed
+    four `O-view.Tray.Tests` cases, including both agreement cases; reverting passed again.
+    `GoldenMasterFixture`/`SkinUnderTest` were not touched.
+
 ## Alternatives considered
 
 **Shared non-Core text-resource module, consumed by both skins.**

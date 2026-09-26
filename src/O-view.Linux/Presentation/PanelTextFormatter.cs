@@ -71,21 +71,21 @@ public static class PanelTextFormatter
                 : string.Create(CultureInfo.InvariantCulture, $"{t.Minutes}m");
 
     /// <summary>
-    /// The session-reset line. Carries a <c>(approx.)</c> suffix, this skin's own marker for
-    /// a bracketed rather than exact reset instant — parallel to
-    /// <see cref="TooltipFormatter"/>'s <c>(est.)</c> suffix for an estimated field.
+    /// The session-reset line. Carries a <c>(approx.)</c> suffix, this skin's own marker,
+    /// exactly when Core flags the instant <see cref="UsageValueStatus.Estimated"/> — the same
+    /// signal <see cref="TooltipFormatter"/>'s <c>(est.)</c> suffix reads, so the panel and the
+    /// tooltip mark the same values even though they word the mark differently. No uncertainty
+    /// width or threshold crosses the contract (ADR-0001, 2026-09-25 amendment, D2).
     /// </summary>
-    public static string SessionReset(
-        DateTimeOffset? resetAtUtc, DateTimeOffset utcNow, TimeZoneInfo displayZone,
-        TimeSpan? uncertainty = null)
+    public static string SessionReset(UsageInstant resetAt, DateTimeOffset utcNow, TimeZoneInfo displayZone)
     {
-        if (resetAtUtc is not { } reset)
+        if (resetAt.Status == UsageValueStatus.Unavailable || resetAt.Value is not { } reset)
         {
             return "No reset observed yet";
         }
 
         var at = TimeZoneInfo.ConvertTime(reset, displayZone);
-        var suffix = IsApproximate(uncertainty) ? " (approx.)" : "";
+        var suffix = resetAt.Status == UsageValueStatus.Estimated ? " (approx.)" : "";
 
         return string.Create(CultureInfo.InvariantCulture,
             $"Resets in {Countdown(reset - utcNow)}, at {at:HH:mm}{suffix}");
@@ -114,11 +114,6 @@ public static class PanelTextFormatter
         return string.Create(CultureInfo.InvariantCulture,
             $"Claude reports a different weekly reset time: {at:ddd HH:mm}. Using the reported time instead of what you entered. Re-enter it if your plan changed.");
     }
-
-    /// <summary>The uncertainty width past which a reset instant is only bracketed, not exact.</summary>
-    public static readonly TimeSpan ApproximateThreshold = TimeSpan.FromMinutes(30);
-
-    private static bool IsApproximate(TimeSpan? uncertainty) => (uncertainty ?? TimeSpan.Zero) > ApproximateThreshold;
 
     /// <summary>
     /// The boost chip on a meter's label row: <c>Boosted 50%, until 31 Aug, ends in 2w, 4d, 14h</c>.

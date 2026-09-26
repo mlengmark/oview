@@ -6,7 +6,7 @@ namespace OView.Tray.Presentation;
 /// <summary>
 /// Builds the detail panel's freshness/countdown/reset text from a
 /// <see cref="UsageSnapshot"/> and the raw scalars the source app's <c>PanelText.cs</c>
-/// also took directly (a duration, a reset instant, an uncertainty span). Every wording
+/// also took directly (a duration, a reset instant). Every wording
 /// decision here — the "As of"/"Local estimate" framing, the approximate marker, the unit
 /// step-down in <see cref="Countdown"/> — lives in this Windows skin, and nowhere in
 /// O-view.Core (ADR-0001). This class is not shared with O-view.Linux; each skin owns its
@@ -86,21 +86,22 @@ public static class PanelTextFormatter
 
     /// <summary>
     /// The session-reset line. Before a reset has been observed, says so rather than
-    /// guessing. Carries a <c>~</c> marker when the reset instant is only bracketed
-    /// (<paramref name="uncertainty"/> wider than <see cref="ApproximateThreshold"/>) — the
-    /// same marker <see cref="TooltipFormatter"/> uses for an estimated field.
+    /// guessing. Carries a <c>~</c> marker exactly when Core flags the instant
+    /// <see cref="UsageValueStatus.Estimated"/> — the same signal and the same marker
+    /// <see cref="TooltipFormatter"/> uses, so the panel and the tooltip cannot disagree about
+    /// one value. Whether a bracketed reset counts as approximate is Core's call, not this
+    /// skin's: no uncertainty width or threshold crosses the contract (ADR-0001, 2026-09-25
+    /// amendment, D2).
     /// </summary>
-    public static string SessionReset(
-        DateTimeOffset? resetAtUtc, DateTimeOffset utcNow, TimeZoneInfo displayZone,
-        TimeSpan? uncertainty = null)
+    public static string SessionReset(UsageInstant resetAt, DateTimeOffset utcNow, TimeZoneInfo displayZone)
     {
-        if (resetAtUtc is not { } reset)
+        if (resetAt.Status == UsageValueStatus.Unavailable || resetAt.Value is not { } reset)
         {
             return "Reset time unknown (no reset observed yet)";
         }
 
         var at = TimeZoneInfo.ConvertTime(reset, displayZone);
-        var marker = IsApproximate(uncertainty) ? "~" : "";
+        var marker = resetAt.Status == UsageValueStatus.Estimated ? "~" : "";
 
         return string.Create(CultureInfo.InvariantCulture,
             $"Resets in {Countdown(reset - utcNow)} · {marker}{at:HH:mm}");
@@ -131,11 +132,6 @@ public static class PanelTextFormatter
         return string.Create(CultureInfo.InvariantCulture,
             $"Claude reports your weekly limit resetting {at:ddd HH:mm}, which does not match the time you entered. O-view is using the reported time. Re-enter yours if your plan changed.");
     }
-
-    /// <summary>The uncertainty width past which a reset instant is only bracketed, not exact.</summary>
-    public static readonly TimeSpan ApproximateThreshold = TimeSpan.FromMinutes(30);
-
-    private static bool IsApproximate(TimeSpan? uncertainty) => (uncertainty ?? TimeSpan.Zero) > ApproximateThreshold;
 
     /// <summary>
     /// The boost chip on a meter's label row: <c>50% Boosted · until 31 Aug · ends in 2w 4d 14h</c>.
