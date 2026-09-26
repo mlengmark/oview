@@ -1167,3 +1167,15 @@ the source of truth for what the contract *means*.
   skin decision, not a contract gap — the contract's job is to make the
   information available and honestly labelled, not to decide how much of
   it a given UI shows.
+
+- **2026-09-26 note — usage-caveat contract implemented (Kit the Builder, OVI-165).** The
+  2026-09-23 (OVI-100) amendment's fields now exist in `O-view.Core`: `UsageStatistics` gains
+  `UnpricedModels`, `TtlUnrecordedCacheWritesWindow31d` and `Rates` as `init`-only properties
+  (no constructor change), and the new types are `RateCardStamp`, `UnpricedModels` and
+  `RateCardSource`. Two shape choices the amendment left open: `RateCardStamp` and
+  `UnpricedModels` carry an explicit `Status` (`Real`/`Unavailable`) rather than being
+  nullable, so the "explicitly unavailable" default is a value, and an unavailable
+  `RateCardStamp` has `Source`/`AsOf` null. All three fields default to *unavailable*, never
+  to "none/zero/bundled". Core holds no caveat wording; `Caveat`, `RateAge` and
+  `TokenScopeCaveat` live in each skin's `PanelTextFormatter`. Nothing populates these fields
+  yet — the pricing/provider port is separate future work, as the amendment said.
