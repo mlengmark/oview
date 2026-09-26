@@ -253,4 +253,69 @@ public static class PanelTextFormatter
             ? string.Create(CultureInfo.InvariantCulture, $"after {TimeZoneInfo.ConvertTime(at, local):HH:mm}.")
             : "on its next check.")
         + " Nothing is wrong with your connection or your install.";
+
+    /// <summary>
+    /// The usage-tile caveat: the qualifiers that apply to the 31-day figures, joined with
+    /// " · ", or empty when none do (OVI-165; ADR-0001's 2026-09-23 amendment). Wording is this
+    /// skin's own historical text. A condition Core could not establish is stated as unknown,
+    /// never left silent, because silence would read as "nothing to qualify".
+    /// </summary>
+    public static string Caveat(UsageStatistics stats)
+    {
+        var parts = new List<string>(4);
+
+        if (PanelStatisticsFormatter.CoverageNote(stats.HistoryCoverage) is { Length: > 0 } coverage)
+        {
+            parts.Add(coverage);
+        }
+
+        if (stats.UnpricedModels.Status == UsageValueStatus.Unavailable)
+        {
+            parts.Add("models without a published rate unknown");
+        }
+        else if (stats.UnpricedModels.ModelIds.Count > 0)
+        {
+            parts.Add($"excludes {string.Join(", ", stats.UnpricedModels.ModelIds)} (no published rate)");
+        }
+
+        if (stats.TtlUnrecordedCacheWritesWindow31d.Status == UsageValueStatus.Unavailable)
+        {
+            parts.Add("cache write durations unknown");
+        }
+        else if (stats.TtlUnrecordedCacheWritesWindow31d.Value > 0)
+        {
+            parts.Add($"{UsageFormatter.Tokens(stats.TtlUnrecordedCacheWritesWindow31d)} cache writes "
+                      + "with no recorded duration, priced at the 5-minute rate");
+        }
+
+        if (stats.Rates.Status == UsageValueStatus.Unavailable)
+        {
+            parts.Add("rates unknown");
+        }
+        else if (stats.Rates.IsStale)
+        {
+            parts.Add(RateAge(stats.Rates));
+        }
+
+        return string.Join(" · ", parts);
+    }
+
+    /// <summary>
+    /// How old the rates are and where they came from: <c>rates: bundled, as of 24 Jun 2026</c>.
+    /// Names the source as well as the date. Empty for an unavailable stamp: there is no source
+    /// or date to state, and <see cref="Caveat"/> says the rates are unknown instead.
+    /// </summary>
+    public static string RateAge(RateCardStamp rates) =>
+        rates is { Source: { } source, AsOf: { } asOf }
+            ? string.Create(
+                CultureInfo.InvariantCulture,
+                $"rates: {(source == RateCardSource.UserFile ? "user file" : "bundled")}, as of {asOf:d MMM yyyy}")
+            : "";
+
+    /// <summary>
+    /// What the token and cost tiles permanently do not cover. Always shown, unlike the
+    /// conditional caveats: a caveat that appears only sometimes teaches that its absence means
+    /// full coverage, which would be false every time.
+    /// </summary>
+    public const string TokenScopeCaveat = "chat and cloud sessions not counted";
 }

@@ -578,3 +578,24 @@ strings is why this ADR's mechanism checks facts, not bytes.
   which facts are safety-critical enough to pin — that judgment starts
   here, with this ADR's fixture examples, and should grow as real drift
   incidents (hopefully none) or near-misses are found.
+
+- **2026-09-26 note — `UsageCaveatFixture` family built; Quinn's OVI-100 sign-off recorded
+  (Kit the Builder, OVI-165).**
+  - **Sign-off, as relayed by the OVI-165 task brief:** the family proposed in the 2026-09-23
+    amendment was accepted on [OVI-100](/OVI/issues/OVI-100) (interaction `d3004df4`). The
+    brief's word is the only evidence this PR has of that acceptance; I did not re-read the
+    interaction itself (INFERRED). This entry is the recorded outcome that amendment asked for.
+  - **Built as proposed:** `UsageCaveatFixture` / `UsageCaveatSkinUnderTest` /
+    `UsageCaveatFixtures` / `UsageCaveatGoldenMasterCrossSkinTests`, member-selecting like
+    `BoostNoticeFixture`; `ContentFact` reused unchanged; the existing six families untouched.
+  - **Fixtures:** the proposal's five, plus five more — the unavailable case is split so the
+    rate-age line (`RateAge`, empty) and the caveat ("unknown") are pinned separately, the
+    `Unavailable` unpriced-models and TTL-count states each get a fixture, and fresh rates and
+    stale-rates-in-`Caveat` are pinned. Extra fixtures are allowed by the proposal ("may add,
+    not drop").
+  - **Decision made in code, for review:** an `Unavailable` field renders as an explicit
+    "unknown" qualifier in `Caveat`, never silence (ADR-0001 decision 6). The proposal only
+    pinned this for `Rates`; extending it to `UnpricedModels` and the TTL count follows the
+    same rule. `RateAge` of an unavailable stamp is `""`.
+  - **Not pinned cross-skin:** `TokenScopeCaveat` (a constant, no input); each skin's tests
+    assert it is non-empty. Wording of the token-scope line differs between skins by design.
