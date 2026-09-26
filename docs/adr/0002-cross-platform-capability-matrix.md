@@ -51,7 +51,7 @@ not re-tested" or "never observed" into "supported."
 | Theme-following | Match OS light/dark preference automatically | **CONFIRMED** — reads `AppsUseLightTheme` | Desktop theme portal implemented; **never observed on real hardware** |
 | Single-instance enforcement | Guarantee exactly one running copy per user session | **CONFIRMED** — named mutex | No equivalent primitive exists; needs its own mechanism (file lock or socket) — genuinely a different implementation, not a shared API |
 | Install & distribution | Get itself onto the machine via the OS's native packaging convention; register uninstall | **CONFIRMED** — Inno Setup installer, per-user, Start Menu shortcut, uninstall registry entry | Headless CI (Ubuntu/Debian/Fedora containers) **confirms install-and-start only** — proves nothing about UI, since containers have no compositor. Hardware reports used a tarball, not the `.deb`; `.deb`-on-real-hardware is untested |
-| Self-update | Check for a new version; self-replace only if the OS's package model allows it, else notify-only | **CONFIRMED** — installer self-replaces via Restart Manager, checksum-verified first | **Must never self-replace** under a package-manager install (the package manager owns those files) — getting this wrong already shipped a real bug once (source repo ADR-0009 amendment) |
+| Self-update | Act on the shared update check's result: self-replace only if the OS's package model allows it, else notify-only. The check itself (fetch, rate-limit detection, `retryAfterUtc`) is **not** per-skin — see the 2026-09-25 (OVI-135) note below | **CONFIRMED** — installer self-replaces via Restart Manager, checksum-verified first | **Must never self-replace** under a package-manager install (the package manager owns those files) — getting this wrong already shipped a real bug once (source repo ADR-0009 amendment) |
 | Menu-dismiss-on-outside-click | Dismiss the widget/menu on an outside click | **CONFIRMED** — Win32 `AttachThreadInput`-based fix | No direct equivalent; compositor-dependent. One hardware-found bug here (#129, panel self-dismissing on an unfocused compositor) fixed but not re-tested |
 
 ### 2026-09-10 update — `O-view.Linux` project scaffolded (OVI-30)
@@ -67,6 +67,29 @@ integration, startup registration, or self-update mechanism was added, and
 **no evidence label in the table above was upgraded** as part of this
 slice — the Linux column's guarantees remain exactly as verified (or not)
 by Rae II's OVI-4 pass, unaffected by this scaffold existing.
+
+### 2026-09-25 amendment — Self-update row: the check is shared, only acting on it is per-OS (OVI-135)
+
+The Self-update row used to say every skin must "check for a new version". That wording
+leaves open who owns the update check and the `retryAfterUtc` value that
+`RateLimitedNotice` renders. The OVI-133 drift check labelled the owner **INFERRED: the
+skin**. A direct read of the source repository at `897777b` refutes that. **CONFIRMED**:
+- The pure rules are in Core, with no HTTP: `RateLimitResponse` and `UpdateCheck`, under
+  `src/O-view.Core/Updates/`.
+- The fetch and the rate-limit cooldown are in the shared `O-view.App` project
+  (`ReleaseFeed`), "held here rather than in either head" (source issue #176).
+- Each head only decides what to do with the result. Windows downloads and self-replaces
+  (`O-view.Tray/Updates/UpdateService.cs`); Linux only notifies
+  (`O-view.Linux/Updates/LinuxUpdateNotice.cs`).
+
+**Decision:** detecting an update is one shared capability, and its result is contract data
+([ADR-0001](0001-core-to-skin-data-contract.md) rows `UpdateCheckOutcome` and
+`UpdateRetryAfterUtc`, same date). *Acting* on it stays "one capability, many
+implementations", exactly as the Windows and Linux cells above already say. Those cells
+and their evidence labels are unchanged; only the "every skin must provide" wording
+moved. **Rejected:** a per-skin check. It duplicates the one piece that is genuinely the
+same on every OS, and a per-head check is the pattern that let the source retry straight
+back into GitHub's limit before issue #176 moved the cooldown into the shared layer.
 
 ### Reading the Linux column honestly
 
