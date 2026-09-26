@@ -39,7 +39,10 @@ public static class TooltipFormatter
             ? string.Create(CultureInfo.InvariantCulture, $"5h: {Marker(snapshot.SessionUtilizationPercent.Status)}{FormatPercent(sessionPercent)}%")
             : "5h: ?";
 
-        var reset = snapshot.SessionResetAt.Value is { } sessionReset
+        // A reset Core flags Unavailable is absent even if it carries a value — the same
+        // reading PanelTextFormatter.SessionReset takes, so the two surfaces never disagree
+        // and an unavailable instant is never shown (ADR-0001).
+        var reset = snapshot.SessionResetAt is { Status: not UsageValueStatus.Unavailable, Value: { } sessionReset }
             ? string.Create(CultureInfo.InvariantCulture, $" · resets {Marker(snapshot.SessionResetAt.Status)}{ToLocal(sessionReset, zone):HH:mm}")
             : "";
 
@@ -47,7 +50,7 @@ public static class TooltipFormatter
             ? string.Create(CultureInfo.InvariantCulture, $" · 7d: {Marker(snapshot.WeeklyUtilizationPercent.Status)}{FormatPercent(weeklyPercent)}%")
             : "";
 
-        var weeklyReset = snapshot.WeeklyResetAt.Value is { } weeklyResetAt
+        var weeklyReset = snapshot.WeeklyResetAt is { Status: not UsageValueStatus.Unavailable, Value: { } weeklyResetAt }
             ? string.Create(CultureInfo.InvariantCulture, $" · resets {Marker(snapshot.WeeklyResetAt.Status)}{ToLocal(weeklyResetAt, zone):ddd HH:mm}")
             : "";
 

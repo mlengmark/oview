@@ -41,6 +41,28 @@ public class TooltipFormatterTests
         Assert.Equal("Session 47% / Week 20%", tooltip);
     }
 
+    /// <summary>
+    /// A reset Core flags <see cref="UsageValueStatus.Unavailable"/> is omitted even when it
+    /// carries a value — matching <c>PanelTextFormatter.SessionReset</c>, which reads the
+    /// same pair as "no reset observed" (OVI-144).
+    /// </summary>
+    [Fact]
+    public void UnavailableResetsAreOmittedEvenWhenAValueIsPresent()
+    {
+        var snapshot = new UsageSnapshot(
+            DataSourceKind.Live,
+            new DateTimeOffset(2026, 9, 8, 20, 45, 0, TimeSpan.Zero),
+            new UsagePercent(47, UsageValueStatus.Real),
+            new UsageInstant(new DateTimeOffset(2026, 9, 8, 20, 59, 0, TimeSpan.Zero), UsageValueStatus.Unavailable),
+            new UsagePercent(20, UsageValueStatus.Real),
+            new UsageInstant(new DateTimeOffset(2026, 9, 7, 23, 0, 0, TimeSpan.Zero), UsageValueStatus.Unavailable),
+            UsageLevel.Green);
+
+        var tooltip = TooltipFormatter.Format(snapshot, Utc);
+
+        Assert.Equal("Session 47% / Week 20%", tooltip);
+    }
+
     [Fact]
     public void UnavailableSnapshotSaysSoRatherThanShowingZero()
     {
