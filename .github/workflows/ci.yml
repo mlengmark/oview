@@ -1,0 +1,96 @@
+# CI for the O-view rebuild. Implements option (a') of ADR-0004
+# (docs/adr/0004-what-non-windows-ci-could-and-could-not-prove.md).
+#
+# What each job proves, and what it does not, is recorded in CLAUDE.md
+# ("Continuous integration"). In short:
+#   - windows: builds and tests the whole solution, including the
+#     net10.0-windows ADR-0003 anti-drift harness (O-view.CrossSkin.Tests).
+#     This is the only automated run of that harness.
+#   - linux: builds and tests only the four net10.0 projects. It proves they
+#     build and their tests pass on the Linux runtime. It does NOT run the
+#     anti-drift harness or the Tray skin, and says nothing about tray icons,
+#     windows or any real Linux desktop behaviour.
+#
+# No release, publish, packaging or secrets. Read-only token.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  windows:
+    name: Windows (full solution, incl. anti-drift harness)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore O-view.slnx
+
+      - name: Build
+        run: dotnet build O-view.slnx --no-restore --configuration Release
+
+      - name: Test
+        run: dotnet test O-view.slnx --no-build --configuration Release --verbosity normal
+
+  linux:
+    name: Linux (net10.0 projects only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      # Named individually on purpose: this job covers only the net10.0
+      # projects, as ADR-0004 option (a') specifies. It deliberately does not
+      # use O-view.slnx, which also contains the three net10.0-windows
+      # projects (Tray, Tray.Tests, CrossSkin.Tests). Note: a probe on this
+      # runner (OVI-124, run 35984892283) showed those projects DO currently
+      # build and pass on Linux; they are excluded by scope, not by necessity.
+      # See CLAUDE.md "Continuous integration".
+      - name: Build net10.0 projects
+        shell: bash
+        run: |
+          set -euo pipefail
+          for p in \
+            src/O-view.Core/O-view.Core.csproj \
+            src/O-view.Linux/O-view.Linux.csproj \
+            tests/O-view.Core.Tests/O-view.Core.Tests.csproj \
+            tests/O-view.Linux.Tests/O-view.Linux.Tests.csproj
+          do
+            dotnet build "$p" --configuration Release
+          done
+
+      - name: Test net10.0 projects
+        shell: bash
+        run: |
+          set -euo pipefail
+          for p in \
+            tests/O-view.Core.Tests/O-view.Core.Tests.csproj \
+            tests/O-view.Linux.Tests/O-view.Linux.Tests.csproj
+          do
+            dotnet test "$p" --no-build --configuration Release --verbosity normal
+          done
+
