@@ -979,13 +979,89 @@ not a silent rewrite) as extraction work actually lands.
 - **2026-09-25 update — `unavailable` wins over a present value, in the tooltip too (Kit
   the Builder, OVI-144).** The entry above overstated the agreement. Both tooltips still
   rendered a `SessionResetAt` or `WeeklyResetAt` that carried a value flagged
-  `unavailable`, with no marker, while the panel said the reset was unknown. Both skins'
+  `unavailable`, with no marker, while the panel said the reset was unknown. *(Wording
+  corrected 2026-09-25, OVI-146: that clause holds for `SessionResetAt` only. The panel's
+  `WeeklyReset` takes a raw `DateTimeOffset`, not a `UsageInstant`, and nothing under
+  `src/` calls it — grep, CONFIRMED — so no panel surface said anything about a
+  `WeeklyResetAt` flagged `unavailable`. The tooltip half of the sentence stands for both
+  rows.)* Both skins'
   `TooltipFormatter` now omit either reset clause when its `Status == Unavailable`,
   whatever the value. For these two instant rows, `unavailable` means "absent": a skin
   never renders the value. **CONFIRMED** by read and a new test per skin
   (`UnavailableResetsAreOmittedEvenWhenAValueIsPresent`). No `src/` producer constructs
   such a pair today (grep), so this was not reachable on screen. No Core change, no
   marker wording change.
+
+- **2026-09-25 amendment (OVI-146) — `unavailable` carries no value: Core makes the
+  ill-formed pair impossible to build (Adrian II the Architect).** OVI-139 and OVI-144 each
+  fixed one skin surface that rendered a value flagged `unavailable`. The tooltip's two
+  percent clauses still can (see below). That is three fixes for one bug class, one consumer
+  at a time. This amendment closes the class at its source.
+
+  **Where the percents stand — CONFIRMED by read at `62fc3ce`.** Both skins'
+  `TooltipFormatter` render the session and weekly percent on `.Value is { }` alone (Tray
+  `src/O-view.Tray/Presentation/TooltipFormatter.cs` :38 and :49, Linux
+  `src/O-view.Linux/Presentation/TooltipFormatter.cs` :37 and :48). A `UsagePercent(47,
+  Unavailable)` would show as a bare `47%`, with no marker. The `Estimate`-tier fallback
+  guards (Tray :32-33, Linux :31-32) test `.Value is null`, so the same pair would also skip
+  the "usage % unknown" copy. **Not reachable today — CONFIRMED by grep:** the only `src/`
+  producer of any of the four value types is `UsageSnapshot.Unavailable` /
+  `UsageStatistics.Unavailable`, and both pass `null`. The first provider port
+  is the first code that could build the pair.
+
+  **Decision — option (a): Core enforces `Status == Unavailable ⇒ Value == null` for every
+  status-paired value type.** Today that is `UsagePercent`, `UsageInstant`, `TokenCount`
+  and `EstimatedUsd`. The rule is the contract's existing definition, stated at the top of
+  this Decision section — **unavailable** means "no source produced a value" — now made
+  true by construction instead of by convention. Consequences for each side:
+  - **Core.** Constructing one of these types with `Unavailable` and a non-null value fails
+    at once, with an `ArgumentException`, at the producer's own call site. That covers
+    every route to an instance, not only the positional constructor. A `with` expression
+    or an object initializer must not be able to build the pair either. `default(T)`
+    already satisfies the rule (`Real` is the enum's zero value; `Value` is `null`). The
+    mechanism is the builder's choice. One constraint: the check must not depend on the
+    order in which a `with` expression assigns `Value` and `Status`.
+  - **Skins.** Reading `.Value` alone is correct for these four types, because `Value is
+    { }` now implies `Status != Unavailable`. The OVI-139/OVI-144 `Status: not Unavailable`
+    guards become redundant, but they are not wrong. They may stay; removing them is not
+    part of this decision. The tooltip percent clauses and the `Estimate` fallback guards
+    comply once Core does, and need no skin edit.
+  - **Every future status-paired type** (for example `WeeklyResetUserEntry`,
+    `UnpricedModels`, `Rates` when they land) enforces the same rule at construction,
+    wherever the type has a value slot that `unavailable` could leave filled. A new row in
+    this table that pairs a value with the status flag inherits this rule without needing
+    its own amendment.
+  - **Out of scope.** The converse, `Value == null` with `Real`/`Estimated`, is **not**
+    forbidden by this amendment. The tooltip renders it as `?` or omits it, which is a
+    visible gap, not a fabricated number. Whether that pair is itself ill-formed is a
+    separate question. Nobody has raised it with a case, and it is not decided here.
+
+  **Rejected: option (b), a contract-wide skin rule** ("every skin treats `Unavailable` as
+  absent for every status-flagged value", pinned by CrossSkin tests). It is the approach
+  that has already failed three times. It relies on every consumer in every skin
+  remembering one check, and on a test existing for each consumer. A missed consumer is
+  found only when a provider first builds the pair, which is the first provider port and
+  the moment this project can least afford a silent fabrication. It also puts
+  data-integrity policy in the skin. This project's layering rule puts data meaning in
+  Core and wording in the skin.
+
+  **Rejected: Core silently normalises the pair** (drops the value, keeps `Unavailable`).
+  It is safe on screen, but it hides a producer bug. A provider that reads a value and
+  then decides it is untrustworthy has made a real decision. It should say so by passing
+  `null`, and a test should catch it when it does not. A throw fails that provider's own
+  tests, at the line that is wrong. Normalising would pass every test and hand the skin a
+  value the provider never meant to send.
+
+  **What this changes for existing tests — CONFIRMED by grep at `62fc3ce`.** Tests that
+  build an `Unavailable` pair *with* a value, to prove a skin ignores it, will throw at
+  construction under this rule. The OVI-144 tooltip tests
+  (`UnavailableResetsAreOmittedEvenWhenAValueIsPresent`, both skins) and the OVI-139 panel
+  tests (`PanelTextFormatterTests.cs` :112, both skins) are among them. Rewrite each one to
+  pin the Core rule (the constructor throws). Do not delete it. What those tests
+  protected, "an unavailable value is never shown", is still pinned, now at the one place
+  that can guarantee it. **The implementation is a separate build task for Kit the Builder
+  and has not landed.** Until it does, the current code does **not** conform to this
+  amendment.
 
 ## Alternatives considered
 
