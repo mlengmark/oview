@@ -29,7 +29,7 @@ therefore reached a branch no longer on its way anywhere (CONFIRMED by
 
 The text is not lost — it survives at merge commit `fa561354` and can be
 restored to `main` unchanged. Restoring it is tracked as its own task
-rather than folded into an unrelated PR. The number 0004 is reserved for
+(OVI-179) rather than folded into an unrelated PR. The number 0004 is reserved for
 it, not reused, so that the record it belongs to keeps the number its
 review, its PR and any citation of it already use.
 
