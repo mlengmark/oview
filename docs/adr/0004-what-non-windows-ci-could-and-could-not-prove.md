@@ -1,10 +1,11 @@
 # ADR-0004: What non-Windows CI could and could not prove for O-view
 
-- **Status:** Proposed — a recommendation for the board, not yet decided.
-  Nothing in this record adds CI; it answers what CI would buy before
-  anyone is asked to fund it. Becomes Accepted or Rejected, amended in
-  place with a dated note, once the board answers the question at the
-  end.
+- **Status:** Accepted — recommendation (a′) was approved and is live. See
+  the 2026-09-27 amendment below. *(This record was written as Proposed:
+  nothing in it adds CI, it answers what CI would buy before anyone is
+  asked to fund it. The board answered while the record itself was lost off
+  `main`; the amendment records that, rather than leaving a Proposed status
+  the repository already contradicts.)*
 - **Date:** 2026-09-24
 - **Deciders:** Adrian II the Architect (author); Quinn the Reviewer
   (review); the board (decision, carried by Chief Gary II).
@@ -339,6 +340,35 @@ Linux.Tests), with the harness left unrestructured?*
 - **Yes:** Chief Gary II scopes the slice.
 - **No:** this record is amended to Rejected, and option (c) stands as
   the documented position.
+
+- **2026-09-27 amendment (OVI-179) — the board answered yes, and (a′) is
+  already live on `main`. Status above moves Proposed → Accepted.**
+
+  **CONFIRMED** by direct read of `origin/main`: `.github/workflows/ci.yml`
+  exists and defines exactly the two jobs this record recommended — a
+  Windows job named "Windows (full solution, incl. anti-drift harness)" on
+  `windows-latest`, and a Linux job named "Linux (net10.0 projects only)"
+  on `ubuntu-latest`. It was added by a commit that names both the slice
+  and this record: *"CI: add GitHub Actions workflow — Windows full
+  solution + Linux net10.0 projects (OVI-124, ADR-0004)"*. The anti-drift
+  harness was not restructured, as recommended.
+
+  **Recorded here a day late, and by the author rather than by the slice
+  that did the work, for a reason worth naming.** OVI-124 built against
+  this record and cited it, but could not amend it, because the record was
+  not on `main` to amend (see the late-landing note in the header). So the
+  approval landed in the workflow file and in a commit message while the
+  record it answered stayed Proposed and invisible. This amendment is the
+  reconciliation, not a new decision: no part of (a′) is being decided
+  here, only written down where the trail can see it.
+
+  **What is not claimed.** This amendment does not assert the board
+  reviewed the record's *reasoning* — only that the slice it recommended
+  was approved and shipped in the shape recommended (CONFIRMED from the
+  workflow file and commit message; the deliberation itself was not read).
+  The "when this conclusion must be revisited" triggers below are
+  unaffected and still stand: R1 remains open, and the Linux skin gaining
+  OS- or runtime-sensitive formatting still reopens this record.
 
 ## Alternatives considered
 

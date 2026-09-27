@@ -636,7 +636,13 @@ strings is why this ADR's mechanism checks facts, not bytes.
     ADR-0004. Read that record, not this sentence.
     *(Added to `main` on 2026-09-27 by OVI-179, not on the date above —
     the pull request that wrote it merged into another branch. See
-    ADR-0004's own late-landing note.)*
+    ADR-0004's own late-landing note. Two things have moved since the
+    amendment was written and are left in place rather than rewritten:
+    CI now exists — `.github/workflows/ci.yml`, added by OVI-124 — so
+    "no CI configuration of any kind" is true of `a2a5556` only, and
+    ADR-0004 is now Accepted, not Proposed. The harness does run on a
+    Windows runner today; the original sentence's error was assuming one
+    already existed, and that remains the point.)*
 - The fixture set needs initial content (a representative set of Core
   snapshots covering ordinary usage, near-limit usage, estimated/fallback
   data, and unavailable data) before the test can catch anything. Building
