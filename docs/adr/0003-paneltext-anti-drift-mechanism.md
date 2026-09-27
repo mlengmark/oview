@@ -555,6 +555,19 @@ code, to keep the two heads honest against each other.
   The harness verification is the build slice's to perform and record on its PR, in the
   worked-example form every prior family's amendment used.
 
+- **2026-09-27 note — the family built, and `PanelText.cs`'s extraction is complete (Kit the
+  Builder, OVI-168).** `OffPlanFixture`/`OffPlanSkinUnderTest`/`OffPlanFixtures`/
+  `OffPlanGoldenMasterCrossSkinTests` exist in `O-view.CrossSkin.Tests`, built to the shape this
+  amendment specified, with the six fixtures above implemented as written and a ninth family
+  now running alongside `GoldenMasterFixture`/`UsageStatisticsFixture`/`FreshnessFixture`/
+  `PanelTextResetFixture`/`BoostNoticeFixture`/`RateLimitedNoticeFixture`/`UsageCaveatFixture`.
+  The `UsageSettingsUrl` pin is one direct equality assertion
+  (`EverySkinUsesTheSameUsageSettingsUrl`) over both skins' constants rather than threaded
+  through fixtures 1–3's content facts — simpler, and it pins the identical fact.
+  - `dotnet test O-view.slnx`: all 9 `O-view.CrossSkin.Tests` pass (up from 7), on Windows.
+  - See [ADR-0001](0001-core-to-skin-data-contract.md)'s 2026-09-27 note for the Core and
+    per-skin surface this family exercises.
+
 ## Alternatives considered
 
 **Shared non-Core text-resource module, consumed by both skins.**

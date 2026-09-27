@@ -20,6 +20,12 @@ public sealed record UsageSnapshot(
     UsageInstant WeeklyResetAt,
     UsageLevel UsageLevel)
 {
+    /// <summary>Whether extra usage is switched on for this account, as relayed from Claude
+    /// Code's own cache. An account setting, not a 31-day statistic. Defaults to <c>null</c> —
+    /// the cache did not say, or said something Core does not understand — never a fabricated
+    /// <see cref="ExtraUsageState.Disabled"/> (ADR-0001, OVI-168).</summary>
+    public ExtraUsageReading? ExtraUsage { get; init; }
+
     /// <summary>
     /// The canonical "no data" snapshot — every value unavailable, not zero.
     /// <see cref="LastIngestAt"/> is <see cref="DateTimeOffset.MinValue"/> here as an

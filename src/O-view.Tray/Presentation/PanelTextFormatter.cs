@@ -14,10 +14,11 @@ namespace OView.Tray.Presentation;
 ///
 /// <para>Covers the <c>Freshness</c>/<c>Countdown</c>/<c>SessionReset</c>/
 /// <c>WeeklyReset</c>/<c>WeeklyResetConflict</c> family (Phase 1 slice 3.1, OVI-29), as of
-/// Phase 1 slice 3.3 (OVI-92) <c>BoostChip</c>/<c>BoostCard</c>, and as of Phase 1 slice 3.4
-/// (OVI-98) <c>RateLimitedNotice</c>. The remaining <c>PanelText.cs</c> members — the
-/// usage-tile caveat and the off-plan banner — are separate, differently-shaped sub-slices
-/// with their own new Core surface, not yet extracted.</para>
+/// Phase 1 slice 3.3 (OVI-92) <c>BoostChip</c>/<c>BoostCard</c>, as of Phase 1 slice 3.4
+/// (OVI-98) <c>RateLimitedNotice</c>, as of Phase 1 sub-slice 4 (OVI-165) <c>Caveat</c>/
+/// <c>RateAge</c>, and as of Phase 1 sub-slice 5 (OVI-168) the off-plan banner's
+/// <c>OffPlanTitle</c>/<c>OffPlanDetail</c>/<c>OffPlanNote</c>/<c>EstTodayLabel</c>/
+/// <c>OffPlanHint</c>. This finishes the extraction of the source app's <c>PanelText.cs</c>.</para>
 /// </summary>
 public static class PanelTextFormatter
 {
@@ -318,4 +319,156 @@ public static class PanelTextFormatter
     /// full coverage, which would be false every time.
     /// </summary>
     public const string TokenScopeCaveat = "chat and cloud sessions not counted";
+
+    /// <summary>
+    /// Claude's own usage settings page, which is where the off-plan banner sends the reader
+    /// for the figure O-view will not state. Deliberately not a Core constant (ADR-0001's
+    /// 2026-09-27 amendment): it is skin-owned and duplicated in <c>O-view.Linux</c>, and the
+    /// ADR-0003 fixture family below pins that both skins use the same value.
+    /// </summary>
+    public const string UsageSettingsUrl = "https://claude.ai/settings/usage";
+
+    /// <summary>Label on the link to <see cref="UsageSettingsUrl"/>.</summary>
+    public const string UsageSettingsLinkLabel = "Open usage settings in Claude";
+
+    /// <summary>
+    /// The off-plan banner's heading (OVI-168; ADR-0001's 2026-09-27 amendment).
+    ///
+    /// <para>Empty when <paramref name="divergence"/> is not off-plan
+    /// (<see cref="DivergenceReading.IsOffPlan"/>) — a skin decides whether to show the banner
+    /// at all, but the entry point itself asserts nothing for a state that never diverged.</para>
+    ///
+    /// <para>The exhausted-window heading only asserts a charge where the account setting
+    /// supports it: an account with extra usage switched off could not be billed anything, so a
+    /// single alarming heading for every exhausted window would be false for that population
+    /// (source app issue #259). <paramref name="extraUsage"/> is <c>null</c> when Claude Code's
+    /// cache did not say, which gets the bare observation.</para>
+    /// </summary>
+    public static string OffPlanTitle(DivergenceReading divergence, ExtraUsageReading? extraUsage)
+    {
+        if (!divergence.IsOffPlan)
+        {
+            return "";
+        }
+
+        return divergence.State == DivergenceState.PlanLimitReached
+            ? extraUsage?.State switch
+            {
+                ExtraUsageState.Enabled => "Plan limit reached — further work bills as extra usage",
+                ExtraUsageState.Disabled => "Plan limit reached — extra usage is switched off",
+                _ => "Plan limit reached",
+            }
+            : "This session's usage is not drawing from your plan";
+    }
+
+    /// <summary>
+    /// The line under <see cref="OffPlanTitle"/>: the observation, then what Claude Code says
+    /// about extra usage on this account, then when it said it.
+    ///
+    /// <para>Empty when <paramref name="divergence"/> is not off-plan, same as
+    /// <see cref="OffPlanTitle"/>. Relayed and stamped, never asserted in this skin's own
+    /// voice — this is a cached answer from another application that can be days old while
+    /// looking exactly as current as a fresh one, so the provenance clause is what makes
+    /// reporting it honest rather than a guess wearing a fact's clothes.</para>
+    /// </summary>
+    public static string OffPlanDetail(
+        DivergenceReading divergence, ExtraUsageReading? extraUsage, DateTimeOffset utcNow, TimeZoneInfo displayZone)
+    {
+        if (!divergence.IsOffPlan)
+        {
+            return "";
+        }
+
+        var observation = divergence.State == DivergenceState.PlanLimitReached
+            ? "The 5-hour window is exhausted, so continued work is not drawing from it."
+            : DivergenceDetail(divergence.OutputTokensInWindow, divergence.PlanRisePoints);
+
+        if (extraUsage is not { } reading)
+        {
+            return divergence.State == DivergenceState.PlanLimitReached
+                ? "The 5-hour window is exhausted, so continued work is not drawing from it. Whether "
+                  + "that bills as extra usage depends on your account settings, which O-view could "
+                  + "not read."
+                : observation;
+        }
+
+        var setting = reading.State == ExtraUsageState.Enabled
+            ? "Extra usage is switched on for this account, so work past the plan allowance "
+              + "can bill beyond it."
+            : "Extra usage is switched off for this account, so work past the plan allowance "
+              + "should not bill beyond it.";
+
+        return string.Create(CultureInfo.InvariantCulture,
+            $"{observation} {setting} ({ReadStamp(reading.FetchedAtUtc, utcNow, displayZone)})");
+    }
+
+    /// <summary>
+    /// What local activity ran past a meter that is not moving: <c>About 1.2M output tokens
+    /// ran in this window while the plan meter moved 3 points.</c> States the observation and
+    /// stops there — naming a cause (whose billing, whose fault) is not this skin's job when
+    /// the two numbers are what a reader can actually check.
+    ///
+    /// <para><paramref name="risePoints"/> is <c>null</c> when Core could not measure a rise
+    /// (see <see cref="DivergenceReading.PlanRisePoints"/>'s doc comment). Nothing here renders
+    /// "0 points" for that case — the clause naming the meter's movement is simply dropped.</para>
+    /// </summary>
+    private static string DivergenceDetail(TokenCount outputTokensInWindow, int? risePoints)
+    {
+        var tokens = UsageFormatter.Tokens(outputTokensInWindow);
+
+        if (risePoints is not { } rise)
+        {
+            return $"About {tokens} output tokens ran in this window with no measurable change in the "
+                + "plan meter. Usage that a plan meter does not account for is billed some other way "
+                + "— O-view cannot see your billing, so check Settings → Usage in Claude for what it "
+                + "was.";
+        }
+
+        return $"About {tokens} output tokens ran in this window while the plan meter moved {rise} "
+            + $"point{(rise == 1 ? "" : "s")}. Usage that a plan meter does not account for is "
+            + "billed some other way — O-view cannot see your billing, so check Settings → Usage "
+            + "in Claude for what it was.";
+    }
+
+    /// <summary>
+    /// <c>reported by Claude Code, read 09:07</c>, or <c>… read 28 Aug 12:50</c> once the
+    /// reading is no longer from the reader's own today — the one thing this clause exists to
+    /// disclose, so a bare <c>HH:mm</c> on an old reading would hide it.
+    /// </summary>
+    private static string ReadStamp(DateTimeOffset fetchedAtUtc, DateTimeOffset utcNow, TimeZoneInfo displayZone)
+    {
+        var read = TimeZoneInfo.ConvertTime(fetchedAtUtc, displayZone);
+        var today = TimeZoneInfo.ConvertTime(utcNow, displayZone).Date;
+
+        return read.Date == today
+            ? string.Create(CultureInfo.InvariantCulture, $"reported by Claude Code, read {read:HH:mm}")
+            : string.Create(CultureInfo.InvariantCulture, $"reported by Claude Code, read {read:d MMM HH:mm}");
+    }
+
+    /// <summary>Sub-label noting that an off-plan figure includes work billed outside the plan.</summary>
+    public static string OffPlanNote(bool offPlan) => offPlan ? "incl. off-plan usage" : "";
+
+    /// <summary>
+    /// The "Est. value/spend today" tile heading, which flips when usage goes off-plan —
+    /// because then it genuinely is spend, not a modelled value within a plan that already
+    /// costs nothing marginal.
+    /// </summary>
+    public static string EstTodayLabel(bool offPlan) => offPlan ? "Est. spend today" : "Est. value today";
+
+    /// <summary>
+    /// What the off-plan section means, shown on hover rather than as standing text. Both
+    /// wordings carry the caveat that the figure is not what was charged — moving it must not
+    /// lose it, which is why it has one definition here rather than being duplicated at every
+    /// call site.
+    /// </summary>
+    public static string OffPlanHint(bool hasCreditUsage)
+    {
+        var models = string.Join(", ", CreditBilledModelIds.All);
+
+        return hasCreditUsage
+            ? $"Estimated at published API rates for models billed as extra usage ({models}). "
+              + "O-view cannot read your credit balance; check your billing page for exact figures."
+            : $"No credit-billed usage ({models}) recorded in the last 31 days. Off-plan usage "
+              + "while O-view wasn't running isn't captured.";
+    }
 }
