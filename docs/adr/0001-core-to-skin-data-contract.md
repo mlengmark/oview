@@ -1239,6 +1239,42 @@ not a silent rewrite) as extraction work actually lands.
   is claimed, and no C# exists yet for any row added here. Until the build slice lands,
   the code does **not** contain this surface.
 
+- **2026-09-27 note — off-plan banner contract implemented, this finishing Phase 1's
+  `PanelText.cs` extraction (Kit the Builder, OVI-168).** The amendment above's five new/
+  narrowed rows now exist in `O-view.Core`: `DivergenceState` (six members), `DivergenceReading`
+  (`State`, `OutputTokensInWindow: TokenCount`, `PlanRisePoints: int?`, derived `IsOffPlan`),
+  `ExtraUsageState` (two members, no `Unknown`), `ExtraUsageReading` (`State`,
+  `FetchedAtUtc: DateTimeOffset`, non-nullable), and `CreditBilledModelIds` (a static
+  `IReadOnlyList<string>`, `["claude-fable-5", "claude-mythos-5"]`, matching the source app's
+  `BillingClass.Credit` entries at the pinned `1106d69`). `UsageStatistics` gains `Divergence`
+  (`DivergenceReading?`, default `null`), `HasCreditUsage` (new `UsageFlag` type — a bool
+  paired with a status, following the same construction rule as `TokenCount`/`EstimatedUsd`;
+  default unavailable), and `OffPlanUsageAmount` (`EstimatedUsd`, default unavailable).
+  `UsageSnapshot` gains `ExtraUsage` (`ExtraUsageReading?`, default `null`).
+  - Each skin's own `Presentation/PanelTextFormatter.cs` gains `OffPlanTitle`, `OffPlanDetail`,
+    `OffPlanNote`, `EstTodayLabel`, and `OffPlanHint`, worded independently per ADR-0003, plus a
+    private `DivergenceDetail`/`ReadStamp` pair each skin owns. Both skins also gain their own
+    `UsageSettingsUrl`/`UsageSettingsLinkLabel` constants (the URL value equal in both, per the
+    amendment above; the label wording independent).
+  - **One behaviour beyond the amendment's letter, needed to satisfy ADR-0003's fixture 5:**
+    `OffPlanTitle` and `OffPlanDetail` return `""` when `DivergenceReading.IsOffPlan` is false,
+    rather than requiring every caller to guard on `IsOffPlan` before invoking them (which is
+    how the source app's equivalent relied on its caller). This keeps the entry points total —
+    calling them with a `Consistent` or `RiseNotMeasurable` reading, directly, without a
+    guard, is not an error and never fabricates banner content.
+  - The ninth cross-skin golden-master fixture family — `OffPlanFixture`/`OffPlanSkinUnderTest`/
+    `OffPlanFixtures`/`OffPlanGoldenMasterCrossSkinTests` — implements the six fixtures ADR-0003's
+    amendment specified, plus a direct `EverySkinUsesTheSameUsageSettingsUrl` check (the ADR-0003
+    amendment asked for this to be pinned "by fixtures 1–3"; implemented instead as one direct
+    equality assertion over both skins' constants, which pins the same fact more simply than
+    threading the URL through three fixtures' rendered text).
+  - **Verified by execution:** `dotnet test O-view.slnx` — all four test projects pass, 181
+    tests total (43 Core, 64 Linux, 65 Tray, 9 CrossSkin), including the 7 new Core contract
+    tests, the 5 new tests per skin, and the 2 new CrossSkin tests. Windows only — no Linux
+    hardware was available to run `O-view.Linux`/`O-view.Linux.Tests` on their native target;
+    they built and passed here as a `net10.0` library on the Windows development machine, same
+    caveat every prior slice's entry carries.
+
 ## Alternatives considered
 
 **Leave the contract implicit, described only by whatever Core's C# types

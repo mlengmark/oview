@@ -28,6 +28,21 @@ public sealed record UsageStatistics(
     /// an unavailable stamp, never a bundled one dated "now" (ADR-0001, OVI-100).</summary>
     public RateCardStamp Rates { get; init; } = RateCardStamp.Unavailable;
 
+    /// <summary>What the plan meter and local activity say about each other, for the current
+    /// 5-hour window. Defaults to <c>null</c> — Core could not run the comparison — never a
+    /// fabricated <see cref="DivergenceState.Consistent"/> (ADR-0001, OVI-168).</summary>
+    public DivergenceReading? Divergence { get; init; }
+
+    /// <summary>Whether any credit-billed model was recorded in the 31-day window. Defaults to
+    /// unavailable; <c>false</c> with <see cref="UsageValueStatus.Real"/> means "Core looked and
+    /// found none", a different fact (ADR-0001, OVI-168).</summary>
+    public UsageFlag HasCreditUsage { get; init; } = new(null, UsageValueStatus.Unavailable);
+
+    /// <summary>Estimated spend, in the 31-day window, for work the plan meter did not account
+    /// for. Defaults to unavailable; a skin renders no figure for a window that was never
+    /// off-plan, never <c>$0.00</c> (ADR-0001, OVI-168).</summary>
+    public EstimatedUsd OffPlanUsageAmount { get; init; } = new(null, UsageValueStatus.Unavailable);
+
     /// <summary>The canonical "no data" statistics — every value unavailable, not zero.</summary>
     public static UsageStatistics Unavailable { get; } = new(
         new TokenCount(null, UsageValueStatus.Unavailable),
