@@ -99,6 +99,23 @@ skin's existing `Presentation/PanelTextFormatter.cs`, alongside
 `BoostChip`/`BoostCard`. The usage-tile caveat and the off-plan banner are
 the last not-yet-extracted `PanelText.cs` members.
 
+**2026-09-27 update (OVI-178) — Phase 1 is complete and Phase 2 is
+designed, not started.** Every display/format/locale leak named in
+[ADR-0001](docs/adr/0001-core-to-skin-data-contract.md) is now extracted
+into the skins; no `PanelText.cs` member remains in a Core-equivalent
+layer. Phase 2's three areas each have a **proposed** record:
+[ADR-0005](docs/adr/0005-data-provider-contract.md) (how Core reads
+Claude's data off disk), [ADR-0006](docs/adr/0006-local-storage-contract.md)
+(what Core persists and where), and
+[ADR-0007](docs/adr/0007-app-shell-contract.md) (the `O-view.App` shell
+layer, its admission rule, and the shell-to-skin seam). **Proposed is not
+accepted:** none of them authorizes an implementation slice until the board
+signs off, and three of their decisions are open board questions — whether
+"read-only against vendor data" permits invoking the vendor's own CLI,
+whether SQLite may be this repository's first runtime dependency, and
+(flagged only, not requested) whether gate G4 should be opened for a shared
+widget. No provider, store, or shell code exists here yet.
+
 **Do not assume this repository contains working code.** If you are looking
 for the current, running implementation, that is
 [`mlengmark/O-view`](https://github.com/mlengmark/O-view) — read-only,
