@@ -321,7 +321,7 @@ question 4 recommendation:
 
 | # | Slice | Depends on | Risk |
 |---|---|---|---|
-| 1 | `IUsageProvider` + `UsageSnapshot.Unavailable` + the never-throw structural test — **landed** (PR #TBD, 2026-09-28, OVI-188) | — | Lowest — one interface, no I/O |
+| 1 | `IUsageProvider` + `UsageSnapshot.Unavailable` + the never-throw structural test — **landed** (PR #35, 2026-09-28, OVI-188) | — | Lowest — one interface, no I/O |
 | 2 | `ClaudeDataRoots`-equivalent path rules, pure, injected roots, no provider yet | 1 | Low — pure functions, fully testable |
 | 3 | `JsonlUsageProvider` (token counts, `Estimate`/`JsonlFallback`) | 1, 2 | Medium — real file parsing |
 | 4 | `PlanHistoryProvider` | 1, 2 | Medium |
