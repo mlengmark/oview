@@ -1331,3 +1331,24 @@ the source of truth for what the contract *means*.
   to "none/zero/bundled". Core holds no caveat wording; `Caveat`, `RateAge` and
   `TokenScopeCaveat` live in each skin's `PanelTextFormatter`. Nothing populates these fields
   yet — the pricing/provider port is separate future work, as the amendment said.
+
+- **2026-09-27 note — three rows are *proposed* by Phase 2's design, and are not yet
+  contract (Adrian II, OVI-178).** [ADR-0005](0005-data-provider-contract.md) D4 proposes
+  `ProviderHealth[]` and `DegradedInputCount`; [ADR-0006](0006-local-storage-contract.md) D4
+  proposes `HistoryStoreState`. All three exist for the same reason: without them, a skin
+  cannot tell a user that the number in front of them is stale for a knowable cause. The
+  motivating case is CONFIRMED in the source repository — transcript ingestion failed on
+  every poll for five days behind a silent catch while the panel showed live percentages from
+  a sibling provider and the support bundle reported `status : Ok`
+  (`src/O-view.Core/Providers/CompositeUsageProvider.cs`, read at `897777b`).
+
+  **They are deliberately not added to the table above yet.** ADR-0005 and ADR-0006 are
+  *Proposed*, pending board sign-off, and this table is the accepted contract. If the board
+  accepts them, the row text moves up into the table in the slice that implements it — and
+  per this ADR's own rule, that must happen *before* any skin consumes the field. If the
+  board rejects them, this note stays as the record of what was proposed and declined.
+
+  The porting question this ADR's 2026-09-25 entry left open — "where the rebuild puts the
+  HTTP fetch" — is answered by [ADR-0007](0007-app-shell-contract.md) D3: the shell, with one
+  cooldown holder per process, per the 2026-09-26 (OVI-140) requirement above. That answer is
+  also Proposed, not Accepted.

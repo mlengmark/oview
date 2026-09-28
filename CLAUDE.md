@@ -99,6 +99,41 @@ skin's existing `Presentation/PanelTextFormatter.cs`, alongside
 `BoostChip`/`BoostCard`. The usage-tile caveat and the off-plan banner are
 the last not-yet-extracted `PanelText.cs` members.
 
+**2026-09-27 update (OVI-178) — Phase 1 is complete and Phase 2 is
+designed, not started.** Every display/format/locale leak named in
+[ADR-0001](docs/adr/0001-core-to-skin-data-contract.md) is now extracted
+into the skins; no `PanelText.cs` member remains in a Core-equivalent
+layer. Phase 2's three areas each have an **accepted** record (see the
+2026-09-28 note below):
+[ADR-0005](docs/adr/0005-data-provider-contract.md) (how Core reads
+Claude's data off disk), [ADR-0006](docs/adr/0006-local-storage-contract.md)
+(what Core persists and where), and
+[ADR-0007](docs/adr/0007-app-shell-contract.md) (the `O-view.App` shell
+layer, its admission rule, and the shell-to-skin seam). No provider, store,
+or shell code exists here yet.
+
+**2026-09-28 — the board approved the addendum and then answered every
+question it raised. Nothing in Phase 2's design is open.** ADR-0005, 0006
+and 0007 are **Accepted**; all four slicing tables are scopable in full.
+Approval is still not authorization for any individual slice — each one is
+its own PR and its own review. The answers:
+
+- **Gate G6 is open — the app may run the vendor's own command so that the
+  vendor refreshes its own cache** (ADR-0005 question A). This narrows the
+  standing "read-only against vendor data" principle in writing, under three
+  binding limits: the vendor's own documented, read-shaped command only;
+  never with arguments that mutate vendor state; and never as a precondition
+  for showing a number. A machine where the refresh does nothing must still
+  work. Anything beyond these three needs the board again.
+- **SQLite (`Microsoft.Data.Sqlite`) is authorized** as this repository's
+  first third-party runtime dependency, for the usage ledger (ADR-0006
+  question C). It is not a general appetite for dependencies, and the
+  `*.csproj` change remains a **board** merge.
+- **Gate G4 stays closed.** No shared widget, no shared window base class;
+  each skin keeps its own.
+- **Gate G5 unchanged.** No second AI source may be audited, designed for,
+  or named.
+
 **Do not assume this repository contains working code.** If you are looking
 for the current, running implementation, that is
 [`mlengmark/O-view`](https://github.com/mlengmark/O-view) — read-only,
@@ -185,6 +220,7 @@ not assumed from a design document alone:
 | G3 | Platform ambition (Windows + Linux now, macOS deferred) |
 | G4 | UI unification (keep two native windows, or unify) |
 | G5 | Any second AI usage source — requires its own dedicated audit first |
+| G6 | Invoking a vendor's own command to make the vendor refresh its own cache — **opened 2026-09-28**, under the three limits in [ADR-0005](docs/adr/0005-data-provider-contract.md) |
 
 Do not scope or begin work that a still-open gate would authorize. If
 you're unsure whether a gate has passed, check the current PDR and ADR
