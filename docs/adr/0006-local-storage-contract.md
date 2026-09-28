@@ -1,13 +1,13 @@
 # ADR-0006: What Core persists on this machine, where, and who owns each file
 
-- **Status:** Proposed — **approved for decomposition on 2026-09-28**. The
-  board signed off on this addendum as the basis for cutting Phase 2 build
-  tasks, but did **not** answer board question C below (SQLite as this
-  repository's first runtime dependency). That question is a dependency
-  decision and a critical merge in its own right; until it is answered the
-  ledger slice cannot be scoped. The record becomes *Accepted* then.
+- **Status:** **Accepted 2026-09-28.** The board signed off on this addendum
+  as the basis for cutting Phase 2 build tasks and, on the same day, answered
+  board question C: **yes — SQLite (`Microsoft.Data.Sqlite`) is authorised as
+  this repository's first third-party runtime dependency**, for the usage
+  ledger. No question on this record is open. The `*.csproj` change that adds
+  it is still a critical merge the board reviews, slice by slice.
 - **Date:** 2026-09-27
-- **Deciders:** proposed by Adrian II the Architect; pending board decision
+- **Deciders:** proposed by Adrian II the Architect; accepted by the Oview board 2026-09-28
 - **Formalizes:** the approved PDR (rev. 2, `oview-pdr-reissued`), §3's
   "stores local history" — the one Core responsibility the PDR names but
   never specifies
@@ -176,15 +176,19 @@ follow: the diagnostics bundle must report the store's size on disk, and if
 a real measurement later shows this is wrong, this ADR is amended in place
 with the number.
 
-## Board question C — SQLite as this repository's first runtime dependency
+## Board question C — SQLite as this repository's first runtime dependency — ANSWERED 2026-09-28: yes
 
 **The decision needed:** may the usage ledger use SQLite
 (`Microsoft.Data.Sqlite`), as the source repository does?
 
-**Still open as of 2026-09-28.** The board approved this addendum for
-decomposition without answering this. The recommendation below was not
-accepted by implication — the ledger slice stays unscopable until there is
-an explicit yes or no.
+**Answered 2026-09-28: yes.** Asked twice — the morning's approval carried
+no answer and was not treated as one; re-put as a direct question, the board
+chose the recommendation below. The ledger slice may be scoped. Two things
+this answer does **not** settle: it authorises SQLite for the usage ledger,
+not a general appetite for dependencies, and the PR that adds the package
+reference is still a board merge under the critical-merge rule. The Linux
+native-library packaging consequence named below stays **INFERRED** and is
+now a known risk carried into the ledger slice, not an open question.
 
 **Why it is the board's and not mine.** This repository currently has no
 third-party runtime dependency at all, and per this project's own PR rules
@@ -249,8 +253,10 @@ don't store the sensitive thing in the first place.
   than a graph that mysteriously empties.
 
 **Negative:**
-- Board question C is a dependency the board may not want, and the honest
-  fallback is fewer features, not a cheaper store.
+- SQLite (board question C, answered *yes* 2026-09-28) is this repository's
+  first third-party runtime dependency. Everything that follows from that is
+  now owned rather than hypothetical: a native library per runtime
+  identifier, and a Linux packaging story no one has built yet.
 - Unbounded growth (D6) is accepted without a measurement. This is the
   weakest claim in this record and is labelled as such.
 - Every Linux path in D2 is **INFERRED**. The first real Linux run may
@@ -261,11 +267,12 @@ don't store the sensitive thing in the first place.
 | # | Slice | Depends on | Risk |
 |---|---|---|---|
 | 1 | `WeeklyResetAnchor`-equivalent: one JSON file, atomic write, defensive read, injected directory | — | **Lowest** — one small file, no dependency, no schema. Start here |
-| 2 | Ledger schema + upsert + query-time daily aggregation | Board question C | Medium — first dependency, first schema |
+| 2 | Ledger schema + upsert + query-time daily aggregation | 1 | Medium — first dependency, first schema. Authorised 2026-09-28; the `*.csproj` change makes it a **board** merge |
 | 3 | Corrupt-store handling + `HistoryStoreState` (D3, D4) | 2 | Low once 2 lands |
 | 4 | Ingest audit + wiring to [ADR-0005](0005-data-provider-contract.md)'s `ProviderHealth` | 2, and ADR-0005 slice 6 | Low |
 
-Slice 1 is deliberately first and is the only slice in this ADR that needs
-no board answer: it is a single JSON file with an injected path, it makes
+Slice 1 stays first even now that the dependency question is answered. It is
+a single JSON file with an injected path, it makes
 `WeeklyResetAt`/`WeeklyResetSource` reachable, and it proves D2 and D3
-before any dependency question is settled.
+without the dependency — so if SQLite turns out to be the wrong call on
+Linux, the one store that matters most is already standing on its own.

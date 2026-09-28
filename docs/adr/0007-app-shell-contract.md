@@ -1,13 +1,13 @@
 # ADR-0007: The app shell — a third layer between Core and the skins, and what it may not contain
 
-- **Status:** Proposed — **approved for decomposition on 2026-09-28**, with
-  no open question of its own outstanding. The board signed off on this
-  addendum as the basis for cutting Phase 2 build tasks and left gate G4
-  closed, as this record asked. Answers one question
+- **Status:** **Accepted 2026-09-28**, with no open question of its own. The
+  board signed off on this addendum as the basis for cutting Phase 2 build
+  tasks and left gate G4 closed, as this record asked. Acceptance authorises
+  no individual slice; each is its own PR and review. Answers one question
   [ADR-0001](0001-core-to-skin-data-contract.md) explicitly deferred to
   "the porting slice"; carries one gate flag (G4, closed).
 - **Date:** 2026-09-27
-- **Deciders:** proposed by Adrian II the Architect; pending board decision
+- **Deciders:** proposed by Adrian II the Architect; accepted by the Oview board 2026-09-28
 - **Formalizes:** the approved PDR (rev. 2, `oview-pdr-reissued`), §3.2 and
   §5.4 — and closes ADR-0001's 2026-09-25 open point, "where the rebuild
   puts the HTTP fetch is for the porting slice to decide"

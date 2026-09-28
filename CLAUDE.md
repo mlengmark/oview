@@ -103,7 +103,8 @@ the last not-yet-extracted `PanelText.cs` members.
 designed, not started.** Every display/format/locale leak named in
 [ADR-0001](docs/adr/0001-core-to-skin-data-contract.md) is now extracted
 into the skins; no `PanelText.cs` member remains in a Core-equivalent
-layer. Phase 2's three areas each have a **proposed** record:
+layer. Phase 2's three areas each have an **accepted** record (see the
+2026-09-28 note below):
 [ADR-0005](docs/adr/0005-data-provider-contract.md) (how Core reads
 Claude's data off disk), [ADR-0006](docs/adr/0006-local-storage-contract.md)
 (what Core persists and where), and
@@ -111,23 +112,27 @@ Claude's data off disk), [ADR-0006](docs/adr/0006-local-storage-contract.md)
 layer, its admission rule, and the shell-to-skin seam). No provider, store,
 or shell code exists here yet.
 
-**2026-09-28 — the board approved the addendum for decomposition, and two
-questions are still open.** The sign-off means these three records are sound
-enough to cut into build tasks. It does **not** authorize any individual
-slice, and it did not answer two of the three questions the records raised:
+**2026-09-28 — the board approved the addendum and then answered every
+question it raised. Nothing in Phase 2's design is open.** ADR-0005, 0006
+and 0007 are **Accepted**; all four slicing tables are scopable in full.
+Approval is still not authorization for any individual slice — each one is
+its own PR and its own review. The answers:
 
-- **Open — does "read-only against vendor data" permit invoking the
-  vendor's own CLI?** (ADR-0005 question A, proposed gate G6.) Until this is
-  answered, the `CachedUsage` provider slice cannot be scoped.
-- **Open — may SQLite be this repository's first runtime dependency?**
-  (ADR-0006 question C.) Until this is answered, the usage-ledger slice
-  cannot be scoped.
-- **Settled — gate G4 stays closed.** No shared widget, no shared window
-  base class; each skin keeps its own.
-
-Every other slice in the three records' slicing tables is scopable now.
-Silence on a recommendation is not agreement with it: do not read either
-open question as decided because a slice was merged.
+- **Gate G6 is open — the app may run the vendor's own command so that the
+  vendor refreshes its own cache** (ADR-0005 question A). This narrows the
+  standing "read-only against vendor data" principle in writing, under three
+  binding limits: the vendor's own documented, read-shaped command only;
+  never with arguments that mutate vendor state; and never as a precondition
+  for showing a number. A machine where the refresh does nothing must still
+  work. Anything beyond these three needs the board again.
+- **SQLite (`Microsoft.Data.Sqlite`) is authorized** as this repository's
+  first third-party runtime dependency, for the usage ledger (ADR-0006
+  question C). It is not a general appetite for dependencies, and the
+  `*.csproj` change remains a **board** merge.
+- **Gate G4 stays closed.** No shared widget, no shared window base class;
+  each skin keeps its own.
+- **Gate G5 unchanged.** No second AI source may be audited, designed for,
+  or named.
 
 **Do not assume this repository contains working code.** If you are looking
 for the current, running implementation, that is
@@ -215,6 +220,7 @@ not assumed from a design document alone:
 | G3 | Platform ambition (Windows + Linux now, macOS deferred) |
 | G4 | UI unification (keep two native windows, or unify) |
 | G5 | Any second AI usage source — requires its own dedicated audit first |
+| G6 | Invoking a vendor's own command to make the vendor refresh its own cache — **opened 2026-09-28**, under the three limits in [ADR-0005](docs/adr/0005-data-provider-contract.md) |
 
 Do not scope or begin work that a still-open gate would authorize. If
 you're unsure whether a gate has passed, check the current PDR and ADR

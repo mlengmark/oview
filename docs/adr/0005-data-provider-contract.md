@@ -1,13 +1,13 @@
 # ADR-0005: The data-provider contract — how Core reads Claude's data off this machine
 
-- **Status:** Proposed — **approved for decomposition on 2026-09-28**. The
-  board signed off on this addendum as the basis for cutting Phase 2 build
-  tasks. That sign-off does not authorise any slice on its own, and it did
-  **not** answer board question A or B below — the acceptance carried no
-  answer to either, so both remain open and still gate the slices named
-  against them. The record becomes *Accepted* when A is answered.
+- **Status:** **Accepted 2026-09-28.** The board signed off on this addendum
+  as the basis for cutting Phase 2 build tasks, and on the same day answered
+  board question A — gate **G6 is open** on the narrow terms below. Question B
+  (SQLite) was answered in [ADR-0006](0006-local-storage-contract.md): yes.
+  No question on this record is open. Acceptance still authorises no slice on
+  its own; each slice in the table below is its own PR and its own review.
 - **Date:** 2026-09-27
-- **Deciders:** proposed by Adrian II the Architect; pending board decision
+- **Deciders:** proposed by Adrian II the Architect; accepted by the Oview board 2026-09-28
 - **Formalizes:** the approved PDR (rev. 2, `oview-pdr-reissued`), §3 and
   §3.3 — the *input* half of the Core boundary, which Phase 1 did not touch
 - **Companion records:** [ADR-0006](0006-local-storage-contract.md)
@@ -202,13 +202,30 @@ the source already avoids it for exactly this reason.
 
 These are not rhetorical, and none is answered by this ADR.
 
-**Amendment, 2026-09-28.** The board approved this addendum for
-decomposition without answering A or B. Silence on a recommendation is not
-assent to it: A still forbids scoping the `CachedUsage` slice, and B still
-forbids scoping the ledger slice. Question C needed no answer — it asked the
-board to leave G5 as it is, and it is unchanged.
+**Amendment, 2026-09-28 (second, superseding the first).** Read this before
+the question text below it. The board approved the addendum in the morning
+without answering A or B; re-asked as a structured question, it answered both
+the same day:
 
-### Board question A — does "read-only against vendor data" permit invoking the vendor's own CLI? (proposed gate G6)
+- **A — answered: allow it, as gate G6.** Gate **G6 is open**. The standing
+  principle "read-only against vendor data" is hereby narrowed in writing,
+  not silently excepted: O-view may run the vendor's own command so that the
+  vendor refreshes its own cache, subject to the three limits stated below,
+  which are now binding contract and not a recommendation. The
+  `CachedUtilizationProvider` slice is unblocked.
+- **B — answered in ADR-0006: yes, SQLite is allowed.** The ledger slice is
+  unblocked. See that record for the terms.
+- **C needed no answer** — it asked the board to leave G5 as it is, and it is
+  unchanged. No second vendor source may be audited, designed for, or named.
+
+**Gate G6, as opened (binding):** O-view may invoke a vendor's own command
+only when all three hold — (i) it is the vendor's own documented,
+read-shaped command; (ii) it is never passed arguments that mutate vendor
+state; (iii) it is never a precondition for showing a number, so a machine
+where the refresh does nothing still works. A slice that needs a fourth
+freedom needs the board again, not a wider reading of these three.
+
+### Board question A — does "read-only against vendor data" permit invoking the vendor's own CLI? (proposed gate G6) — ANSWERED 2026-09-28: yes, as G6
 
 **The fact, CONFIRMED:** the source repository's `ClaudeCliRefresher`
 starts a Claude Code process so that Claude Code will refresh its own usage
@@ -235,11 +252,16 @@ prefers the strict reading, say so before the `CachedUsage` slice is
 scoped — it changes what that slice can contain and lowers what ADR-0006's
 anchor can promise.
 
-### Board question B — SQLite as a dependency
+**Board answer, 2026-09-28: the narrower reading, adopted as gate G6, with
+all three limits.** They are restated at the top of this section as binding
+contract. The `CachedUtilizationProvider` slice may be scoped.
+
+### Board question B — SQLite as a dependency — ANSWERED 2026-09-28: yes
 
 Deferred in full to [ADR-0006](0006-local-storage-contract.md), board
-question C. Flagged here only because the `Jsonl` provider is the thing
-that feeds it, and the two slices land next to each other.
+question C, which the board answered *yes* on 2026-09-28. Flagged here only
+because the `Jsonl` provider is the thing that feeds it, and the two slices
+land next to each other.
 
 ### Board question C — G5's boundary, restated for the record
 
@@ -287,8 +309,10 @@ in Core's store ([ADR-0006](0006-local-storage-contract.md)).
   path claim as **INFERRED** until someone reads a real redirected store.
 - D2's three named providers are three slices, not one. That is more PRs
   than a single reader would have been, and deliberately so.
-- Board question A blocks the `CachedUsage` slice specifically. The other
-  two providers can be scoped without it.
+- Gate G6 (board question A, answered 2026-09-28) narrows a standing product
+  principle rather than leaving it absolute. The cost is that "read-only"
+  now needs its three limits quoted with it; the benefit is that the limits
+  are written down and testable instead of implied by whatever a slice did.
 
 ## Slicing guidance for decomposition
 
@@ -301,8 +325,8 @@ question 4 recommendation:
 | 2 | `ClaudeDataRoots`-equivalent path rules, pure, injected roots, no provider yet | 1 | Low — pure functions, fully testable |
 | 3 | `JsonlUsageProvider` (token counts, `Estimate`/`JsonlFallback`) | 1, 2 | Medium — real file parsing |
 | 4 | `PlanHistoryProvider` | 1, 2 | Medium |
-| 5 | `CachedUtilizationProvider` | 1, 2, **board question A** | Medium; gated |
-| 6 | `CompositeUsageProvider` + `ProviderHealth` (D3, D4) | 3, 4 (5 if authorized) | Medium — needs ≥2 providers to be meaningful |
+| 5 | `CachedUtilizationProvider`, incl. the vendor-refresh call under G6's three limits | 1, 2 | Medium — G6 open since 2026-09-28; no longer gated |
+| 6 | `CompositeUsageProvider` + `ProviderHealth` (D3, D4) | 3, 4, 5 | Medium — needs ≥2 providers to be meaningful |
 
 Slice 6's `ProviderHealth` rows must land in
 [ADR-0001](0001-core-to-skin-data-contract.md) before any skin consumes
