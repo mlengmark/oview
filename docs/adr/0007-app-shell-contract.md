@@ -1,9 +1,11 @@
 # ADR-0007: The app shell — a third layer between Core and the skins, and what it may not contain
 
-- **Status:** Proposed — Phase 2 design. Requires board sign-off before any
-  slice against it is scoped. Answers one question
+- **Status:** Proposed — **approved for decomposition on 2026-09-28**, with
+  no open question of its own outstanding. The board signed off on this
+  addendum as the basis for cutting Phase 2 build tasks and left gate G4
+  closed, as this record asked. Answers one question
   [ADR-0001](0001-core-to-skin-data-contract.md) explicitly deferred to
-  "the porting slice"; carries one gate flag (G4).
+  "the porting slice"; carries one gate flag (G4, closed).
 - **Date:** 2026-09-27
 - **Deciders:** proposed by Adrian II the Architect; pending board decision
 - **Formalizes:** the approved PDR (rev. 2, `oview-pdr-reissued`), §3.2 and
@@ -220,6 +222,10 @@ is already proven in a shipping app (CONFIRMED by OVI-4's live run, 60-second
 cadence observed).
 
 ## Gate flag — G4 stays closed, and this ADR is drawn so it can
+
+**Confirmed 2026-09-28:** the board approved this addendum and did not open
+G4. This section is now a standing constraint on the shell slices, not a
+question.
 
 **What this ADR does:** the shell owns window *lifecycle events* — "show
 the widget," "hide it," "shut down." Each skin keeps its own window, its own

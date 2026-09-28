@@ -1,9 +1,11 @@
 # ADR-0006: What Core persists on this machine, where, and who owns each file
 
-- **Status:** Proposed — Phase 2 design. Requires board sign-off before any
-  slice against it is scoped. Carries one board question that is a
-  dependency decision (SQLite) and therefore a critical merge in its own
-  right.
+- **Status:** Proposed — **approved for decomposition on 2026-09-28**. The
+  board signed off on this addendum as the basis for cutting Phase 2 build
+  tasks, but did **not** answer board question C below (SQLite as this
+  repository's first runtime dependency). That question is a dependency
+  decision and a critical merge in its own right; until it is answered the
+  ledger slice cannot be scoped. The record becomes *Accepted* then.
 - **Date:** 2026-09-27
 - **Deciders:** proposed by Adrian II the Architect; pending board decision
 - **Formalizes:** the approved PDR (rev. 2, `oview-pdr-reissued`), §3's
@@ -178,6 +180,11 @@ with the number.
 
 **The decision needed:** may the usage ledger use SQLite
 (`Microsoft.Data.Sqlite`), as the source repository does?
+
+**Still open as of 2026-09-28.** The board approved this addendum for
+decomposition without answering this. The recommendation below was not
+accepted by implication — the ledger slice stays unscopable until there is
+an explicit yes or no.
 
 **Why it is the board's and not mine.** This repository currently has no
 third-party runtime dependency at all, and per this project's own PR rules

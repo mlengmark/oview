@@ -1,9 +1,11 @@
 # ADR-0005: The data-provider contract — how Core reads Claude's data off this machine
 
-- **Status:** Proposed — Phase 2 design. Requires board sign-off before any
-  slice against it is scoped. Carries three board questions (see
-  "Board questions" below), one of which touches a standing product
-  principle and must be answered before the first provider slice.
+- **Status:** Proposed — **approved for decomposition on 2026-09-28**. The
+  board signed off on this addendum as the basis for cutting Phase 2 build
+  tasks. That sign-off does not authorise any slice on its own, and it did
+  **not** answer board question A or B below — the acceptance carried no
+  answer to either, so both remain open and still gate the slices named
+  against them. The record becomes *Accepted* when A is answered.
 - **Date:** 2026-09-27
 - **Deciders:** proposed by Adrian II the Architect; pending board decision
 - **Formalizes:** the approved PDR (rev. 2, `oview-pdr-reissued`), §3 and
@@ -199,6 +201,12 @@ the source already avoids it for exactly this reason.
 ## Board questions
 
 These are not rhetorical, and none is answered by this ADR.
+
+**Amendment, 2026-09-28.** The board approved this addendum for
+decomposition without answering A or B. Silence on a recommendation is not
+assent to it: A still forbids scoping the `CachedUsage` slice, and B still
+forbids scoping the ledger slice. Question C needed no answer — it asked the
+board to leave G5 as it is, and it is unchanged.
 
 ### Board question A — does "read-only against vendor data" permit invoking the vendor's own CLI? (proposed gate G6)
 

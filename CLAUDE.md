@@ -108,13 +108,26 @@ layer. Phase 2's three areas each have a **proposed** record:
 Claude's data off disk), [ADR-0006](docs/adr/0006-local-storage-contract.md)
 (what Core persists and where), and
 [ADR-0007](docs/adr/0007-app-shell-contract.md) (the `O-view.App` shell
-layer, its admission rule, and the shell-to-skin seam). **Proposed is not
-accepted:** none of them authorizes an implementation slice until the board
-signs off, and three of their decisions are open board questions — whether
-"read-only against vendor data" permits invoking the vendor's own CLI,
-whether SQLite may be this repository's first runtime dependency, and
-(flagged only, not requested) whether gate G4 should be opened for a shared
-widget. No provider, store, or shell code exists here yet.
+layer, its admission rule, and the shell-to-skin seam). No provider, store,
+or shell code exists here yet.
+
+**2026-09-28 — the board approved the addendum for decomposition, and two
+questions are still open.** The sign-off means these three records are sound
+enough to cut into build tasks. It does **not** authorize any individual
+slice, and it did not answer two of the three questions the records raised:
+
+- **Open — does "read-only against vendor data" permit invoking the
+  vendor's own CLI?** (ADR-0005 question A, proposed gate G6.) Until this is
+  answered, the `CachedUsage` provider slice cannot be scoped.
+- **Open — may SQLite be this repository's first runtime dependency?**
+  (ADR-0006 question C.) Until this is answered, the usage-ledger slice
+  cannot be scoped.
+- **Settled — gate G4 stays closed.** No shared widget, no shared window
+  base class; each skin keeps its own.
+
+Every other slice in the three records' slicing tables is scopable now.
+Silence on a recommendation is not agreement with it: do not read either
+open question as decided because a slice was merged.
 
 **Do not assume this repository contains working code.** If you are looking
 for the current, running implementation, that is
