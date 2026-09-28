@@ -102,7 +102,7 @@ contract:
 
 | Obligation | Rule | Why it is contract, not style |
 |---|---|---|
-| Never throws | Any failure, malformed file, missing directory or permission error yields `UsageSnapshot.None` | A monitoring tool that dies on a bad poll is worse than one showing a stale number (CONFIRMED — `UsageEngine`'s own doc comment states this as the design) |
+| Never throws | Any failure, malformed file, missing directory or permission error yields `UsageSnapshot.Unavailable` — this repository's existing sentinel (`src/O-view.Core/Models/UsageSnapshot.cs`), not a new `.None` member; the source repo names the same sentinel `UsageSnapshot.None` (see above), but this repo already carries it forward under the name ADR-0001 established | A monitoring tool that dies on a bad poll is worse than one showing a stale number (CONFIRMED — `UsageEngine`'s own doc comment states this as the design) |
 | Clock is injected | `utcNow` is a parameter, never read inside a provider | Staleness and reset prediction are otherwise untestable (CONFIRMED — `IUsageProvider`'s doc comment) |
 | Read-only | A provider opens vendor files for reading and never writes, moves, or truncates them | Standing product principle; OVI-4 confirmed the running app writes only to its own store |
 | No display text | A provider returns contract values with status flags, never a sentence | [ADR-0001](0001-core-to-skin-data-contract.md) |
@@ -191,8 +191,8 @@ Carried forward from `ClaudeDataRoots` unchanged in spirit:
   **Windows MSIX, Linux Snap, and Linux Flatpak** are enumerated for the
   authorized platforms. macOS layouts are **out of scope (G3)** and must
   not be added speculatively.
-- A provider that finds no root returns `UsageSnapshot.None` with
-  `DataSourceKind.Unavailable`. It never guesses a path into existence.
+- A provider that finds no root returns `UsageSnapshot.Unavailable` (already
+  `DataSourceKind.Unavailable`). It never guesses a path into existence.
 
 **Rejected: `Environment.SpecialFolder` called directly inside a
 provider.** It is what makes the layout rules untestable off-target, and
@@ -321,7 +321,7 @@ question 4 recommendation:
 
 | # | Slice | Depends on | Risk |
 |---|---|---|---|
-| 1 | `IUsageProvider` + `UsageSnapshot.None` + the never-throw structural test | — | Lowest — one interface, no I/O |
+| 1 | `IUsageProvider` + `UsageSnapshot.Unavailable` + the never-throw structural test — **landed** (PR #TBD, 2026-09-28, OVI-188) | — | Lowest — one interface, no I/O |
 | 2 | `ClaudeDataRoots`-equivalent path rules, pure, injected roots, no provider yet | 1 | Low — pure functions, fully testable |
 | 3 | `JsonlUsageProvider` (token counts, `Estimate`/`JsonlFallback`) | 1, 2 | Medium — real file parsing |
 | 4 | `PlanHistoryProvider` | 1, 2 | Medium |
@@ -331,3 +331,26 @@ question 4 recommendation:
 Slice 6's `ProviderHealth` rows must land in
 [ADR-0001](0001-core-to-skin-data-contract.md) before any skin consumes
 them, per that ADR's own rule.
+
+- **2026-09-28 update — slice 1 landed (Kit the Builder, OVI-188).**
+  `src/O-view.Core/Providers/IUsageProvider.cs` carries D1's single method
+  forward as written above. D1's four obligations are now enforced by
+  `IUsageProviderContractTests` (`tests/O-view.Core.Tests/Providers/`)
+  rather than by prose: never-throws is proven by a test double that throws
+  from every internal path and still returns a snapshot through the seam;
+  clock-injection is proven at the interface's shape (`GetSnapshot`'s only
+  parameter is `utcNow`) since no implementation exists yet to scan for a
+  direct clock read — each provider slice (2 onward) carries its own version
+  of that check. Read-only and no-display-text are not independently
+  testable at this slice (there is no I/O yet); they carry forward as
+  obligations on slices 3-5's implementations instead.
+  **Correction to D1's text above:** this repository already has the "no
+  data" sentinel D1 describes — `UsageSnapshot.Unavailable`
+  (`DataSourceKind.Unavailable`, every value status-flagged, established by
+  ADR-0001 and in use across all three skins' tests). The source repository
+  names the same sentinel `UsageSnapshot.None`; this ADR's D1 text originally
+  carried that name forward without checking it against this repository's
+  already-landed Core code. `.None` was never added — doing so would have
+  given Core two names for one sentinel. The table above and the two
+  `UsageSnapshot.None` references earlier in this decision have been
+  corrected to `UsageSnapshot.Unavailable` to match.
