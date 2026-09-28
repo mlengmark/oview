@@ -11,7 +11,7 @@
   (review); the board (decision, carried by Chief Gary II).
 - **Origin:** OVI-111, from Rae II's cross-platform claim ledger (OVI-104),
   row 2a.
-- **Reached `main` on 2026-09-27, three days after it was decided
+- **Reached `main` on 2026-09-28, four days after it was decided
   (OVI-179).** The date above is not back-dated and is not a mistake: this
   record was written, reviewed by Quinn, and merged on 2026-09-26 — but
   [PR #19](https://github.com/mlengmark/oview/pull/19) was targeted at
