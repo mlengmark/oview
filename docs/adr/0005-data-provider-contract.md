@@ -322,7 +322,7 @@ question 4 recommendation:
 | # | Slice | Depends on | Risk |
 |---|---|---|---|
 | 1 | `IUsageProvider` + `UsageSnapshot.Unavailable` + the never-throw structural test — **landed** (PR #35, 2026-09-28, OVI-188) | — | Lowest — one interface, no I/O |
-| 2 | `ClaudeDataRoots`-equivalent path rules, pure, injected roots, no provider yet | 1 | Low — pure functions, fully testable |
+| 2 | `ClaudeDataRoots`-equivalent path rules, pure, injected roots, no provider yet — **landed** (PR #36, 2026-09-29, OVI-200) | 1 | Low — pure functions, fully testable |
 | 3 | `JsonlUsageProvider` (token counts, `Estimate`/`JsonlFallback`) | 1, 2 | Medium — real file parsing |
 | 4 | `PlanHistoryProvider` | 1, 2 | Medium |
 | 5 | `CachedUtilizationProvider`, incl. the vendor-refresh call under G6's three limits | 1, 2 | Medium — G6 open since 2026-09-28; no longer gated |
@@ -354,3 +354,24 @@ them, per that ADR's own rule.
   given Core two names for one sentinel. The table above and the two
   `UsageSnapshot.None` references earlier in this decision have been
   corrected to `UsageSnapshot.Unavailable` to match.
+
+- **2026-09-29 update — slice 2 landed (Kit the Builder, OVI-200).**
+  `src/O-view.Core/Providers/ClaudeDataRoots.cs` carries D5 forward as pure,
+  injected-input functions: `WindowsCanonical`, `WindowsMsix`,
+  `LinuxCanonical`, `LinuxSnap`, and `LinuxFlatpak` each resolve one layout
+  from directly-supplied root strings and vendor identifiers, returning
+  `null` rather than guessing when a required input is missing.
+  `CandidateRoots(ClaudeDataRootInputs)` is the one member D5 allows to be
+  platform-aware; it does not detect the platform — `ClaudeDataRootInputs`
+  carries an injected `ClaudeHostPlatform` value, so the member only
+  *selects* which layout rules to call, never reading the real OS or
+  environment. No provider exists yet and no I/O is performed anywhere in
+  this file (proven by `ClaudeDataRootsTests`, which exercises every rule
+  with fake roots only). `WindowsPackageFamilyName`, `LinuxSnapName`, and
+  `LinuxFlatpakAppId` have no default values: this ADR's D5 text records the
+  *shape* of the MSIX/Snap/Flatpak layouts, not a confirmed exact vendor
+  identifier for any of them, and this slice does not fabricate one — a
+  caller (slice 5's `CachedUtilizationProvider` or its host) supplies the
+  real identifier when one is confirmed. macOS is out of scope (G3) and adds
+  no `ClaudeHostPlatform` member. Slices 3-5 consume `CandidateRoots` to
+  build real providers; none of that I/O exists in this slice.
