@@ -324,7 +324,7 @@ question 4 recommendation:
 | 1 | `IUsageProvider` + `UsageSnapshot.Unavailable` + the never-throw structural test — **landed** (PR #35, 2026-09-28, OVI-188) | — | Lowest — one interface, no I/O |
 | 2 | `ClaudeDataRoots`-equivalent path rules, pure, injected roots, no provider yet — **landed** (PR #36, 2026-09-29, OVI-200) | 1 | Low — pure functions, fully testable |
 | 3a | Transcript-line parsing and de-duplication: `TranscriptTokens`, `TranscriptRecord`, `TranscriptParser` — pure functions over strings, no I/O — **landed** (PR #38, 2026-09-29, OVI-203) | 1, 2 | Low — string fixtures only |
-| 3b | `JsonlUsageProvider` proper: locates transcripts under `ClaudeDataRoots.CandidateRoots`, reads files, produces a `UsageSnapshot` (token counts, `Estimate`/`JsonlFallback`) | 1, 2, 3a | Medium — real file parsing |
+| 3b | `JsonlUsageProvider` proper: locates transcripts under `ClaudeDataRoots.CandidateRoots`, reads files, produces a `UsageSnapshot` shaped exactly per D6a — **landed** (PR #41, 2026-09-29, OVI-219) | 1, 2, 3a | Medium — real file parsing |
 | 4 | `PlanHistoryProvider` | 1, 2 | Medium |
 | 5 | `CachedUtilizationProvider`, incl. the vendor-refresh call under G6's three limits | 1, 2 | Medium — G6 open since 2026-09-28; no longer gated |
 | 6 | `CompositeUsageProvider` + `ProviderHealth` (D3, D4) | 3, 4, 5 | Medium — needs ≥2 providers to be meaningful |
@@ -540,3 +540,26 @@ them, per that ADR's own rule.
   `UsageSnapshot.Unavailable` and nothing else. The statistics seam (D6c) is
   **not** part of slice 3b — it depends on the ledger
   ([ADR-0006](0006-local-storage-contract.md) slice 2) and is sliced with it.
+
+- **2026-09-29 update — slice 3b landed (Kit the Builder, OVI-219).**
+  `src/O-view.Core/Providers/Jsonl/JsonlUsageProvider.cs` takes an injected
+  candidate-root list — typically slice 2's `ClaudeDataRoots.CandidateRoots`
+  result — and walks each root's `*.jsonl` files, most-canonical root first,
+  returning as soon as `TranscriptParser.TryParseAssistantRecord` (slice 3a)
+  parses one line. A hit returns exactly D6a's table: `JsonlFallback`,
+  `LastIngestAt` set to the injected `utcNow` (never a file or transcript
+  timestamp), both percentage/reset pairs `Unavailable`/`null`, `UsageLevel.Green`,
+  `ExtraUsage` null. No readable record anywhere yields
+  `UsageSnapshot.Unavailable`. No token totals are aggregated or returned —
+  `UsageSnapshot` has no field for them (D6a); that is D6c's separate,
+  not-yet-filed seam. Directory enumeration and every file read are wrapped in
+  one `try`/`catch` for `IOException`/`UnauthorizedAccessException`/
+  `SecurityException` — covering a subdirectory that disappears or denies
+  access mid-walk, not only the initial existence check — so a missing root,
+  an exclusively-locked file, or unparseable content all fall through to
+  `Unavailable` rather than throwing, proven by `JsonlUsageProviderTests`
+  (`tests/O-view.Core.Tests/Providers/Jsonl/`), including a real
+  `FileShare.None`-locked file. `DataSourceKind.Estimate`'s and
+  `JsonlFallback`'s doc comments carry D6b's two corrections in the same PR.
+  No skin change: both skins already render an all-unavailable
+  `JsonlFallback` snapshot correctly, per D6a's `TooltipFormatter` read.
