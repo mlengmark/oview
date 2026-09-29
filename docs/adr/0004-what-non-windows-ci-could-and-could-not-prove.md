@@ -370,6 +370,15 @@ Linux.Tests), with the harness left unrestructured?*
   unaffected and still stand: R1 remains open, and the Linux skin gaining
   OS- or runtime-sensitive formatting still reopens this record.
 
+- **2026-09-29 note (OVI-181) — Accepted now also rests on an explicit
+  board reply, not only on inference from shipped code.** The board
+  accepted a `request_confirmation` on OVI-181 explicitly acknowledging
+  this record's Accepted status (interaction `960affbf`, resolved
+  2026-09-29 10:31). This closes the gap the 2026-09-27 amendment named:
+  that gap was honest that the board's *deliberation* had not been read,
+  only the shipped artefact. That gap is now closed by a direct reply;
+  the rest of the 2026-09-27 amendment's content is unchanged.
+
 ## Alternatives considered
 
 The alternatives are options (a), (b) and (c) and routes R1 to R3 above,
