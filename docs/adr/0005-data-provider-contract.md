@@ -412,6 +412,131 @@ them, per that ADR's own rule.
   `Pricing` namespace speculatively. 3b (`JsonlUsageProvider` proper:
   locating transcripts under `ClaudeDataRoots.CandidateRoots`, reading
   files, producing a `UsageSnapshot`) depends on 1, 2, and this slice, and
-  is not yet filed — it has an open design question of its own, tracked
-  separately, about which `UsageSnapshot` field a token-count source
-  populates when the type carries percentages.
+  is not yet filed — it had an open design question of its own, about which
+  `UsageSnapshot` field a token-count source populates when the type carries
+  percentages. That question is **closed by the OVI-204 amendment directly
+  below** (D6a): the answer is none of them.
+
+- **2026-09-29 amendment (OVI-204) — what a JSONL-sourced snapshot actually
+  populates, and where token counts reach a skin.** Briefing slice 3a
+  (OVI-202) surfaced that D2's row for `JsonlUsageProvider` — "token counts,
+  not percentages" — never said what the snapshot it must return therefore
+  *contains*. `UsageSnapshot` carries percentages and reset instants and
+  nothing else; token counts live on `UsageStatistics`
+  ([ADR-0001](0001-core-to-skin-data-contract.md)). Slice 3b could not be
+  briefed without closing that. The three answers below are **D6**, plus two
+  corrections to text already written in this record. **D1 is untouched:**
+  `IUsageProvider` keeps its single method returning one `UsageSnapshot`, so
+  none of this needed board escalation.
+
+  **D6a — A JSONL-sourced snapshot carries provenance and time, not meters.**
+  `JsonlUsageProvider.GetSnapshot` returns either `UsageSnapshot.Unavailable`
+  (the scan found no readable transcript record at all) or a snapshot whose
+  fields are exactly:
+
+  | Field | Value | Why |
+  |---|---|---|
+  | `DataSourceKind` | `JsonlFallback` | see D6b |
+  | `LastIngestAt` | the `utcNow` this call was made with, once the ingest has read something | This field is *O-view's own capture time* (ADR-0001's row), not the age of the newest activity in the file |
+  | `SessionUtilizationPercent`, `WeeklyUtilizationPercent` | `Unavailable`, value `null` | transcripts record tokens spent, never the plan's limit; a percentage cannot be computed from them without a plan-limit table this repository does not have |
+  | `SessionResetAt`, `WeeklyResetAt` | `Unavailable`, value `null` | transcripts record no reset instant; the weekly anchor is [ADR-0006](0006-local-storage-contract.md)'s store, reached by the composite, never fabricated here |
+  | `UsageLevel` | `Green` | the documented sentinel `UsageSnapshot.Unavailable` already uses for "no band was computed"; with both percentages unavailable no skin reads it |
+  | `ExtraUsage` | `null` | not a fact transcripts carry |
+
+  **An all-unavailable snapshot under a non-`Unavailable` `DataSourceKind` is
+  legal, and this record states so explicitly.** `DataSourceKind` is the
+  provenance of a snapshot — *which reader produced it* — and has never been a
+  claim that any particular value is present; every value carries its own
+  `UsageValueStatus`. That is the entire reason per-value status flags exist
+  (ADR-0001). CONFIRMED by read at `cd68e17`: both skins already render such a
+  snapshot correctly today — `TooltipFormatter` fires its "local estimate ·
+  usage % unknown" copy only for `DataSourceKind.Estimate`, so a
+  `JsonlFallback` snapshot with null percentages renders `5h: ?` with the reset
+  and weekly clauses omitted, and is not mislabelled. **Slice 3b needs no skin
+  change.**
+
+  **Correction to the behaviour carried forward from the source repository.**
+  The source's `JsonlUsageProvider.GetSnapshot` returns
+  `new UsageSnapshot(DataSource.Estimate, null, null, null, latest)` where
+  `latest` is the store's *last recorded activity* — passed into the field this
+  repository calls `LastIngestAt` (CONFIRMED at `897777b`). Those are two
+  different facts, and conflating them makes a skin word "as of three days ago"
+  for a read that happened a second ago. This repository does not carry that
+  forward. Last-recorded-activity is real and worth having; it belongs on the
+  statistics seam (D6c), which is built from the ledger.
+
+  **D6b — `JsonlUsageProvider` emits `JsonlFallback` only. No provider in Phase
+  2 emits `Estimate`.** D2's cell listed both without saying which applies when,
+  and `DataSourceKind`'s own doc comment says `Estimate` is "modelled from token
+  pricing" — which for a *snapshot* would mean modelling a **utilization
+  percentage** from token counts. That needs a plan-limit table (how large is a
+  5-hour window on this plan?), and this repository has none. Inventing one is
+  the "never fabricate a number" principle failing exactly where it matters. So:
+  a JSONL read is a *fallback source*, never an *estimate of a meter*, and
+  `JsonlFallback` is the only tier it emits.
+
+  `Estimate` stays in the enum, dormant: ADR-0001 established it, the skins
+  already carry wording for it, and removing an accepted contract value to
+  express "nothing emits this yet" costs a Core contract change for no gain. It
+  is reserved for a future provider that can genuinely model a meter. Slice 3b
+  carries one doc-comment correction with it: `DataSourceKind`'s `Estimate`
+  summary is amended to name it as reserved and unemitted, and `JsonlFallback`'s
+  to say the snapshot carries provenance and capture time rather than derived
+  percentages.
+
+  **Rejected: emitting `Estimate` with the percentages still null**, on the
+  reading that "estimate" describes the provider's general confidence. It makes
+  the two tiers indistinguishable in the only place they are observable, and it
+  lights the skins' "local estimate" copy over a snapshot that is estimating
+  nothing. **Rejected: a rate-card/plan-limit table to make the percentages
+  computable.** That is its own decision with its own record, it needs vendor
+  figures nobody here has confirmed, and it is not required to build slice 3b.
+
+  **D6c — `UsageStatistics` reaches a skin by a second seam, reading the ledger
+  — not through `IUsageProvider`.** The two types answer different questions
+  from different sources: a `UsageSnapshot` is *the plan meter now*, read live
+  from vendor artefacts by a provider; `UsageStatistics` is *accumulated local
+  history* (today's and the 31-day window's tokens and estimated spend), which
+  by [ADR-0006](0006-local-storage-contract.md)'s whole justification can only
+  come from Core's own ledger, because the vendor deletes the transcripts behind
+  it after ~30 days. Core therefore defines a second read seam over the ledger:
+
+  ```
+  UsageStatistics GetStatistics(DateTimeOffset utcNow)
+  ```
+
+  with D1's same four obligations (never throws — yields
+  `UsageStatistics.Unavailable`; clock injected; read-only against vendor data;
+  no display text). It is **not** an `IUsageProvider`, is not part of
+  composition (D3), and has no `DataSourceKind` — statistics are not tiered by
+  provenance; each value carries its own status flag and the `Rates` stamp
+  beside it. This is what the source repository already does (CONFIRMED at
+  `897777b`: `PanelStatistics` is built from rollups queried out of
+  `RollupStore`, never from `IUsageProvider`); this amendment writes the seam
+  down rather than inventing one.
+
+  **Rejected: widening `IUsageProvider` to return both** (a second method, a
+  tuple, or a combined record). D1's single method is accepted board contract,
+  and widening it would force `PlanHistoryProvider` and
+  `CachedUtilizationProvider` to return statistics they have no source for —
+  every one of them answering "unavailable" forever, which is a shape that lies
+  about what the seam is for. **Rejected: putting statistics on the composite.**
+  The composite's job is choosing between snapshots of the same meters;
+  statistics have exactly one source and nothing to choose between.
+
+  **Correction to D3's tier order.** D3 writes the ordering as "`Live` beats
+  `Stale` beats `Estimate` beats `Unavailable`", carried over from the source's
+  four-value enum, and omits `JsonlFallback` — which this repository's enum has
+  and the source's did not. The order is **`Live` > `Stale` > `JsonlFallback` >
+  `Estimate` > `Unavailable`**, matching the enum's own declaration order and
+  ADR-0001's "still trusted above `JsonlFallback`/`Estimate`". The completeness
+  tie-break that follows tier does the load-bearing work here: a JSONL snapshot
+  with every meter unavailable never displaces one carrying real percentages at
+  the same tier, and D3's rule already says so.
+
+  **What slice 3b can now be briefed as:** a `JsonlUsageProvider` that scans
+  transcripts via slice 2's `ClaudeDataRoots`, returns `UsageSnapshot`s shaped
+  exactly by D6a's table, and emits `JsonlFallback` or
+  `UsageSnapshot.Unavailable` and nothing else. The statistics seam (D6c) is
+  **not** part of slice 3b — it depends on the ledger
+  ([ADR-0006](0006-local-storage-contract.md) slice 2) and is sliced with it.
