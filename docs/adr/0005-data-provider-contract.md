@@ -325,7 +325,7 @@ question 4 recommendation:
 | 2 | `ClaudeDataRoots`-equivalent path rules, pure, injected roots, no provider yet — **landed** (PR #36, 2026-09-29, OVI-200) | 1 | Low — pure functions, fully testable |
 | 3a | Transcript-line parsing and de-duplication: `TranscriptTokens`, `TranscriptRecord`, `TranscriptParser` — pure functions over strings, no I/O — **landed** (PR #38, 2026-09-29, OVI-203) | 1, 2 | Low — string fixtures only |
 | 3b | `JsonlUsageProvider` proper: locates transcripts under `ClaudeDataRoots.CandidateRoots`, reads files, produces a `UsageSnapshot` shaped exactly per D6a — **landed** (PR #41, 2026-09-29, OVI-219) | 1, 2, 3a | Medium — real file parsing |
-| 4 | `PlanHistoryProvider` | 1, 2 | Medium |
+| 4 | `PlanHistoryProvider` — **landed** (PR pending, 2026-09-29, OVI-222) | 1, 2 | Medium |
 | 5 | `CachedUtilizationProvider`, incl. the vendor-refresh call under G6's three limits | 1, 2 | Medium — G6 open since 2026-09-28; no longer gated |
 | 6 | `CompositeUsageProvider` + `ProviderHealth` (D3, D4) | 3, 4, 5 | Medium — needs ≥2 providers to be meaningful |
 
@@ -563,3 +563,65 @@ them, per that ADR's own rule.
   `JsonlFallback`'s doc comments carry D6b's two corrections in the same PR.
   No skin change: both skins already render an all-unavailable
   `JsonlFallback` snapshot correctly, per D6a's `TooltipFormatter` read.
+
+- **2026-09-29 update — slice 4 landed (Kit the Builder, OVI-222).**
+  `src/O-view.Core/Providers/PlanHistory/PlanHistoryProvider.cs` takes an
+  injected candidate-root list — typically slice 2's
+  `ClaudeDataRoots.CandidateRoots` result — and reads
+  `plan-usage-history.json` under each root, most-canonical root first,
+  stopping at the first root whose file parses to at least one valid sample.
+  A hit returns `DataSourceKind.Live` when the newest sample's age is at most
+  the freshness bound, else `Stale`; `SessionUtilizationPercent` and
+  `WeeklyUtilizationPercent` carry that sample's `fh`/`sd` values as `Real`;
+  `SessionResetAt`/`WeeklyResetAt` are `Unavailable`; `LastIngestAt` is the
+  injected `utcNow`; `UsageLevel` is `Green`; `ExtraUsage` is `null`. No file,
+  no `samples` array, or no sample that parses anywhere yields
+  `UsageSnapshot.Unavailable`. Proven by `PlanHistoryProviderTests`
+  (`tests/O-view.Core.Tests/Providers/PlanHistory/`): Live, Stale, boundary-
+  exact freshness, multi-sample newest-wins, multi-root first-hit-wins,
+  malformed-sample and missing-file `Unavailable`, and never-throws against
+  both a `FileShare.None`-locked file and non-JSON content.
+
+  **On-disk format — CONFIRMED at `897777b`**, read directly from
+  `src/O-view.Core/Providers/PlanHistory/PlanHistoryFile.cs` and
+  `PlanHistorySample.cs` in the source repository (read-only reference, never
+  pushed to): a JSON object with a `samples` array; each element needs `t`
+  (Unix epoch milliseconds, number), `org` (non-empty string), and `u.fh` /
+  `u.sd` (integers, 0–100) to survive parsing, and anything else in the
+  element is ignored. A malformed sample is skipped, not fatal to the file;
+  a malformed or missing file yields no samples, not an exception. This
+  slice ports that validation field-for-field.
+
+  **Deliberately not carried forward — CONFIRMED present in the source at the
+  same commit, out of scope for this slice.** The source's
+  `PlanHistoryProvider.GetSnapshot` also runs `ResetDetector` (session-window
+  boundary detection and next-reset prediction), narrows that window against
+  local transcript activity via an injected store lookup, and resolves a
+  preferred organization read from `~/.claude.json` to de-interleave a
+  multi-org file, falling back to the file's most-recently-active org when no
+  preference is supplied or matches. None of that machinery exists in this
+  repository yet — no `~/.claude.json` reader, no transcript-activity lookup,
+  no ADR-0006 store — and ADR-0005's D2 table itself assigns "the exact
+  weekly reset instant" to `CachedUtilizationProvider` alone, not this
+  provider. This slice therefore reports the two percentages the file states
+  directly and nothing else: no session or weekly reset instant, and no
+  per-organization filtering (equivalent to the source's own null-preference
+  fallback — the file's latest sample wins regardless of which org it names).
+  A future slice may reintroduce window/reset derivation here if a spec calls
+  for it; this one does not invent it.
+
+  **Correction to this ADR's own D2 table.** The table's `PlanHistoryProvider`
+  row states "Samples roughly every 5 minutes (CONFIRMED — CompositeUsageProvider)".
+  Reading the source at the same pinned commit (`897777b`) directly —
+  `PlanHistoryProvider.DefaultFreshness`'s own doc comment — shows Claude
+  Desktop's cadence changed from 5 to 15 minutes on 2026-08-10, measured
+  against 1,443 real sampling gaps, and that the source's own freshness bound
+  was independently re-measured and raised to 16 minutes for that reason (one
+  interval at the new cadence plus a minute of slack). The D2 table's 5-minute
+  figure was accurate once but predates that change; this slice's
+  `DefaultFreshness` uses 16 minutes, the figure CONFIRMED current as of the
+  same pinned commit this ADR cites elsewhere, and flags the table text as
+  needing a correction rather than silently overriding it. No skin change:
+  both skins already handle `DataSourceKind.Live`/`Stale`
+  (`src/O-view.Tray/Presentation/PanelTextFormatter.cs`,
+  `src/O-view.Linux/Presentation/PanelTextFormatter.cs`).
