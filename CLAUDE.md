@@ -236,24 +236,31 @@ slice. For code:
   `dotnet test O-view.slnx`. `O-view.Core` and its test project target
   `net10.0` and are *intended* to build and test on a non-Windows runner —
   that is the enforcement mechanism Core's platform-neutrality is meant to
-  rest on, not a formality. **No such run has ever happened.** This
-  repository has no CI workflow — no `.github/`, no `.circleci/`, no
-  `.gitlab-ci.yml`, `azure-pipelines.yml`, `.travis.yml`, `appveyor.yml`
-  or `Jenkinsfile` (CONFIRMED by directory listing, 2026-09-23) — and
-  nothing has built or tested this rebuild's code on non-Windows hardware.
-  Until CI exists, the layering rule is held by review and by the
-  structural tests in `O-view.Core.Tests`, not by a green non-Windows
-  build. [ADR-0003](docs/adr/0003-paneltext-anti-drift-mechanism.md)'s
-  2026-09-10 amendment records the same thing ("this repository has no CI
-  workflow yet"); whether to add CI, and what it would cover, is an open
-  board decision, not something to settle in passing.
+  rest on, not a formality. **That run now happens on every push:**
+  `.github/workflows/ci.yml` (added by OVI-124) runs a Windows job over
+  the whole solution and a Linux job over the four `net10.0` projects —
+  Core, Core.Tests, Linux, Linux.Tests. *Corrected 2026-09-27 (OVI-179):
+  this paragraph previously said the repository had no CI workflow of any
+  kind and that whether to add one was an open board decision. Both were
+  true when written (CONFIRMED by directory listing, 2026-09-23) and both
+  stopped being true when OVI-124 landed; the correction is recorded here
+  rather than edited away.* The anti-drift harness and the Tray skin are
+  covered by the Windows job only — see the next bullet and ADR-0004 for
+  what each job does and does not prove. **Read
+  [ADR-0004](docs/adr/0004-what-non-windows-ci-could-and-could-not-prove.md)
+  before changing CI** — it sets out, project by project, what a
+  non-Windows run does and does not prove, and why the anti-drift harness
+  is not being restructured. It is the record the current workflow
+  implements.
   `O-view.Tray` and its test project target `net10.0-windows`: they are
   Windows-only by declaration. Today they also build and pass on Linux
   (see the next bullet), but nothing should rely on that. `O-view.Linux`
   and its test project also target `net10.0` and build on any runner,
   same as Core.
 - **The anti-drift harness is Windows-only by declaration, not yet by
-  necessity.** `O-view.CrossSkin.Tests` (the
+  necessity.** [ADR-0004](docs/adr/0004-what-non-windows-ci-could-and-could-not-prove.md)
+  route R1 records the route to make it platform-neutral by design, and
+  why it is not taken. `O-view.CrossSkin.Tests` (the
   [ADR-0003](docs/adr/0003-paneltext-anti-drift-mechanism.md) golden-master
   harness) targets `net10.0-windows` because it references `O-view.Tray`
   directly (CONFIRMED —

@@ -622,6 +622,27 @@ strings is why this ADR's mechanism checks facts, not bytes.
   authorizes**. Per this role's boundaries, that cost is flagged to Chief
   Gary II for scoping into Kit the Builder's extraction slice, rather than
   decided unilaterally here.
+  - **2026-09-24 amendment (OVI-111) — the CI-runner sentence above is
+    superseded by [ADR-0004](0004-what-non-windows-ci-could-and-could-not-prove.md).**
+    It assumed "the same Windows CI runner the Tray build already uses".
+    No such runner exists: this repository has no CI configuration of any
+    kind (CONFIRMED: no CI config on `main` at `a2a5556`, per Quinn the
+    Reviewer on OVI-112, and the directory listing recorded in
+    `CLAUDE.md`). This record's own 2026-09-10 amendment already said so.
+    The only surviving part of the sentence is that the harness needs a
+    Windows runner (CONFIRMED: `O-view.CrossSkin.Tests` targets
+    `net10.0-windows`). Whether any CI is added, which runners it uses,
+    and what each job would and would not prove are now covered by
+    ADR-0004. Read that record, not this sentence.
+    *(Added to `main` on 2026-09-27 by OVI-179, not on the date above —
+    the pull request that wrote it merged into another branch. See
+    ADR-0004's own late-landing note. Two things have moved since the
+    amendment was written and are left in place rather than rewritten:
+    CI now exists — `.github/workflows/ci.yml`, added by OVI-124 — so
+    "no CI configuration of any kind" is true of `a2a5556` only, and
+    ADR-0004 is now Accepted, not Proposed. The harness does run on a
+    Windows runner today; the original sentence's error was assuming one
+    already existed, and that remains the point.)*
 - The fixture set needs initial content (a representative set of Core
   snapshots covering ordinary usage, near-limit usage, estimated/fallback
   data, and unavailable data) before the test can catch anything. Building

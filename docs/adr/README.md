@@ -12,26 +12,22 @@ edit history. See [`CLAUDE.md`](../../CLAUDE.md) for the full discipline.
 | [0001](0001-core-to-skin-data-contract.md) | The Core-to-skin data contract, as a living document | Accepted | Every value Core can hand a skin: type, unit, real/estimated/unavailable status flag. Cross-references the confirmed presentation-string leaks in the source repository's `O-view.Core.Models`. |
 | [0002](0002-cross-platform-capability-matrix.md) | The cross-platform capability matrix, as a living document | Accepted | Per OS capability, what every skin must provide and what each platform currently, actually guarantees — confirmed / confirmed-narrow / inferred / never-observed, unchanged from OVI-4's verification. |
 | [0003](0003-paneltext-anti-drift-mechanism.md) | Cross-skin wording golden-master tests replace `PanelText.cs`'s centralization | Accepted | Resolves PDR board question 0. Pins the content facts each skin's wording must state for a given figure, not the exact string — preserving per-skin ownership of wording while catching issue #55/#56-style drift. Flags a new shared test project as a cost for Chief Gary II to scope. |
-| 0004 | *(what non-Windows CI could and could not prove)* | **Missing from `main` — see the note below** | Reviewed and merged as PR #19, but into a stacked base branch rather than `main`, so its content never landed. Recoverable; tracked separately. Number **not** reused. |
+| [0004](0004-what-non-windows-ci-could-and-could-not-prove.md) | What non-Windows CI could and could not prove for O-view | Accepted | A Linux CI job runs Core, Core.Tests, Linux and Linux.Tests, not the ADR-0003 anti-drift harness or the Tray skin, which are Windows-only. Recommended a two-job workflow (Windows: whole solution; Linux: the `net10.0` projects) and no harness restructuring — approved and live in `.github/workflows/ci.yml` (OVI-124); see the record's 2026-09-27 amendment. |
 | [0005](0005-data-provider-contract.md) | The data-provider contract — how Core reads Claude's data off this machine | Accepted 2026-09-28 | Phase 2. One input seam (`IUsageProvider`), three named Claude providers, composition by information value, provider health as contract data. Opened **gate G6**: the app may invoke the vendor's own documented, read-shaped command so the vendor refreshes its own cache — under three limits stated in the record. |
 | [0006](0006-local-storage-contract.md) | What Core persists on this machine, where, and who owns each file | Accepted 2026-09-28 | Phase 2. Three stores, each justified by being unrecomputable; injected paths; corruption degrades to "not known yet". SQLite authorised as this repository's first third-party runtime dependency, for the usage ledger only. |
 | [0007](0007-app-shell-contract.md) | The app shell — a third layer between Core and the skins, and what it may not contain | Accepted 2026-09-28 | Phase 2. Names `O-view.App`, gives it an admission rule, and answers ADR-0001's deferred "where does the HTTP fetch go". Gate G4 stays closed: no shared widget, no shared window base class. |
 
-## A gap in this trail: ADR-0004
+## A note on ADR-0004's dates
 
-ADR-0004 is not in this directory, and the gap is recorded rather than
-tidied away. Its content was written, reviewed and merged (PR #19,
-2026-09-26) — but that PR's base was the branch
-`docs/ovi-109-ci-wording-correction`, not `main`, and it merged 81 seconds
-*after* that base had itself merged to `main` and been deleted. The content
-therefore reached a branch no longer on its way anywhere (CONFIRMED by
-`gh pr view 19` and by `git ls-tree origin/main docs/adr/`).
-
-The text is not lost — it survives at merge commit `fa561354` and can be
-restored to `main` unchanged. Restoring it is tracked as its own task
-(OVI-179) rather than folded into an unrelated PR. The number 0004 is reserved for
-it, not reused, so that the record it belongs to keeps the number its
-review, its PR and any citation of it already use.
+0004 was written, reviewed and merged on 2026-09-26 — but into another pull
+request's branch rather than into `main`, 81 seconds after that base had itself
+merged and been deleted, so its content never landed. The text was never lost
+(it survived at merge commit `fa561354`) and reached `main` unchanged on
+2026-09-28 as its own task, OVI-179, rather than folded into an unrelated PR.
+The number 0004 was reserved for it, not reused, so the record keeps the number
+its review, its PR and every citation of it already use. Its header date is the
+date it was decided, not the date it landed here; see the note at the head of
+the record.
 
 The general lesson is already this project's written rule ("branch from
 current `main`, never from another open PR — no stacked PRs"); this entry
