@@ -1352,3 +1352,37 @@ the source of truth for what the contract *means*.
   HTTP fetch" — is answered by [ADR-0007](0007-app-shell-contract.md) D3: the shell, with one
   cooldown holder per process, per the 2026-09-26 (OVI-140) requirement above. That answer is
   also Proposed, not Accepted.
+
+- **2026-09-29 note (OVI-204) — how to read the `DataSourceKind` row, and where
+  `UsageStatistics` comes from. No row in the table above changes.** Phase 2's
+  first provider slices needed two things this table implied but never said:
+
+  **A snapshot may carry a non-`Unavailable` `DataSourceKind` with every value
+  flagged `unavailable`.** `DataSourceKind` states *which reader produced this
+  snapshot*; it is not, and never was, a claim that any particular value in it
+  is present. Presence is per value, on each value's own `UsageValueStatus` —
+  which is why those flags exist. The concrete case is
+  [ADR-0005](0005-data-provider-contract.md)'s `JsonlUsageProvider`: a
+  transcript read yields a real capture time and a real provenance label but no
+  percentage and no reset instant, because transcripts record tokens spent and
+  never the plan's limit. A skin must not infer "this snapshot has values" from
+  the tier, nor "no data at all" from an unavailable percentage. CONFIRMED by
+  read at `cd68e17`: both skins already do this correctly, and the 2026-09-11
+  entry above already grouped `JsonlFallback` with `Live`/`Stale` in
+  `Freshness` for the same reason.
+
+  **`DataSourceKind.Estimate` is reserved and unemitted.** ADR-0005 D6b decides
+  that no provider in Phase 2 produces it: modelling a *utilization percentage*
+  from token counts would need a plan-limit table this repository does not have,
+  and inventing one breaks "never fabricate a number". The value stays in the
+  enum with the skins' existing wording intact, for a future provider that can
+  genuinely model a meter. Nothing in this table moves.
+
+  **`UsageStatistics` is fed by a second Core seam, not by `IUsageProvider`.**
+  This table specifies both types side by side and is silent on who produces
+  them. ADR-0005 D6c decides: snapshots come from providers reading vendor
+  artefacts; statistics come from a ledger read
+  ([ADR-0006](0006-local-storage-contract.md)), because the 31-day figures
+  outlive the vendor's ~30-day transcript retention and cannot be read from
+  vendor files at all. This is a producer decision, not a contract-shape
+  decision — every row of both types is unchanged.
