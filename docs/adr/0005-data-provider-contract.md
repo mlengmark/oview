@@ -323,7 +323,8 @@ question 4 recommendation:
 |---|---|---|---|
 | 1 | `IUsageProvider` + `UsageSnapshot.Unavailable` + the never-throw structural test — **landed** (PR #35, 2026-09-28, OVI-188) | — | Lowest — one interface, no I/O |
 | 2 | `ClaudeDataRoots`-equivalent path rules, pure, injected roots, no provider yet — **landed** (PR #36, 2026-09-29, OVI-200) | 1 | Low — pure functions, fully testable |
-| 3 | `JsonlUsageProvider` (token counts, `Estimate`/`JsonlFallback`) | 1, 2 | Medium — real file parsing |
+| 3a | Transcript-line parsing and de-duplication: `TranscriptTokens`, `TranscriptRecord`, `TranscriptParser` — pure functions over strings, no I/O — **landed** (PR #38, 2026-09-29, OVI-203) | 1, 2 | Low — string fixtures only |
+| 3b | `JsonlUsageProvider` proper: locates transcripts under `ClaudeDataRoots.CandidateRoots`, reads files, produces a `UsageSnapshot` (token counts, `Estimate`/`JsonlFallback`) | 1, 2, 3a | Medium — real file parsing |
 | 4 | `PlanHistoryProvider` | 1, 2 | Medium |
 | 5 | `CachedUtilizationProvider`, incl. the vendor-refresh call under G6's three limits | 1, 2 | Medium — G6 open since 2026-09-28; no longer gated |
 | 6 | `CompositeUsageProvider` + `ProviderHealth` (D3, D4) | 3, 4, 5 | Medium — needs ≥2 providers to be meaningful |
@@ -375,3 +376,42 @@ them, per that ADR's own rule.
   real identifier when one is confirmed. macOS is out of scope (G3) and adds
   no `ClaudeHostPlatform` member. Slices 3-5 consume `CandidateRoots` to
   build real providers; none of that I/O exists in this slice.
+
+- **2026-09-29 update — slice 3a landed (Kit the Builder, OVI-203).** Slice 3
+  (the row above's original `JsonlUsageProvider`) is split into 3a and 3b:
+  the source repository's `Providers/Jsonl/` is 1,949 lines across 11 files
+  and depends on `OView.Core.Pricing` (`TokenSplit`, `UsageModifiers`,
+  `CostEstimator`), a namespace that does not exist in this repository —
+  taken whole, the slice would both exceed ~500 changed lines and silently
+  decide how Core prices tokens. 3a lands only the part that needs neither:
+  `src/O-view.Core/Providers/Jsonl/TranscriptTokens.cs` (a `readonly record
+  struct` carrying `InputTokens`, `OutputTokens`, `CacheCreationInputTokens`,
+  `CacheReadInputTokens`, and the two TTL fields), `TranscriptRecord.cs`
+  (`RequestId`, `TimestampUtc`, `Model`, `Tokens` — no pricing type), and
+  `TranscriptParser.cs`, a static class with `TryParseAssistantRecord`
+  (string in, `TranscriptRecord` out, never throws) and `Deduplicate`
+  (groups by `RequestId`, keeps the last occurrence in file order). No file
+  I/O, no clock read, and no `UsageSnapshot` exist anywhere in this slice —
+  proven by `TranscriptParserTests`, which exercises every rule with string
+  fixtures only.
+  **`CacheCreationEphemeral5mTokens` and `CacheCreationEphemeral1hTokens`
+  are nullable on purpose.** `usage.cache_creation` is not present on every
+  record — a record whose `cache_creation` object is missing or unreadable
+  is not attributed to either TTL, and writing `0` there would fabricate a
+  number this project has promised never to fabricate; the flat
+  `cache_creation_input_tokens` beside it still carries the unattributed
+  total. The synthetic-record marker (`<synthetic>`) is compared
+  case-insensitively in exactly one place, `TranscriptParser`, rather than
+  the three diverging branches the source repository carried (GitHub issue
+  #57) — synthetic records are dropped, not stored at zero, because every
+  one measured carries all-zero usage.
+  **Deliberately deferred to whichever slice adds `OView.Core.Pricing`:**
+  `usage.speed` and `usage.inference_geo`, the two published pricing
+  modifiers. They are load-bearing only under a rate card, and this slice
+  parses no pricing at all — not even inactive fields — rather than add a
+  `Pricing` namespace speculatively. 3b (`JsonlUsageProvider` proper:
+  locating transcripts under `ClaudeDataRoots.CandidateRoots`, reading
+  files, producing a `UsageSnapshot`) depends on 1, 2, and this slice, and
+  is not yet filed — it has an open design question of its own, tracked
+  separately, about which `UsageSnapshot` field a token-count source
+  populates when the type carries percentages.
