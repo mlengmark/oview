@@ -266,7 +266,7 @@ don't store the sensitive thing in the first place.
 
 | # | Slice | Depends on | Risk |
 |---|---|---|---|
-| 1 | `WeeklyResetAnchor`-equivalent: one JSON file, atomic write, defensive read, injected directory | — | **Lowest** — one small file, no dependency, no schema. Start here |
+| 1 | `WeeklyResetAnchor`-equivalent: one JSON file, atomic write, defensive read, injected directory — **landed** (PR #40, 2026-09-29, OVI-215) | — | **Lowest** — one small file, no dependency, no schema. Start here |
 | 2 | Ledger schema + upsert + query-time daily aggregation | 1 | Medium — first dependency, first schema. Authorised 2026-09-28; the `*.csproj` change makes it a **board** merge |
 | 3 | Corrupt-store handling + `HistoryStoreState` (D3, D4) | 2 | Low once 2 lands |
 | 4 | Ingest audit + wiring to [ADR-0005](0005-data-provider-contract.md)'s `ProviderHealth` | 2, and ADR-0005 slice 6 | Low |
@@ -276,3 +276,23 @@ a single JSON file with an injected path, it makes
 `WeeklyResetAt`/`WeeklyResetSource` reachable, and it proves D2 and D3
 without the dependency — so if SQLite turns out to be the wrong call on
 Linux, the one store that matters most is already standing on its own.
+
+- **2026-09-29 update — slice 1 landed (Kit the Builder, OVI-215).**
+  `src/O-view.Core/Storage/WeeklyResetAnchorStore.cs` implements D1's
+  weekly-reset-anchor row: a directory-injected constructor (D2 — no
+  `Environment.SpecialFolder`, no OS branch), an atomic `Save` (temp file
+  then replace, D3.1), and a `Read` that degrades to `null` on a missing
+  file, missing directory, unparseable JSON, or an unparseable/missing
+  `anchorUtc` field (D3.2) rather than throwing. D3's third obligation —
+  moving a corrupt file aside instead of overwriting it — is explicitly
+  slice 3's job (`HistoryStoreState`) and is not attempted here.
+  `WeeklyResetAnchorStoreTests`
+  (`tests/O-view.Core.Tests/Storage/`) covers missing file, missing
+  directory, unparseable JSON, a missing/invalid `anchorUtc`, a
+  save/read round trip, overwrite, temp-file cleanup after a successful
+  write, and recovery after a prior corrupt write. No SQLite, ledger
+  schema, or shell-side path resolution is introduced by this slice; no
+  provider or `UsageSnapshot` wiring happens here either — the contract
+  rows this store feeds (`WeeklyResetAt`/`WeeklyResetSource`, both already
+  in [ADR-0001](0001-core-to-skin-data-contract.md)) stay unconsumed until
+  a later slice wires a provider to this store.
