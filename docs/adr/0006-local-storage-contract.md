@@ -278,7 +278,7 @@ don't store the sensitive thing in the first place.
 | 1 | `WeeklyResetAnchor`-equivalent: one JSON file, atomic write, defensive read, injected directory — **landed** (PR #40, 2026-09-29, OVI-215) | — | **Lowest** — one small file, no dependency, no schema. Start here |
 | 2 | Ledger schema + upsert + query-time daily aggregation — **landed** (OVI-230, 2026-09-30) | 1 | Medium — first dependency, first schema. Authorised 2026-09-28; the `*.csproj` change makes it a **board** merge |
 | 3 | Corrupt-store handling + `HistoryStoreState` (D3, D4) | 2 | Low once 2 lands |
-| 4 | Ingest audit + wiring to [ADR-0005](0005-data-provider-contract.md)'s `ProviderHealth` | 2, and ADR-0005 slice 6 | Low |
+| 4 | Ingest audit + wiring to [ADR-0005](0005-data-provider-contract.md)'s `ProviderHealth` — **landed** (PR TBD, 2026-09-30, OVI-252) | 2, and ADR-0005 slice 6 | Low |
 
 Slice 1 stays first even now that the dependency question is answered. It is
 a single JSON file with an injected path, it makes
@@ -374,3 +374,40 @@ Linux, the one store that matters most is already standing on its own.
   regardless of OS or permissions. No `ProviderHealth` wiring happens here
   (slice 4's job, blocked on ADR-0005 slice 6); nothing yet writes
   `HistoryStoreState` onto a `UsageSnapshot` — that wiring is also slice 4's.
+
+- **2026-09-30 update — slice 4 landed (Kit the Builder, OVI-252).**
+  `src/O-view.Core/Storage/IngestAuditStore.cs` implements D1's ingest audit
+  row: a directory-injected constructor (D2, same pattern as slices 1-3)
+  reads and writes `ingest-audit.json` — one entry per provider name holding
+  `LastSuccessAt`/`ConsecutiveFailures` — atomically (temp file, then
+  replace, D3.1) and degrades to an empty trail on a missing file, missing
+  directory, or unparseable JSON (D3.2) rather than throwing or guessing.
+  An unparseable file is moved aside via the same `CorruptStoreRecovery`
+  helper slices 1-3 use (D3.3), and `State` reports `Ok`/`Rebuilt`/
+  `Unavailable` exactly as the other two stores do (D4).
+  `CompositeUsageProvider` (ADR-0005 slice 6, PR #48) now takes an optional
+  `IngestAuditStore` constructor parameter: when supplied, the constructor
+  seeds `Health`'s per-provider `LastSuccessAt`/`ConsecutiveFailures` from
+  the store's persisted rows instead of starting every provider at "never
+  polled", and every `GetSnapshot` call saves the updated rows back
+  (best-effort — a failed save never throws and never blocks the poll, the
+  same D3 degrade-gracefully rule the store itself follows). Omitting the
+  parameter preserves the previous in-memory-only behaviour, which is what
+  `CompositeUsageProviderTests`' existing cases still exercise.
+  `IngestAuditStoreTests` (`tests/O-view.Core.Tests/Storage/`) covers a
+  missing file, a missing directory, unparseable JSON, a round trip across
+  multiple providers, directory creation, overwrite, temp-file cleanup, and
+  the same `Rebuilt`/`Unavailable` corruption paths slices 1-3 prove. Four
+  new `CompositeUsageProviderTests` cases prove the wiring itself: health
+  persists across a new `CompositeUsageProvider` instance for the same
+  directory (simulating a process restart), both `ConsecutiveFailures` and
+  `LastSuccessAt` survive that restart, and a save failure (the audit file's
+  path occupied by a directory) never surfaces as an exception from
+  `GetSnapshot`. This is the last unbuilt slice in this ADR's table — no
+  skin renders the audit trail or health fields yet (that is a future
+  ADR-0007 app-shell slice), and this slice does not attempt the
+  `HistoryStoreState`-onto-`UsageSnapshot` wiring slice 3's note flagged:
+  ADR-0001's now-accepted contract row (:102) already settled that
+  `HistoryStoreState` is a Core-owned store-health fact reported via each
+  store's own `State` property, not a `UsageSnapshot` field, so there is no
+  such wiring left to do.
