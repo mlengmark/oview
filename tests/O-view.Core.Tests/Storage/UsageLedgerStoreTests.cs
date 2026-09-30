@@ -1,3 +1,4 @@
+using OView.Core.Models;
 using OView.Core.Providers.Jsonl;
 using OView.Core.Storage;
 
@@ -225,5 +226,60 @@ public sealed class UsageLedgerStoreTests : IDisposable
         var bucket = Assert.Single(reopened.QueryDailyUsage(TimeZoneInfo.Utc));
 
         Assert.Equal(42, bucket.InputTokens);
+    }
+
+    [Fact]
+    public void StateIsOkWhenTheDatabaseFileNeverExistedOrWasNeverCorrupt()
+    {
+        var store = new UsageLedgerStore(_directory);
+
+        store.Upsert(Record("req-1", new DateTimeOffset(2026, 9, 25, 12, 0, 0, TimeSpan.Zero)));
+
+        Assert.Equal(HistoryStoreState.Ok, store.State);
+    }
+
+    [Fact]
+    public void ACorruptDatabaseFileIsMovedAsideRatherThanLeftOrDeleted()
+    {
+        Directory.CreateDirectory(_directory);
+        var path = Path.Combine(_directory, "usage.db");
+        File.WriteAllText(path, "this is not a sqlite database");
+
+        _ = new UsageLedgerStore(_directory);
+
+        Assert.True(File.Exists(path + ".corrupt"));
+        Assert.Equal("this is not a sqlite database", File.ReadAllText(path + ".corrupt"));
+    }
+
+    [Fact]
+    public void ConstructingOverACorruptDatabaseFileReportsRebuiltAndStartsAnEmptyUsableStore()
+    {
+        Directory.CreateDirectory(_directory);
+        File.WriteAllText(Path.Combine(_directory, "usage.db"), "this is not a sqlite database");
+
+        var store = new UsageLedgerStore(_directory);
+
+        Assert.Equal(HistoryStoreState.Rebuilt, store.State);
+        Assert.Empty(store.QueryDailyUsage(TimeZoneInfo.Utc));
+
+        store.Upsert(Record("req-1", new DateTimeOffset(2026, 9, 25, 12, 0, 0, TimeSpan.Zero)));
+        Assert.Single(store.QueryDailyUsage(TimeZoneInfo.Utc));
+    }
+
+    [Fact]
+    public void ConstructingOverACorruptDatabaseFileReportsUnavailableWhenItCannotBeMovedAside()
+    {
+        Directory.CreateDirectory(_directory);
+        var path = Path.Combine(_directory, "usage.db");
+        File.WriteAllText(path, "this is not a sqlite database");
+        // Occupy the exact backup destination with a directory: File.Move onto an existing
+        // directory always fails, on every platform, regardless of permissions — the
+        // deterministic way to force the "still can't be recovered" branch in a test.
+        Directory.CreateDirectory(path + ".corrupt");
+
+        var store = new UsageLedgerStore(_directory);
+
+        Assert.Equal(HistoryStoreState.Unavailable, store.State);
+        Assert.True(File.Exists(path));
     }
 }

@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using OView.Core.Models;
 
 namespace OView.Core.Storage;
 
@@ -20,8 +21,9 @@ namespace OView.Core.Storage;
 /// <para><b>ADR-0006 D3 — corruption degrades to "not known yet", never to a crash or a
 /// guess.</b> Writes are atomic (temp file, then replace); a read that finds a missing or
 /// unparseable file returns <see langword="null"/> rather than throwing or inventing a value.
-/// Moving a corrupt file aside instead of overwriting it is ADR-0006 slice 3's job, not
-/// this one's — this slice only proves the write/read pair.</para>
+/// A file found corrupt on <see cref="Read"/> is moved aside rather than left in place or
+/// deleted (D3.3), and <see cref="State"/> reports whether that happened this session
+/// (ADR-0006 D4, OVI-236).</para>
 /// </summary>
 public sealed class WeeklyResetAnchorStore
 {
@@ -43,8 +45,18 @@ public sealed class WeeklyResetAnchorStore
     }
 
     /// <summary>
+    /// Whether this store was readable and writable this session (<see cref="HistoryStoreState.Ok"/>),
+    /// found corrupt and moved aside in favour of a fresh empty store
+    /// (<see cref="HistoryStoreState.Rebuilt"/>), or still cannot be trusted after that recovery
+    /// attempt (<see cref="HistoryStoreState.Unavailable"/>) — ADR-0006 D4.
+    /// </summary>
+    public HistoryStoreState State { get; private set; } = HistoryStoreState.Ok;
+
+    /// <summary>
     /// The stored weekly-reset instant, or <see langword="null"/> when none has been stored,
-    /// the file is missing, or the file could not be parsed. Never throws.
+    /// the file is missing, or the file could not be parsed. Never throws. A file found corrupt
+    /// is moved aside (ADR-0006 D3.3) rather than left in place, and <see cref="State"/> is
+    /// updated to reflect it.
     /// </summary>
     public DateTimeOffset? Read()
     {
@@ -57,13 +69,17 @@ public sealed class WeeklyResetAnchorStore
                 return null;
             }
 
-            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-            var file = JsonSerializer.Deserialize<AnchorFile>(stream, SerializerOptions);
+            AnchorFile? file;
+            using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            {
+                file = JsonSerializer.Deserialize<AnchorFile>(stream, SerializerOptions);
+            }
 
             if (file?.AnchorUtc is not { Length: > 0 } text ||
                 !DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture,
                     DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var anchor))
             {
+                MarkCorrupt(path);
                 return null;
             }
 
@@ -71,8 +87,19 @@ public sealed class WeeklyResetAnchorStore
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {
+            MarkCorrupt(path);
             return null;
         }
+    }
+
+    private void MarkCorrupt(string path)
+    {
+        if (State == HistoryStoreState.Unavailable)
+        {
+            return;
+        }
+
+        State = CorruptStoreRecovery.MoveAsideIfPresent(path);
     }
 
     /// <summary>

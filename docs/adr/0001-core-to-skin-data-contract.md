@@ -99,6 +99,7 @@ render this as an explicit gap, never as zero or blank).
 | `ExtraUsageState` | enum {`Disabled`, `Enabled`} | — | real | two members only. The source app's third member, `Unknown`, is **not** carried: "the cache did not say" is the parent field's `unavailable` status, and encoding it twice is the ill-formed pair OVI-146 closed; added 2026-09-27 (OVI-168) |
 | `HasCreditUsage` | bool | — | real / unavailable | whether any credit-billed model was recorded in the 31-day window. Lives on `UsageStatistics`. `false` + `real` means "Core looked and found none" and is a different fact from `unavailable`; added 2026-09-27 (OVI-168) |
 | `CreditBilledModelIds` | `string[]` — a Core-owned static set, **not** a snapshot field | — | real | the vendor model ids billed as extra usage. Core owns the set, verbatim; a skin owns how it is joined into a sentence. Replaces the source app's `CreditBilledModels.DisplayList`, which was a pre-joined display string; added 2026-09-27 (OVI-168) |
+| `HistoryStoreState` | enum {`Ok`, `Rebuilt`, `Unavailable`} — a Core-owned store-health fact, **not** a `UsageSnapshot` field | — | real | whether a local history store (ADR-0006 D1) was readable and writable this session (`Ok`), was found corrupt and moved aside in favour of a fresh empty store this session (`Rebuilt`), or still cannot be read or written after that recovery attempt (`Unavailable`). `Rebuilt` means `HistoryCoverage.RecordedDays` is newly near-zero for a reason the user should be allowed to know; Core reports the state, the skin decides whether and how to say so. Added 2026-09-30 (ADR-0006 D4, OVI-236) |
 
 **What Core must never emit, by contract:** a pre-formatted display
 sentence, a field separator, a locale-bound date/time string, or any
@@ -1341,6 +1342,18 @@ the source of truth for what the contract *means*.
   every poll for five days behind a silent catch while the panel showed live percentages from
   a sibling provider and the support bundle reported `status : Ok`
   (`src/O-view.Core/Providers/CompositeUsageProvider.cs`, read at `897777b`).
+
+- **2026-09-30 update — `HistoryStoreState` implemented (Kit the Builder, OVI-236,
+  ADR-0006 slice 3).** The row this ADR's 2026-09-27 note proposed now exists as a real enum
+  in `O-view.Core.Models` and as a `State` property on both `WeeklyResetAnchorStore` and
+  `UsageLedgerStore` (`src/O-view.Core/Storage/`). Each store now also implements ADR-0006
+  D3.3: a store found corrupt on open (an unparseable JSON file, or a database file SQLite
+  cannot read) is moved aside to `{path}.corrupt` rather than overwritten or deleted, before a
+  fresh empty store is created in its place. `ProviderHealth`/`DegradedInputCount` (this note's
+  other proposed pair) remain unimplemented — still ADR-0005 slice 6/ADR-0006 slice 4's job, not
+  this one's. `UsageSnapshot` was **not** changed by this slice; nothing currently populates
+  `HistoryStoreState` onto a snapshot, the same wiring gap the ADR-0006 slicing table names as
+  slice 4's job.
 
   **They are deliberately not added to the table above yet.** ADR-0005 and ADR-0006 are
   *Proposed*, pending board sign-off, and this table is the accepted contract. If the board
