@@ -278,7 +278,7 @@ don't store the sensitive thing in the first place.
 | 1 | `WeeklyResetAnchor`-equivalent: one JSON file, atomic write, defensive read, injected directory — **landed** (PR #40, 2026-09-29, OVI-215) | — | **Lowest** — one small file, no dependency, no schema. Start here |
 | 2 | Ledger schema + upsert + query-time daily aggregation — **landed** (OVI-230, 2026-09-30) | 1 | Medium — first dependency, first schema. Authorised 2026-09-28; the `*.csproj` change makes it a **board** merge |
 | 3 | Corrupt-store handling + `HistoryStoreState` (D3, D4) | 2 | Low once 2 lands |
-| 4 | Ingest audit + wiring to [ADR-0005](0005-data-provider-contract.md)'s `ProviderHealth` — **landed** (PR TBD, 2026-09-30, OVI-252) | 2, and ADR-0005 slice 6 | Low |
+| 4 | Ingest audit + wiring to [ADR-0005](0005-data-provider-contract.md)'s `ProviderHealth` — **landed** (PR #49, 2026-09-30, OVI-252) | 2, and ADR-0005 slice 6 | Low |
 
 Slice 1 stays first even now that the dependency question is answered. It is
 a single JSON file with an injected path, it makes
