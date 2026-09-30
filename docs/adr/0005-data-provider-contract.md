@@ -143,9 +143,12 @@ grounds in review.
 
 ### D3 — Composition selects by information value; the winner keeps its own source label
 
-`CompositeUsageProvider` is carried forward with the source's rule intact:
-tier first (`Live` beats `Stale` beats `Estimate` beats `Unavailable`),
-then completeness, then recency, then argument order as a final tie-break.
+`CompositeUsageProvider` is carried forward with the source's rule intact,
+corrected for this repository's four-tier enum: tier first (`Live` beats
+`Stale` beats `JsonlFallback` beats `Estimate`; `Unavailable` is excluded
+from ranking rather than ranked last — an `Unavailable` reading carries no
+information to prefer over another `Unavailable` reading), then
+completeness, then recency, then argument order as a final tie-break.
 The winning snapshot's `DataSourceKind` travels to the skin unchanged.
 
 **Rejected: strict precedence by list position.** The source repository
@@ -326,8 +329,8 @@ question 4 recommendation:
 | 3a | Transcript-line parsing and de-duplication: `TranscriptTokens`, `TranscriptRecord`, `TranscriptParser` — pure functions over strings, no I/O — **landed** (PR #38, 2026-09-29, OVI-203) | 1, 2 | Low — string fixtures only |
 | 3b | `JsonlUsageProvider` proper: locates transcripts under `ClaudeDataRoots.CandidateRoots`, reads files, produces a `UsageSnapshot` shaped exactly per D6a — **landed** (PR #41, 2026-09-29, OVI-219) | 1, 2, 3a | Medium — real file parsing |
 | 4 | `PlanHistoryProvider` — **landed** (PR pending, 2026-09-29, OVI-222) | 1, 2 | Medium |
-| 5 | `CachedUtilizationProvider`, incl. the vendor-refresh call under G6's three limits | 1, 2 | Medium — G6 open since 2026-09-28; no longer gated |
-| 6 | `CompositeUsageProvider` + `ProviderHealth` (D3, D4) | 3, 4, 5 | Medium — needs ≥2 providers to be meaningful |
+| 5 | `CachedUtilizationProvider`, incl. the vendor-refresh call under G6's three limits — **landed** (PR #43, 2026-09-30, OVI-227) | 1, 2 | Medium — G6 open since 2026-09-28; no longer gated |
+| 6 | `CompositeUsageProvider` + `ProviderHealth` (D3, D4) — **landed** (PR #48, 2026-09-30, OVI-243) | 3, 4, 5 | Medium — needs ≥2 providers to be meaningful |
 
 Slice 6's `ProviderHealth` rows must land in
 [ADR-0001](0001-core-to-skin-data-contract.md) before any skin consumes
@@ -524,15 +527,19 @@ them, per that ADR's own rule.
   The composite's job is choosing between snapshots of the same meters;
   statistics have exactly one source and nothing to choose between.
 
-  **Correction to D3's tier order.** D3 writes the ordering as "`Live` beats
-  `Stale` beats `Estimate` beats `Unavailable`", carried over from the source's
-  four-value enum, and omits `JsonlFallback` — which this repository's enum has
-  and the source's did not. The order is **`Live` > `Stale` > `JsonlFallback` >
-  `Estimate` > `Unavailable`**, matching the enum's own declaration order and
-  ADR-0001's "still trusted above `JsonlFallback`/`Estimate`". The completeness
-  tie-break that follows tier does the load-bearing work here: a JSONL snapshot
-  with every meter unavailable never displaces one carrying real percentages at
-  the same tier, and D3's rule already says so.
+  **Correction to D3's tier order (superseded — D3's text is now current).**
+  D3 originally wrote the ordering as "`Live` beats `Stale` beats `Estimate`
+  beats `Unavailable`", carried over from the source's four-value enum, and
+  omitted `JsonlFallback` — which this repository's enum has and the source's
+  did not. D3 has since been corrected in place to read **`Live` > `Stale` >
+  `JsonlFallback` > `Estimate`, with `Unavailable` excluded from ranking**
+  rather than ranked last (an `Unavailable` reading carries no information to
+  prefer over another `Unavailable` reading), matching the enum's own
+  declaration order and ADR-0001's "still trusted above
+  `JsonlFallback`/`Estimate`". The completeness tie-break that follows tier
+  does the load-bearing work here: a JSONL snapshot with every meter
+  unavailable never displaces one carrying real percentages at the same tier,
+  and D3's rule already says so.
 
   **What slice 3b can now be briefed as:** a `JsonlUsageProvider` that scans
   transcripts via slice 2's `ClaudeDataRoots`, returns `UsageSnapshot`s shaped
@@ -730,3 +737,41 @@ them, per that ADR's own rule.
   `WeeklyResetSource` (`CachedExact`/`UserEntered`, ADR-0001) remains
   documented-but-unimplemented, exactly as before this slice, since a source
   label for the field needs the composite that does not yet exist.
+
+- **2026-09-30 update — slice 6 landed (Kit the Builder, OVI-243).**
+  `src/O-view.Core/Providers/Composite/CompositeUsageProvider.cs` resolves the
+  chain `PlanHistoryProvider` → `CachedUtilizationProvider` →
+  `JsonlUsageProvider` (OAuth deferred) into one `UsageSnapshot`, taking an
+  ordered `IReadOnlyList<NamedUsageProvider>` (a provider paired with the
+  stable name its `ProviderHealth` entry reports under) and an optional
+  `Action<string>? log`. Selection ranks every candidate not itself
+  `DataSourceKind.Unavailable` by D3's rule exactly: tier first (`Live` >
+  `Stale` > `JsonlFallback` > `Estimate`, per D3), then completeness (how many of
+  `SessionUtilizationPercent`/`SessionResetAt`/`WeeklyUtilizationPercent`/
+  `WeeklyResetAt` are not `UsageValueStatus.Unavailable`), then recency
+  (`LastIngestAt`, newest first), then argument order as the final tie-break
+  (earliest-declared provider wins an exact tie). The winning snapshot is
+  returned exactly as its provider built it — no field is relabelled or
+  merged across candidates. Proven by `CompositeUsageProviderTests`
+  (`tests/O-view.Core.Tests/Providers/Composite/`) with one test per
+  tie-break level plus the full tier ordering.
+
+  `ProviderHealth` (`ProviderName`, `Outcome` — `Ok`/`NoData`/`Failed` —,
+  `LastSuccessAt`, `ConsecutiveFailures`) and `DegradedInputCount` (D4) land
+  in `src/O-view.Core/Models/` and are exposed as `CompositeUsageProvider`
+  state — `Health`/`DegradedInputCount` — rather than on `UsageSnapshot`
+  itself, the same pattern ADR-0006 D4's `HistoryStoreState` already uses for
+  a store-health fact that isn't one of a snapshot's own values. `NoData`
+  (provider ran fine, reported `Unavailable`) and `Failed` (provider threw,
+  caught here since D1's never-throw obligation is this type's own contract
+  too) are kept distinct per D4's explicit rule; `ConsecutiveFailures` counts
+  only a `Failed` streak and is left unchanged by a `NoData` poll, since
+  "currently has nothing to report" and "is currently broken" are different
+  facts a skin needs to tell apart. `Action<string>? log` receives one line
+  per swallowed provider exception, in addition to (not instead of) the
+  `Health` entry — proven by a test that a throwing provider's failure is
+  observable through the seam and that omitting `log` still yields
+  `UsageSnapshot.Unavailable` rather than propagating. Both new rows are
+  added to [ADR-0001](0001-core-to-skin-data-contract.md) in this same PR,
+  per this ADR's own rule that they must land there before any skin consumes
+  them — no skin wiring is part of this slice.
