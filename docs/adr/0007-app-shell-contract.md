@@ -303,7 +303,7 @@ shell-level hint would be a competing opinion about the same figure.
 
 | # | Slice | Depends on | Risk |
 |---|---|---|---|
-| 1 | `O-view.App` project + `IClock`/`IAppTimer` + the layering structural test (shell references Core, never a skin; Core references neither) — **landed** (PR #TBD, 2026-09-30, OVI-261) | — | **Lowest** — a project, two interfaces, one test. Start here |
+| 1 | `O-view.App` project + `IClock`/`IAppTimer` + the layering structural test (shell references Core, never a skin; Core references neither) — **landed** (PR #50, 2026-09-30, OVI-261) | — | **Lowest** — a project, two interfaces, one test. Start here |
 | 2 | The poll loop: composition + cadence + failed-poll-keeps-previous-state, against a fake provider | 1, ADR-0005 slice 1 | Low — no real I/O |
 | 3 | D6's two seams, with one skin wired to a fake shell and vice versa | 1 | Low |
 | 4 | Store lifetime + injected directory (ADR-0006 D2) | 1, ADR-0006 slice 1 | Low |
@@ -317,7 +317,7 @@ Slices 1–5 need no board answer beyond this ADR. Slice 6 is where
 "never observed" rows start to bite, and its Linux half should be expected
 to ship unverified and labelled as such.
 
-- **2026-09-30 update — slice 1 landed (Kit the Builder, OVI-261, PR #TBD).**
+- **2026-09-30 update — slice 1 landed (Kit the Builder, OVI-261, PR #50).**
   `src/O-view.App/O-view.App.csproj` adds the third layer as a BCL-only
   `net10.0` project (matching Core's target framework) that references only
   `O-view.Core`. `IClock` (`src/O-view.App/IClock.cs`) and `IAppTimer`
