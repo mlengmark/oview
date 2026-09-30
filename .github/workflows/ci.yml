@@ -76,8 +76,10 @@ jobs:
           set -euo pipefail
           for p in \
             src/O-view.Core/O-view.Core.csproj \
+            src/O-view.App/O-view.App.csproj \
             src/O-view.Linux/O-view.Linux.csproj \
             tests/O-view.Core.Tests/O-view.Core.Tests.csproj \
+            tests/O-view.App.Tests/O-view.App.Tests.csproj \
             tests/O-view.Linux.Tests/O-view.Linux.Tests.csproj
           do
             dotnet build "$p" --configuration Release
@@ -89,6 +91,7 @@ jobs:
           set -euo pipefail
           for p in \
             tests/O-view.Core.Tests/O-view.Core.Tests.csproj \
+            tests/O-view.App.Tests/O-view.App.Tests.csproj \
             tests/O-view.Linux.Tests/O-view.Linux.Tests.csproj
           do
             dotnet test "$p" --no-build --configuration Release --verbosity normal

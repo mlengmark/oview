@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- The third layer between Core and the skins (ADR-0007). Platform-neutral by
+         the same rule as O-view.Core: no Win32, no System.Drawing, no
+         Microsoft.Win32, no OS-conditional branching, and no user-facing display
+         strings, formats, locale, or platform limits (ADR-0007 D1/D2 — the shell
+         owns the process, never a pixel). BCL-only where possible; references
+         O-view.Core only, never a skin (ADR-0007 D1's admission rule, enforced by
+         O-view.App.Tests' layering structural test). Matches Core's target
+         framework so it builds on the Linux net10.0-only CI job as well as the
+         full Windows solution. -->
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>OView.App</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="O-view.App.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\O-view.Core\O-view.Core.csproj" />
+  </ItemGroup>
+
+</Project>
