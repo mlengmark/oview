@@ -625,3 +625,108 @@ them, per that ADR's own rule.
   both skins already handle `DataSourceKind.Live`/`Stale`
   (`src/O-view.Tray/Presentation/PanelTextFormatter.cs`,
   `src/O-view.Linux/Presentation/PanelTextFormatter.cs`).
+
+- **2026-09-30 update — slice 5 landed (Kit the Builder, OVI-227).**
+  `src/O-view.Core/Providers/CachedUsage/CachedUtilization.cs` parses
+  `~/.claude.json` -> `cachedUsageUtilization` (schema CONFIRMED by reading the
+  source repository's `CachedUtilization.cs`/`CachedUtilizationProvider.cs`/
+  `ExtraUsageStatus.cs` at `897777b`, read-only reference, never pushed to):
+  `fetchedAtMs` (required — an undated block is refused wholesale),
+  `utilization.five_hour`/`utilization.seven_day` (each `{utilization: 0-100,
+  resets_at: ISO-8601}`, independently optional), and
+  `utilization.extra_usage.is_enabled` (boolean). No escalation to Rae was
+  needed — the schema was unambiguous in the source evidence.
+  `src/O-view.Core/Providers/CachedUsage/CachedUtilizationProvider.cs`
+  implements `IUsageProvider`: `Live` when the block's age is at most 15
+  minutes, else `Stale`; a bar whose own `resets_at` is at or before `utcNow`
+  is dropped rather than shown as a stale-but-plausible figure (the block is a
+  cache, and can sit unrefreshed across a window boundary); both bars dropped
+  yields `UsageSnapshot.Unavailable` rather than an empty non-`Unavailable`
+  snapshot, so a future composite (slice 6) can still fall through to a source
+  that knows something. `ExtraUsage` is populated only when `is_enabled` is a
+  JSON boolean, stamped with the block's own `fetchedAtMs` (not
+  `LastIngestAt`), consistent with the already-landed `ExtraUsageReading`
+  contract (OVI-168). Every failure — no candidate root, missing file,
+  malformed JSON, an exclusively-locked file — degrades to
+  `UsageSnapshot.Unavailable`, proven by `CachedUtilizationProviderTests`
+  (`tests/O-view.Core.Tests/Providers/CachedUsage/`) including a real
+  `FileShare.None`-locked file.
+
+  **Path resolution reuses `ClaudeDataRoots`, per this slice's brief, rather
+  than porting the source's separate `ClaudeAccount` resolver.** The source
+  keys `.claude.json` resolution off `CLAUDE_CONFIG_DIR` and the user profile
+  via its own type; carrying that in would have been a second, parallel
+  path-guessing scheme next to `ClaudeDataRoots` (D5), reading the environment
+  a second way. Instead `ClaudeDataRoots.ClaudeCliConfigRoots(homeDirectory)`
+  is a new pure function *on that same type*: `.claude.json` sits at the same
+  relative location on both platforms (directly under, or under `.claude/`
+  beside, the home directory), so unlike every other member of
+  `ClaudeDataRoots` it takes no `ClaudeHostPlatform` at all. `CLAUDE_CONFIG_DIR`
+  itself is **not** read anywhere in this repository — Core cannot read
+  environment variables (D5/ADR-0006 D2); a future slice can extend this
+  method with an explicit override parameter if the shell needs to inject one,
+  and this record flags that as the deferral rather than a silent gap.
+  `CachedUtilization.TryReadNewest` then picks the **freshest fetch across
+  every candidate**, not the first that exists — carried forward from the
+  source's own documented trap: Claude Code's 2026-08-24 migration to
+  `~/.claude/.claude.json` left a stale-but-readable stub behind at the old
+  path, and existence-first resolution picked the stub.
+
+  **Deliberately deferred, CONFIRMED present in the source at the same
+  commit, out of scope for this slice:** the source's zero-reading distrust
+  window (an aged zero degrading to unavailable, sharing a threshold with
+  `PlanHistoryProvider`) is not carried forward, because slice 4 did not port
+  the constant it would share, and inventing a fresh one with no measurement
+  behind it would itself be a fabricated number. The account-identity fields
+  (`accountUuid`, and the source's richer `ExtraUsageStatus` — `userDisabled`,
+  `spendLimitReached`, `disabledReason`) are not carried forward either:
+  nothing in this repository's `UsageSnapshot` has a field for account
+  identity, and `ExtraUsageState` (OVI-168) is already the two-member enum
+  this repository settled on, with "unknown" already expressed by the parent
+  `ExtraUsageReading?` being null — adding a richer record here would give
+  Core two ways to say the same thing.
+
+  `src/O-view.Core/Providers/CachedUsage/ClaudeCliRefresher.cs` implements
+  gate G6 (ADR-0005, board-answered 2026-09-28) with all three limits
+  structural rather than aspirational: (i) `UsageArgument` is exactly
+  `"/usage"`, Claude Code's own documented slash command (CONFIRMED, source
+  GitHub issue #234); (ii) it is the only entry ever added to
+  `ProcessStartInfo.ArgumentList`, passed with `UseShellExecute` false — never
+  through a shell, which is the source's own root-cause fix for a confirmed
+  misinterpretation (Git Bash/MSYS path-translating `/usage` into a real
+  prompt); (iii) proven structurally in
+  `CachedUtilizationProviderTests.ConstructorTakesNoUsageCacheRefresherSoARefreshCanNeverGateAReading`
+  that `CachedUtilizationProvider`'s constructor has no
+  `IUsageCacheRefresher`/`ClaudeCliRefresher` parameter at all, so invoking a
+  refresher is strictly the shell's (ADR-0007) polling decision, never inside
+  the read path a poll depends on. `Refresh()` never throws and never reads
+  the system clock (it compares the cached block's own `fetchedAtMs` before
+  and after the run, needing no `utcNow`). Proven by `ClaudeCliRefresherTests`
+  with every process outcome (`Refreshed`, `Unchanged`, `NotFound`,
+  `TimedOut`, `Failed`) driven through an injected `ProcessRun` delegate — no
+  test in this repository spawns a real `claude` process.
+
+  **Deliberately deferred: the source's billed-invocation cost guard**
+  (`BilledTranscriptGuard`/`TranscriptCostGuard`, which snapshots Claude
+  Code's transcript tree before and after the spawn to detect a misrouted
+  `/usage` that reached the model and was billed, measured at roughly 50K
+  tokens per occurrence). This slice's boundary excludes touching
+  `JsonlUsageProvider`/`TranscriptParser` beyond reuse, and that guard would
+  need to read the same transcript tree those own. G6's three limits do not
+  require it — they are satisfied by the argument-list-not-shell design
+  above, which is the source's own confirmed root cause for the one
+  misinterpretation case on record. A future slice may add the guard with its
+  own review of the transcript coupling it would introduce; this one does not
+  invent a narrower substitute.
+
+  **ADR-0006 wiring.** `CachedUtilizationProvider` takes an optional
+  `WeeklyResetAnchorStore` (ADR-0006, PR #40); when a call observes a
+  current, not-yet-passed weekly reset instant, it is saved to that store as
+  a side effect, so the exact instant survives the next stretch the vendor's
+  cache spends stale (measured at 43 hours, ADR-0006). This slice only
+  *writes* the anchor — nothing reads it back into a snapshot yet, per this
+  slice's boundary against `CompositeUsageProvider`/`ProviderHealth` wiring
+  (slice 6). No new field is added to `UsageSnapshot`;
+  `WeeklyResetSource` (`CachedExact`/`UserEntered`, ADR-0001) remains
+  documented-but-unimplemented, exactly as before this slice, since a source
+  label for the field needs the composite that does not yet exist.

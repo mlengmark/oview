@@ -151,4 +151,28 @@ public static class ClaudeDataRoots
             candidates.Add(resolved);
         }
     }
+
+    /// <summary>
+    /// Candidate directories for Claude Code's own config file, <c>.claude.json</c> (ADR-0005
+    /// slice 5) — unlike the layouts above, this one is the same relative shape on both
+    /// authorized platforms, so it takes no <see cref="ClaudeHostPlatform"/> at all: the file
+    /// sits directly under the user's home directory, or under <c>.claude/</c> beside it after
+    /// Claude Code's 2026-08-24 migration to that location. Returns both, most-canonical
+    /// (unmigrated) first — a provider reading this list must not assume existence order means
+    /// freshness order, because a migrated machine can leave a stale stub behind at the old
+    /// path. Returns an empty list when <paramref name="homeDirectory"/> is not supplied, the
+    /// same "never guess a path into existence" rule every other member here follows.
+    /// </summary>
+    public static IReadOnlyList<string> ClaudeCliConfigRoots(string? homeDirectory)
+    {
+        var candidates = new List<string>();
+
+        if (!string.IsNullOrEmpty(homeDirectory))
+        {
+            candidates.Add(homeDirectory);
+            candidates.Add(Path.Combine(homeDirectory, ".claude"));
+        }
+
+        return candidates;
+    }
 }

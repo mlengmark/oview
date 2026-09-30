@@ -172,4 +172,32 @@ public class ClaudeDataRootsTests
 
         Assert.Empty(candidates);
     }
+
+    [Fact]
+    public void ClaudeCliConfigRootsReturnsHomeDirectoryFirstThenItsDotClaudeSubdirectory()
+    {
+        var candidates = ClaudeDataRoots.ClaudeCliConfigRoots(@"C:\Users\fakeuser");
+
+        Assert.Equal(
+            [@"C:\Users\fakeuser", Path.Combine(@"C:\Users\fakeuser", ".claude")],
+            candidates);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public void ClaudeCliConfigRootsReturnsEmptyWithoutAHomeDirectoryRatherThanGuessingAPath(string? homeDirectory)
+    {
+        Assert.Empty(ClaudeDataRoots.ClaudeCliConfigRoots(homeDirectory));
+    }
+
+    [Fact]
+    public void ClaudeCliConfigRootsTakesNoPlatformBecauseTheLayoutIsTheSameOnBoth()
+    {
+        var method = typeof(ClaudeDataRoots).GetMethod(nameof(ClaudeDataRoots.ClaudeCliConfigRoots));
+
+        Assert.NotNull(method);
+        var parameter = Assert.Single(method!.GetParameters());
+        Assert.Equal(typeof(string), parameter.ParameterType);
+    }
 }
