@@ -267,7 +267,7 @@ don't store the sensitive thing in the first place.
 | # | Slice | Depends on | Risk |
 |---|---|---|---|
 | 1 | `WeeklyResetAnchor`-equivalent: one JSON file, atomic write, defensive read, injected directory — **landed** (PR #40, 2026-09-29, OVI-215) | — | **Lowest** — one small file, no dependency, no schema. Start here |
-| 2 | Ledger schema + upsert + query-time daily aggregation | 1 | Medium — first dependency, first schema. Authorised 2026-09-28; the `*.csproj` change makes it a **board** merge |
+| 2 | Ledger schema + upsert + query-time daily aggregation — **landed** (OVI-230, 2026-09-30) | 1 | Medium — first dependency, first schema. Authorised 2026-09-28; the `*.csproj` change makes it a **board** merge |
 | 3 | Corrupt-store handling + `HistoryStoreState` (D3, D4) | 2 | Low once 2 lands |
 | 4 | Ingest audit + wiring to [ADR-0005](0005-data-provider-contract.md)'s `ProviderHealth` | 2, and ADR-0005 slice 6 | Low |
 
@@ -296,3 +296,35 @@ Linux, the one store that matters most is already standing on its own.
   rows this store feeds (`WeeklyResetAt`/`WeeklyResetSource`, both already
   in [ADR-0001](0001-core-to-skin-data-contract.md)) stay unconsumed until
   a later slice wires a provider to this store.
+
+- **2026-09-30 update — slice 2 landed (Kit the Builder, OVI-230).**
+  `src/O-view.Core/Storage/UsageLedgerStore.cs` implements D1's usage
+  ledger over `Microsoft.Data.Sqlite` (board question C, authorised
+  2026-09-28): a directory-injected constructor (D2, same pattern as slice
+  1) opens `usage.db` and creates its single `usage_requests` table
+  (`request_id` primary key, timestamp, model, and the six token fields
+  already defined by `TranscriptRecord`/`TranscriptTokens`, ADR-0005 D6a).
+  `Upsert`/`UpsertRange` write exclusively via `INSERT ... ON CONFLICT
+  (request_id) DO UPDATE`, never a blind `INSERT` — re-ingesting a
+  transcript rewrites identical rows, and when one ingest carries the same
+  `request_id` twice, the last call in file order wins because it is the
+  last write. `QueryDailyUsage(TimeZoneInfo zone)` aggregates (local date ×
+  model) buckets fresh on every call from each row's stored UTC timestamp
+  and the caller-supplied zone — no `utc_date` column exists, so a UTC-day
+  straddle (source issue #211) resolves correctly by construction, not by
+  a special case. `zone` is a parameter rather than `TimeZoneInfo.Local`
+  because [ADR-0001](0001-core-to-skin-data-contract.md) (:464) already
+  treats "which zone" as a skin-owned computation Core only accepts, never
+  resolves. `UsageLedgerStoreTests`
+  (`tests/O-view.Core.Tests/Storage/`) covers an empty store, directory
+  creation, re-ingest idempotency, overwrite-on-changed-fields, file-order
+  duplicate resolution within one `UpsertRange`, multi-request and
+  multi-model grouping, the UTC-day-straddle case explicitly (UTC vs.
+  UTC-8 bucketing the same row on different local dates), token-field
+  summation with absent ephemeral-cache fields treated as zero, and a
+  fresh store instance reading rows a prior instance wrote. `Pooling=false`
+  is set on the connection string so tests can delete their temp directory
+  immediately after use; it has no effect on the store's on-disk
+  behaviour. No corrupt-store handling, `HistoryStoreState`, or
+  `ProviderHealth` wiring is introduced by this slice — both are slice 3's
+  and slice 4's job.

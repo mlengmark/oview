@@ -13,4 +13,11 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- First third-party runtime dependency in this repository, authorised by the board
+         2026-09-28 for the usage ledger only (ADR-0006 board question C). Not a general
+         appetite for dependencies. -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.12" />
+  </ItemGroup>
+
 </Project>
