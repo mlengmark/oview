@@ -303,7 +303,7 @@ shell-level hint would be a competing opinion about the same figure.
 
 | # | Slice | Depends on | Risk |
 |---|---|---|---|
-| 1 | `O-view.App` project + `IClock`/`IAppTimer` + the layering structural test (shell references Core, never a skin; Core references neither) | — | **Lowest** — a project, two interfaces, one test. Start here |
+| 1 | `O-view.App` project + `IClock`/`IAppTimer` + the layering structural test (shell references Core, never a skin; Core references neither) — **landed** (PR #TBD, 2026-09-30, OVI-261) | — | **Lowest** — a project, two interfaces, one test. Start here |
 | 2 | The poll loop: composition + cadence + failed-poll-keeps-previous-state, against a fake provider | 1, ADR-0005 slice 1 | Low — no real I/O |
 | 3 | D6's two seams, with one skin wired to a fake shell and vice versa | 1 | Low |
 | 4 | Store lifetime + injected directory (ADR-0006 D2) | 1, ADR-0006 slice 1 | Low |
@@ -316,3 +316,40 @@ Slices 1–5 need no board answer beyond this ADR. Slice 6 is where
 [ADR-0002](0002-cross-platform-capability-matrix.md)'s Linux
 "never observed" rows start to bite, and its Linux half should be expected
 to ship unverified and labelled as such.
+
+- **2026-09-30 update — slice 1 landed (Kit the Builder, OVI-261, PR #TBD).**
+  `src/O-view.App/O-view.App.csproj` adds the third layer as a BCL-only
+  `net10.0` project (matching Core's target framework) that references only
+  `O-view.Core`. `IClock` (`src/O-view.App/IClock.cs`) and `IAppTimer`
+  (`src/O-view.App/IAppTimer.cs`) carry the shape named in D2 point 4 —
+  used only as a naming/shape reference against the source repository's
+  `O-view.App/IClock.cs`/`IAppTimer.cs` at `897777b`, not copied — with no
+  concrete implementation (`SystemClock`, `ITimerFactory`, a dispatcher- or
+  Avalonia-backed timer) in this slice; that is explicitly deferred to
+  slice 2's poll loop work. `tests/O-view.App.Tests/LayeringStructuralTests.cs`
+  encodes D1's admission rule as a durable check: it reads the
+  `ProjectReference` items out of `O-view.Core.csproj` and
+  `O-view.App.csproj` directly (rather than reflecting on the built
+  assemblies) and asserts Core references neither App nor a skin, App
+  references Core but never a skin. Reflection on `Assembly
+  .GetReferencedAssemblies()` was tried first and rejected: because App
+  currently has no code that actually uses a Core type, the compiler elides
+  the unused assembly reference from the built DLL even though the
+  `ProjectReference` — and the boundary it represents — still stands, which
+  would have made the positive "App references Core" assertion flicker
+  false as soon as it passed. Verified live: temporarily adding
+  `<ProjectReference Include="..\O-view.Tray\O-view.Tray.csproj" />` to
+  `O-view.App.csproj` fails restore with `NU1201` (`net10.0` cannot
+  reference `net10.0-windows7.0`) before the structural test even runs,
+  confirming the target-framework choice is itself a second, independent
+  guard on top of the test. `O-view.App` and `O-view.App.Tests` are added
+  to `O-view.slnx` and to both CI jobs' explicit project lists in
+  `.github/workflows/ci.yml` — the Linux job lists `net10.0` projects by
+  path rather than using the solution file, so both needed a line each.
+  `dotnet build`/`dotnet test` run clean on the full solution (354 tests
+  passed, 0 failed, across all five test projects including the new
+  `O-view.App.Tests`) and on the six-project Linux-job subset individually.
+  Not verified: an actual Linux run of this CI job (no Linux runner
+  available here; CONFIRMED only that the same six projects build
+  individually on this Windows machine with `net10.0`, not
+  `net10.0-windows`, targets).
