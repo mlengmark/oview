@@ -35,8 +35,19 @@ public class LayeringStructuralTests
         var path = Path.Combine(SrcDirectory, projectFolder, projectFileName);
         var document = XDocument.Load(path);
         return document.Descendants("ProjectReference")
-            .Select(element => Path.GetFileNameWithoutExtension(element.Attribute("Include")!.Value))
+            .Select(element => ProjectNameFromInclude(element.Attribute("Include")!.Value))
             .ToArray();
+    }
+
+    // MSBuild Include paths are committed with Windows-style backslashes regardless of
+    // the OS that later reads them. Path.GetFileNameWithoutExtension only recognises '/'
+    // as a separator on non-Windows runtimes, so on Linux it strips the .csproj extension
+    // but leaves the directory portion in place. Normalise separators ourselves instead of
+    // relying on the OS-specific Path behaviour.
+    private static string ProjectNameFromInclude(string include)
+    {
+        var normalized = include.Replace('\\', '/');
+        return Path.GetFileNameWithoutExtension(normalized);
     }
 
     [Fact]
