@@ -1,3 +1,4 @@
+using OView.Core.Models;
 using OView.Core.Storage;
 
 namespace OView.Core.Tests.Storage;
@@ -132,5 +133,62 @@ public sealed class WeeklyResetAnchorStoreTests : IDisposable
         store.Save(anchor);
 
         Assert.Equal(anchor, store.Read());
+    }
+
+    [Fact]
+    public void StateIsOkBeforeAnyCorruptionIsEverEncountered()
+    {
+        var store = new WeeklyResetAnchorStore(_directory);
+
+        store.Save(DateTimeOffset.UtcNow);
+        store.Read();
+
+        Assert.Equal(HistoryStoreState.Ok, store.State);
+    }
+
+    [Fact]
+    public void ReadMovesAnUnparseableFileAsideRatherThanLeavingOrDeletingIt()
+    {
+        Directory.CreateDirectory(_directory);
+        var path = Path.Combine(_directory, "weekly-reset.json");
+        File.WriteAllText(path, "{ this is not valid json");
+        var store = new WeeklyResetAnchorStore(_directory);
+
+        store.Read();
+
+        Assert.False(File.Exists(path));
+        Assert.True(File.Exists(path + ".corrupt"));
+        Assert.Equal("{ this is not valid json", File.ReadAllText(path + ".corrupt"));
+    }
+
+    [Fact]
+    public void ReadReportsRebuiltAfterMovingACorruptFileAside()
+    {
+        Directory.CreateDirectory(_directory);
+        File.WriteAllText(Path.Combine(_directory, "weekly-reset.json"), "{ \"anchorUtc\": \"not-a-timestamp\" }");
+        var store = new WeeklyResetAnchorStore(_directory);
+
+        store.Read();
+
+        Assert.Equal(HistoryStoreState.Rebuilt, store.State);
+    }
+
+    [Fact]
+    public void ReadReportsUnavailableWhenTheCorruptFileCannotBeMovedAside()
+    {
+        Directory.CreateDirectory(_directory);
+        var path = Path.Combine(_directory, "weekly-reset.json");
+        File.WriteAllText(path, "{ this is not valid json");
+        // Occupy the exact backup destination with a directory: File.Move onto an existing
+        // directory always fails, on every platform, regardless of permissions — the
+        // deterministic way to force the "still can't be recovered" branch in a test.
+        Directory.CreateDirectory(path + ".corrupt");
+        var store = new WeeklyResetAnchorStore(_directory);
+
+        var result = store.Read();
+
+        Assert.Null(result);
+        Assert.Equal(HistoryStoreState.Unavailable, store.State);
+        Assert.True(File.Exists(path));
     }
 }

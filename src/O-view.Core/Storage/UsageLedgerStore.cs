@@ -1,5 +1,6 @@
 using System.Globalization;
 using Microsoft.Data.Sqlite;
+using OView.Core.Models;
 using OView.Core.Providers.Jsonl;
 
 namespace OView.Core.Storage;
@@ -24,9 +25,13 @@ namespace OView.Core.Storage;
 /// a local day that straddles two UTC days).</para>
 ///
 /// <para><b>ADR-0006 D2 — this type never resolves its own path.</b> It takes a directory, like
-/// <see cref="WeeklyResetAnchorStore"/>; the shell (ADR-0007) decides where that directory is.
-/// Corrupt-database handling (D3) and <c>HistoryStoreState</c> (D4) are slice 3's job, not
-/// this one's.</para>
+/// <see cref="WeeklyResetAnchorStore"/>; the shell (ADR-0007) decides where that directory is.</para>
+///
+/// <para><b>ADR-0006 D3/D4 — a database that cannot be opened is corrupt, not fatal.</b> If the
+/// schema cannot be created against the file already on disk, that file is moved aside (D3.3)
+/// and a fresh empty database is created in its place. <see cref="State"/> reports whether that
+/// happened this session, or whether the store still cannot be trusted after the attempt
+/// (OVI-236).</para>
 /// </summary>
 public sealed class UsageLedgerStore
 {
@@ -34,34 +39,64 @@ public sealed class UsageLedgerStore
 
     private readonly string _connectionString;
 
+    /// <summary>
+    /// Whether this store was readable and writable this session (<see cref="HistoryStoreState.Ok"/>),
+    /// found corrupt and moved aside in favour of a fresh empty database
+    /// (<see cref="HistoryStoreState.Rebuilt"/>), or still cannot be trusted after that recovery
+    /// attempt (<see cref="HistoryStoreState.Unavailable"/>) — ADR-0006 D4.
+    /// </summary>
+    public HistoryStoreState State { get; private set; } = HistoryStoreState.Ok;
+
     /// <param name="directory">The directory the store's database file lives in. Never resolved
     /// internally (ADR-0006 D2) — the caller (ultimately the shell) decides where this is.</param>
     public UsageLedgerStore(string directory)
     {
         Directory.CreateDirectory(directory);
 
+        var path = Path.Combine(directory, FileName);
         _connectionString = new SqliteConnectionStringBuilder
         {
-            DataSource = Path.Combine(directory, FileName),
+            DataSource = path,
             Pooling = false,
         }.ToString();
 
-        using var connection = OpenConnection();
-        using var command = connection.CreateCommand();
-        command.CommandText = """
-            CREATE TABLE IF NOT EXISTS usage_requests (
-                request_id TEXT PRIMARY KEY,
-                timestamp_utc TEXT NOT NULL,
-                model TEXT NOT NULL,
-                input_tokens INTEGER NOT NULL,
-                output_tokens INTEGER NOT NULL,
-                cache_creation_input_tokens INTEGER NOT NULL,
-                cache_read_input_tokens INTEGER NOT NULL,
-                cache_creation_ephemeral_5m_tokens INTEGER NULL,
-                cache_creation_ephemeral_1h_tokens INTEGER NULL
-            );
-            """;
-        command.ExecuteNonQuery();
+        if (!TryCreateSchema())
+        {
+            State = CorruptStoreRecovery.MoveAsideIfPresent(path);
+
+            if (State != HistoryStoreState.Unavailable && !TryCreateSchema())
+            {
+                State = HistoryStoreState.Unavailable;
+            }
+        }
+    }
+
+    private bool TryCreateSchema()
+    {
+        try
+        {
+            using var connection = OpenConnection();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                CREATE TABLE IF NOT EXISTS usage_requests (
+                    request_id TEXT PRIMARY KEY,
+                    timestamp_utc TEXT NOT NULL,
+                    model TEXT NOT NULL,
+                    input_tokens INTEGER NOT NULL,
+                    output_tokens INTEGER NOT NULL,
+                    cache_creation_input_tokens INTEGER NOT NULL,
+                    cache_read_input_tokens INTEGER NOT NULL,
+                    cache_creation_ephemeral_5m_tokens INTEGER NULL,
+                    cache_creation_ephemeral_1h_tokens INTEGER NULL
+                );
+                """;
+            command.ExecuteNonQuery();
+            return true;
+        }
+        catch (Exception ex) when (ex is SqliteException or IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
     }
 
     /// <summary>

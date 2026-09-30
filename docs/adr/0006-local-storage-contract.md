@@ -328,3 +328,28 @@ Linux, the one store that matters most is already standing on its own.
   behaviour. No corrupt-store handling, `HistoryStoreState`, or
   `ProviderHealth` wiring is introduced by this slice — both are slice 3's
   and slice 4's job.
+
+- **2026-09-30 update — slice 3 landed (Kit the Builder, OVI-236).** Both
+  `WeeklyResetAnchorStore` and `UsageLedgerStore` now implement D3.3 and D4.
+  A store found corrupt on open — an unparseable JSON file for the anchor
+  store, or a database file SQLite cannot read for the ledger store — is
+  moved aside to `{path}.corrupt` (a fixed name, chosen as the simplest
+  convention since no source-repository `CorruptBackups` naming scheme was
+  available to carry forward; a second corruption in a later session
+  overwrites the previous backup rather than accumulating one file per
+  incident) before a fresh empty store is created in its place. Each store
+  exposes a new `State` property of the new `OView.Core.Models.HistoryStoreState`
+  enum (`Ok`/`Rebuilt`/`Unavailable`), now a real row in
+  [ADR-0001](0001-core-to-skin-data-contract.md)'s contract table:
+  `Rebuilt` when a corrupt copy was moved aside this session, `Unavailable`
+  when the store still cannot be read or written after that recovery
+  attempt (for example, the corrupt copy could not even be moved aside),
+  `Ok` otherwise. New tests in both stores' existing suites
+  (`tests/O-view.Core.Tests/Storage/`) cover a corrupt file/database being
+  moved aside rather than deleted, `Rebuilt` after successful recovery, and
+  `Unavailable` when recovery itself fails — the last proven deterministically
+  and cross-platform by pre-occupying the exact backup path with a
+  directory, since `File.Move` onto an existing directory always fails
+  regardless of OS or permissions. No `ProviderHealth` wiring happens here
+  (slice 4's job, blocked on ADR-0005 slice 6); nothing yet writes
+  `HistoryStoreState` onto a `UsageSnapshot` — that wiring is also slice 4's.
