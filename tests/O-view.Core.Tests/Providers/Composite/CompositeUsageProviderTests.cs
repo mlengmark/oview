@@ -1,6 +1,7 @@
 using OView.Core.Models;
 using OView.Core.Providers;
 using OView.Core.Providers.Composite;
+using OView.Core.Storage;
 
 namespace OView.Core.Tests.Providers.Composite;
 
@@ -269,5 +270,86 @@ public sealed class CompositeUsageProviderTests
     private sealed class DelegateProvider(Func<DateTimeOffset, UsageSnapshot> getSnapshot) : IUsageProvider
     {
         public UsageSnapshot GetSnapshot(DateTimeOffset utcNow) => getSnapshot(utcNow);
+    }
+
+    private sealed class TempDirectory : IDisposable
+    {
+        public string Path { get; } = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "ovi252-" + Guid.NewGuid().ToString("N"));
+
+        public void Dispose()
+        {
+            if (Directory.Exists(Path))
+            {
+                Directory.Delete(Path, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void WithNoAuditStoreHealthStartsAtNeverPolledEveryConstruction()
+    {
+        var composite = new CompositeUsageProvider([
+            new NamedUsageProvider("p", new ThrowingProvider(new InvalidOperationException("boom"))),
+        ]);
+
+        composite.GetSnapshot(UtcNow);
+
+        Assert.Null(composite.Health.Single().LastSuccessAt);
+        Assert.Equal(1, composite.Health.Single().ConsecutiveFailures);
+    }
+
+    [Fact]
+    public void AuditStoreSeedsHealthFromPersistedHistoryAcrossNewInstances()
+    {
+        using var dir = new TempDirectory();
+        var store = new IngestAuditStore(dir.Path);
+        var first = new CompositeUsageProvider(
+            [new NamedUsageProvider("p", new ThrowingProvider(new InvalidOperationException("boom")))],
+            auditStore: store);
+        first.GetSnapshot(UtcNow);
+        first.GetSnapshot(UtcNow.AddMinutes(1));
+
+        // A fresh instance (simulating a process restart) reads the same directory.
+        var second = new CompositeUsageProvider(
+            [new NamedUsageProvider("p", new ThrowingProvider(new InvalidOperationException("boom")))],
+            auditStore: new IngestAuditStore(dir.Path));
+
+        second.GetSnapshot(UtcNow.AddMinutes(2));
+
+        Assert.Equal(3, second.Health.Single().ConsecutiveFailures);
+    }
+
+    [Fact]
+    public void AuditStoreRecordsLastSuccessAcrossNewInstances()
+    {
+        using var dir = new TempDirectory();
+        var successAt = UtcNow;
+        var first = new CompositeUsageProvider(
+            [new NamedUsageProvider("p", new StubProvider(Snapshot(DataSourceKind.Live, successAt)))],
+            auditStore: new IngestAuditStore(dir.Path));
+        first.GetSnapshot(successAt);
+
+        var second = new CompositeUsageProvider(
+            [new NamedUsageProvider("p", new ThrowingProvider(new InvalidOperationException("boom")))],
+            auditStore: new IngestAuditStore(dir.Path));
+        second.GetSnapshot(successAt.AddMinutes(5));
+
+        Assert.Equal(successAt, second.Health.Single().LastSuccessAt);
+    }
+
+    [Fact]
+    public void AuditStoreSaveFailureNeverThrowsFromGetSnapshot()
+    {
+        using var dir = new TempDirectory();
+        // Occupy the file path with a directory so Save's temp-file write fails deterministically.
+        Directory.CreateDirectory(dir.Path);
+        Directory.CreateDirectory(System.IO.Path.Combine(dir.Path, "ingest-audit.json.tmp"));
+        var composite = new CompositeUsageProvider(
+            [new NamedUsageProvider("p", new StubProvider(Snapshot(DataSourceKind.Live, UtcNow)))],
+            auditStore: new IngestAuditStore(dir.Path));
+
+        var exception = Record.Exception(() => composite.GetSnapshot(UtcNow));
+
+        Assert.Null(exception);
     }
 }

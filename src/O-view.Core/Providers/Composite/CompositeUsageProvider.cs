@@ -1,4 +1,5 @@
 using OView.Core.Models;
+using OView.Core.Storage;
 
 namespace OView.Core.Providers.Composite;
 
@@ -37,11 +38,20 @@ namespace OView.Core.Providers.Composite;
 /// failed ingestion sit behind a panel reading <c>status: Ok</c> (CONFIRMED, D4). The seam is
 /// diagnostics-bundle detail, in addition to <see cref="Health"/> — not a replacement for it,
 /// since a log file the user never opens is not something a skin can act on.</para>
+///
+/// <para><b>Health survives a restart when an <see cref="IngestAuditStore"/> is supplied
+/// (ADR-0006 D1, slice 4).</b> Without one, <see cref="_lastSuccessAt"/> and
+/// <see cref="_consecutiveFailures"/> start at "never polled" every time this type is
+/// constructed — indistinguishable from a provider that has genuinely never succeeded. With
+/// one, the constructor seeds both from the store's persisted rows, and every
+/// <see cref="GetSnapshot"/> call saves the updated rows back (best-effort; a failed save never
+/// throws and never blocks the poll, matching the store's own D3 contract).</para>
 /// </summary>
 public sealed class CompositeUsageProvider : IUsageProvider
 {
     private readonly IReadOnlyList<NamedUsageProvider> _providers;
     private readonly Action<string>? _log;
+    private readonly IngestAuditStore? _auditStore;
     private readonly Dictionary<string, DateTimeOffset?> _lastSuccessAt;
     private readonly Dictionary<string, int> _consecutiveFailures;
 
@@ -51,7 +61,14 @@ public sealed class CompositeUsageProvider : IUsageProvider
     /// to that provider's <see cref="ProviderHealth"/> entry (D4). Optional — a caller with no
     /// diagnostics bundle to write to may omit it; <see cref="Health"/> still reports the
     /// failure either way.</param>
-    public CompositeUsageProvider(IReadOnlyList<NamedUsageProvider> providers, Action<string>? log = null)
+    /// <param name="auditStore">Backs <see cref="Health"/>'s <c>LastSuccessAt</c>/
+    /// <c>ConsecutiveFailures</c> with persisted history (ADR-0006 D1) instead of in-memory-only
+    /// state. Optional — a caller with no store to inject (e.g. a unit test) gets the previous
+    /// in-memory-only behaviour.</param>
+    public CompositeUsageProvider(
+        IReadOnlyList<NamedUsageProvider> providers,
+        Action<string>? log = null,
+        IngestAuditStore? auditStore = null)
     {
         if (providers is null || providers.Count == 0)
         {
@@ -60,12 +77,23 @@ public sealed class CompositeUsageProvider : IUsageProvider
 
         _providers = providers;
         _log = log;
+        _auditStore = auditStore;
         _lastSuccessAt = new Dictionary<string, DateTimeOffset?>();
         _consecutiveFailures = new Dictionary<string, int>();
+
+        var persisted = auditStore?.ReadAll();
         foreach (var named in providers)
         {
-            _lastSuccessAt[named.Name] = null;
-            _consecutiveFailures[named.Name] = 0;
+            if (persisted is not null && persisted.TryGetValue(named.Name, out var record))
+            {
+                _lastSuccessAt[named.Name] = record.LastSuccessAt;
+                _consecutiveFailures[named.Name] = record.ConsecutiveFailures;
+            }
+            else
+            {
+                _lastSuccessAt[named.Name] = null;
+                _consecutiveFailures[named.Name] = 0;
+            }
         }
     }
 
@@ -161,6 +189,15 @@ public sealed class CompositeUsageProvider : IUsageProvider
         }
 
         Health = health;
+
+        if (_auditStore is not null)
+        {
+            var records = _providers.ToDictionary(
+                named => named.Name,
+                named => new IngestAuditRecord(_lastSuccessAt[named.Name], _consecutiveFailures[named.Name]));
+            _auditStore.Save(records);
+        }
+
         return bestSnapshot ?? UsageSnapshot.Unavailable;
     }
 
