@@ -247,8 +247,12 @@ don't store the sensitive thing in the first place.
 - The 31-day figures in [ADR-0001](0001-core-to-skin-data-contract.md)
   become reachable, which they are not today at any provider quality.
 - D2's injected directory means every storage test runs against a temp
-  directory on either CI runner — relevant because this repository has no
-  non-Windows CI (CONFIRMED — `CLAUDE.md`).
+  directory on either CI runner, so the storage tests are runner-agnostic
+  (CONFIRMED — `.github/workflows/ci.yml`). *Amended 2026-09-30 (OVI-232):
+  this bullet previously said "this repository has no non-Windows CI
+  (CONFIRMED — `CLAUDE.md`)". That was stale. CI has had an `ubuntu-latest`
+  job for the four `net10.0` projects since ADR-0004 option (a'); what no CI
+  runner covers is a real Linux **desktop**, not Linux itself.*
 - D3 plus D4 make store failure a thing the product can say out loud rather
   than a graph that mysteriously empties.
 
@@ -256,7 +260,12 @@ don't store the sensitive thing in the first place.
 - SQLite (board question C, answered *yes* 2026-09-28) is this repository's
   first third-party runtime dependency. Everything that follows from that is
   now owned rather than hypothetical: a native library per runtime
-  identifier, and a Linux packaging story no one has built yet.
+  identifier, and a Linux packaging story no one has built yet. Narrowed
+  2026-09-30 (OVI-232): the `dotnet build`/`dotnet test` half of this is no
+  longer a risk — `Microsoft.Data.Sqlite` restores, builds and runs on
+  `ubuntu-latest` CI (CONFIRMED, see the slice-2 note below). What stays open
+  is self-contained/RID-specific publishing and the `.deb`/tarball story,
+  which CI does not exercise (**INFERRED**).
 - Unbounded growth (D6) is accepted without a measurement. This is the
   weakest claim in this record and is labelled as such.
 - Every Linux path in D2 is **INFERRED**. The first real Linux run may
@@ -328,6 +337,18 @@ Linux, the one store that matters most is already standing on its own.
   behaviour. No corrupt-store handling, `HistoryStoreState`, or
   `ProviderHealth` wiring is introduced by this slice — both are slice 3's
   and slice 4's job.
+
+  **Linux status (added 2026-09-30, OVI-232).** CONFIRMED: the repository's
+  `ubuntu-latest` CI job restores and builds `O-view.Core` with the new
+  `Microsoft.Data.Sqlite 10.0.12` reference and runs all 10
+  `UsageLedgerStoreTests` green there (run 36681831049, head
+  `c57c160`) — the store opens a database, creates its schema, upserts and
+  aggregates on Linux. Still untried (**INFERRED**, not a CI gap this job can
+  close): behaviour on a real Linux desktop — file locking and concurrent
+  access against a store in a live `$XDG_DATA_HOME` directory rather than a
+  per-test temp directory, and RID-specific publishing/packaging of the
+  native library. PR #44's own "not run on Linux" risk line was stale on the
+  same point and was corrected in its body before merge.
 
 - **2026-09-30 update — slice 3 landed (Kit the Builder, OVI-236).** Both
   `WeeklyResetAnchorStore` and `UsageLedgerStore` now implement D3.3 and D4.
