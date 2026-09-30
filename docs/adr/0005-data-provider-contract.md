@@ -327,7 +327,7 @@ question 4 recommendation:
 | 3b | `JsonlUsageProvider` proper: locates transcripts under `ClaudeDataRoots.CandidateRoots`, reads files, produces a `UsageSnapshot` shaped exactly per D6a — **landed** (PR #41, 2026-09-29, OVI-219) | 1, 2, 3a | Medium — real file parsing |
 | 4 | `PlanHistoryProvider` — **landed** (PR pending, 2026-09-29, OVI-222) | 1, 2 | Medium |
 | 5 | `CachedUtilizationProvider`, incl. the vendor-refresh call under G6's three limits — **landed** (PR #43, 2026-09-30, OVI-227) | 1, 2 | Medium — G6 open since 2026-09-28; no longer gated |
-| 6 | `CompositeUsageProvider` + `ProviderHealth` (D3, D4) — **landed** (PR pending, 2026-09-30, OVI-243) | 3, 4, 5 | Medium — needs ≥2 providers to be meaningful |
+| 6 | `CompositeUsageProvider` + `ProviderHealth` (D3, D4) — **landed** (PR #48, 2026-09-30, OVI-243) | 3, 4, 5 | Medium — needs ≥2 providers to be meaningful |
 
 Slice 6's `ProviderHealth` rows must land in
 [ADR-0001](0001-core-to-skin-data-contract.md) before any skin consumes
