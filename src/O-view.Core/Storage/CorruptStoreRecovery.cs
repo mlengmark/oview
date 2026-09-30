@@ -19,20 +19,24 @@ internal static class CorruptStoreRecovery
 
     /// <summary>
     /// Moves the file at <paramref name="path"/> aside if it exists. Returns
-    /// <see cref="HistoryStoreState.Rebuilt"/> when the move succeeded (or there was nothing to
-    /// move — a first-ever write follows the same "fresh store" path), or
-    /// <see cref="HistoryStoreState.Unavailable"/> when the corrupt copy could not even be moved
+    /// <see cref="HistoryStoreState.Rebuilt"/> only when a file actually existed and was moved —
+    /// the ADR-0006 D4 contract meaning of <c>Rebuilt</c> is "found corrupt and moved aside", a
+    /// reason the user should be allowed to know. Returns <see cref="HistoryStoreState.Ok"/> when
+    /// there was nothing to move aside (a caller retrying after some other, unrelated failure with
+    /// no corrupt file on disk did not actually recover from corruption). Returns
+    /// <see cref="HistoryStoreState.Unavailable"/> when a corrupt copy could not even be moved
     /// aside, which means the store cannot be trusted this session. Never throws.
     /// </summary>
     public static HistoryStoreState MoveAsideIfPresent(string path)
     {
         try
         {
-            if (File.Exists(path))
+            if (!File.Exists(path))
             {
-                File.Move(path, path + CorruptSuffix, overwrite: true);
+                return HistoryStoreState.Ok;
             }
 
+            File.Move(path, path + CorruptSuffix, overwrite: true);
             return HistoryStoreState.Rebuilt;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
