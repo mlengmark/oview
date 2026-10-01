@@ -310,7 +310,7 @@ shell-level hint would be a competing opinion about the same figure.
 | 5 | Shell settings file (D4, behaviour settings only) — **landed** (PR #54, 2026-10-01, OVI-280) | 1 | Low |
 | 6 | Single-instance + startup registration per D5, one skin at a time | 1, 3 | Medium — first real OS mechanism; Windows first, since Linux is unverifiable here |
 | 7 | Update-check fetch + one-cooldown-per-process (D3) | 1, 2 | Medium — first HTTP in this repository |
-| 8 | Diagnostics bundle + redaction | 1, 4 | Low |
+| 8 | Diagnostics bundle + redaction — **landed** (PR #57, 2026-10-01, OVI-292) | 1, 4 | Low |
 
 Slices 1–5 need no board answer beyond this ADR. Slice 6 is where
 [ADR-0002](0002-cross-platform-capability-matrix.md)'s Linux
