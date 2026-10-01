@@ -304,7 +304,7 @@ shell-level hint would be a competing opinion about the same figure.
 | # | Slice | Depends on | Risk |
 |---|---|---|---|
 | 1 | `O-view.App` project + `IClock`/`IAppTimer` + the layering structural test (shell references Core, never a skin; Core references neither) — **landed** (PR #50, 2026-09-30, OVI-261) | — | **Lowest** — a project, two interfaces, one test. Start here |
-| 2 | The poll loop: composition + cadence + failed-poll-keeps-previous-state, against a fake provider | 1, ADR-0005 slice 1 | Low — no real I/O |
+| 2 | The poll loop: composition + cadence + failed-poll-keeps-previous-state, against a fake provider — **landed** (PR #51, 2026-10-01, OVI-268) | 1, ADR-0005 slice 1 | Low — no real I/O |
 | 3 | D6's two seams, with one skin wired to a fake shell and vice versa | 1 | Low |
 | 4 | Store lifetime + injected directory (ADR-0006 D2) | 1, ADR-0006 slice 1 | Low |
 | 5 | Shell settings file (D4, behaviour settings only) | 1 | Low |
@@ -353,3 +353,39 @@ to ship unverified and labelled as such.
   available here; CONFIRMED only that the same six projects build
   individually on this Windows machine with `net10.0`, not
   `net10.0-windows`, targets).
+
+- **2026-10-01 update — slice 2 landed (Kit the Builder, OVI-268, PR #51).**
+  `IAppTimer` gained an `Elapsed` event, which slice 1 did not ship — a
+  repeating timer with no way to be notified of a tick cannot drive a poll
+  loop. This is a deliberate, documented extension of slice 1's shape, not a
+  design change: `IClock`/`IAppTimer`'s own doc comments now point at this
+  slice's implementations. `src/O-view.App/SystemClock.cs` and
+  `src/O-view.App/AppTimer.cs` are the first real implementations —
+  `SystemClock` wraps `DateTimeOffset.UtcNow`; `AppTimer` wraps
+  `System.Threading.Timer`, not a UI-framework dispatcher timer, keeping the
+  seam's whole point (no named UI framework) intact. `UsagePollLoop`
+  (`src/O-view.App/UsagePollLoop.cs`) is the composition root D2 point 4
+  describes: it takes an `IUsageProvider` (ADR-0005), an `IClock`, an
+  `IAppTimer`, and a cadence (`TimeSpan`, a constructor parameter — slice 5's
+  settings file does not exist yet, so no default is invented here), wires
+  the timer's `Elapsed` event to a poll, and exposes `CurrentSnapshot`. A
+  poll that returns normally — including `UsageSnapshot.Unavailable`, which
+  is a legitimate "no data" answer — always replaces `CurrentSnapshot`; a
+  poll that throws is caught and leaves it untouched (D2 point 9). This is
+  defense in depth, not reliance on `IUsageProvider`'s own never-throw
+  contract (ADR-0005 D1) being violated: the shell's obligation not to crash
+  the process does not get to assume every provider upholds it.
+  `tests/O-view.App.Tests/UsagePollLoopTests.cs` adds 6 tests against fakes
+  only (`FakeUsageProvider`, `FakeClock`, a hand-rolled `FakeAppTimer` that
+  raises `Elapsed` on command) — no real timer or network — covering a
+  normal tick, the Unavailable-before-first-tick starting state, a throwing
+  provider leaving the previous snapshot in place and the loop continuing to
+  poll afterward, and `Dispose` stopping/unsubscribing/disposing the timer.
+  `dotnet test O-view.slnx` passes in full: 360 tests (up from 354 at slice
+  1), including 12 in `O-view.App.Tests` (up from 6). Deferred to later
+  slices, per the slicing table: store/anchor lifetime (4), a settings file
+  or settings-driven cadence (5), single-instance/startup registration (6),
+  the update-check fetch (7), the diagnostics bundle (8), and threshold/
+  off-plan event decisions (D2 point 6, out of scope for this ADR's shell
+  layer as currently sliced). Not verified: an actual Linux run (no Linux
+  runner available here; same CONFIRMED/INFERRED boundary as slice 1).
