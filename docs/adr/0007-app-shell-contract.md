@@ -307,7 +307,7 @@ shell-level hint would be a competing opinion about the same figure.
 | 2 | The poll loop: composition + cadence + failed-poll-keeps-previous-state, against a fake provider — **landed** (PR #51, 2026-10-01, OVI-268) | 1, ADR-0005 slice 1 | Low — no real I/O |
 | 3 | D6's two seams, with one skin wired to a fake shell and vice versa — **landed** (PR #52, 2026-10-01, OVI-273) | 1 | Low |
 | 4 | Store lifetime + injected directory (ADR-0006 D2) — **landed** (PR #53, 2026-10-01, OVI-277) | 1, ADR-0006 slice 1 | Low |
-| 5 | Shell settings file (D4, behaviour settings only) | 1 | Low |
+| 5 | Shell settings file (D4, behaviour settings only) — **landed** (PR #54, 2026-10-01, OVI-280) | 1 | Low |
 | 6 | Single-instance + startup registration per D5, one skin at a time | 1, 3 | Medium — first real OS mechanism; Windows first, since Linux is unverifiable here |
 | 7 | Update-check fetch + one-cooldown-per-process (D3) | 1, 2 | Medium — first HTTP in this repository |
 | 8 | Diagnostics bundle + redaction | 1, 4 | Low |
@@ -473,3 +473,54 @@ to ship unverified and labelled as such.
   covers the resolution logic only, and `StoreLifetimeTests` covers store
   construction only, against temp directories in both cases, not the two
   composed together against a real OS-provided path.
+
+- **2026-10-01 update — slice 5 landed (Kit the Builder, OVI-280, PR #54).**
+  `src/O-view.App/ShellSettings.cs` adds a `sealed record` carrying exactly
+  D4's three behaviour settings — `AlertThresholdPercent` (int),
+  `PollCadence` (`TimeSpan`), `AutoUpdateEnabled` (bool) — and nothing else:
+  not the usage ledger or weekly-reset anchor (Core's stores, ADR-0006 D1),
+  not run-at-startup (the OS stays the sole owner, D4's explicit rejection,
+  never mirrored here), not a per-skin perceptual preference such as widget
+  position (D4's other explicit rejection, each skin's own file).
+  `ShellSettings.Default` gives the poll loop's previously-undefaulted
+  cadence (slice 2's landing note) a value: 60 seconds, CONFIRMED against
+  the source app's shipping cadence (D6, OVI-4's live run). The other two
+  defaults — 80% alert threshold, auto-update off — are INFERRED,
+  reasonable starting points with no confirmed source-app value to carry
+  forward; both are inert until a later slice ships the settings UI that
+  lets a user change them. `src/O-view.App/ShellSettingsStore.cs` is a
+  file-backed store in the same shape as
+  `OView.Core.Storage.WeeklyResetAnchorStore`: takes a directory and never
+  resolves its own (the shell calls it with
+  `StoreDirectoryResolver.ResolveDefault()`'s result, reusing slice 4's
+  resolver rather than resolving a second time), writes atomically (temp
+  file then replace), and `Load()` degrades to `ShellSettings.Default`
+  rather than throwing on a missing file, a corrupt/unparseable file, or a
+  zero-or-negative stored cadence. No settings UI ships in this slice — the
+  seam only: the type, the store, and the defaults. No run-at-startup
+  mirroring, no widget-position or per-skin preference handling, no
+  single-instance/startup-registration work, no update-check fetch — all
+  explicitly out of scope per the slicing table. `UsagePollLoop`'s public
+  constructor is unchanged (cadence stays an explicit parameter, as slice 2
+  shipped it); giving the poll loop a default did not require touching its
+  shape, since the default now lives in `ShellSettings.Default` and would
+  be read by whatever later slice wires a `ShellSettingsStore` into the
+  shell's composition root — no such composition root exists yet (deferred,
+  same as `StoreLifetime.CreateDefault()`'s caller). Wiring the poll loop
+  and the stores together into one shell composition root is not this
+  slice's scope and is not yet tracked as its own slice; flagging it here
+  for Chief Gary II to scope. `tests/O-view.App.Tests/ShellSettingsStoreTests.cs`
+  (6 tests: missing-file-uses-defaults, save-then-load round trip, directory
+  creation on save, overwrite-on-second-save, corrupt-JSON-uses-defaults,
+  zero-cadence-uses-defaults) adds 6 tests with no real user-profile I/O,
+  each against its own temp directory. `dotnet test O-view.slnx` passes in
+  full: 387 tests (up from 381 at slice 4), including 39 in
+  `O-view.App.Tests` (up from 33). `LayeringStructuralTests` passes
+  unmodified — `O-view.App.csproj` still references only `O-view.Core`, no
+  new package or project reference was added. Deferred to later slices, per
+  the slicing table: single-instance/startup registration (6), the
+  update-check fetch (7), the diagnostics bundle (8), and the settings UI
+  itself. Not verified: an actual Linux run (no Linux runner available
+  here; same CONFIRMED/INFERRED boundary as prior slices) and no real
+  Windows `%LOCALAPPDATA%` profile was exercised end-to-end — same boundary
+  as slice 4's note, same reason.
