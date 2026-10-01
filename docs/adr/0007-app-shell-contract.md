@@ -309,7 +309,7 @@ shell-level hint would be a competing opinion about the same figure.
 | 4 | Store lifetime + injected directory (ADR-0006 D2) — **landed** (PR #53, 2026-10-01, OVI-277) | 1, ADR-0006 slice 1 | Low |
 | 5 | Shell settings file (D4, behaviour settings only) — **landed** (PR #54, 2026-10-01, OVI-280) | 1 | Low |
 | 6 | Single-instance + startup registration per D5, one skin at a time — **landed** (PR #55, 2026-10-01, OVI-283) | 1, 3 | Medium — first real OS mechanism; Windows first, since Linux is unverifiable here |
-| 7 | Update-check fetch + one-cooldown-per-process (D3) | 1, 2 | Medium — first HTTP in this repository |
+| 7 | Update-check fetch + one-cooldown-per-process (D3) — **landed** (PR #56, 2026-10-01, OVI-288) | 1, 2 | Medium — first HTTP in this repository |
 | 8 | Diagnostics bundle + redaction — **landed** (PR #57, 2026-10-01, OVI-292) | 1, 4 | Low |
 
 Slices 1–5 need no board answer beyond this ADR. Slice 6 is where
@@ -580,3 +580,49 @@ to ship unverified and labelled as such.
   update-check fetch (7), the diagnostics bundle (8), the settings UI, and
   the composition root that would call any of slices 4-6's pieces from a
   real `Main`.
+
+- **2026-10-01 update — slice 7 landed (Kit the Builder, OVI-288, PR #56).**
+  Closes D3. `src/O-view.Core/Updates/` gains four BCL-only types ported
+  unchanged from the source repository: `ReleaseVersion` (tag/assembly
+  version parsing and comparison), `ReleaseAssetSelector`/`ReleaseAssets`
+  (per-platform asset-name matching, not user-facing wording), `RateLimitResponse`
+  (reads GitHub's `x-ratelimit-*`/`retry-after` headers into a throttled/not
+  verdict with no HTTP types), and `UpdateCheck`/`UpdateCheckResult`/
+  `UpdateOutcome`/`AvailableUpdate` (the pure comparison against
+  `releases/latest`'s JSON body). None of these are display strings or
+  formats — they are the same class of pure rule ADR-0001 D4 already named
+  for Core.
+  `src/O-view.App/Updates/` gains the shell-side seam: `IReleaseFeedTransport`
+  (one method, `FetchLatestReleaseAsync`, returning a `ReleaseFeedResponse`
+  record of status/headers/body — the same seam shape as `IClock`/`IAppTimer`),
+  `HttpReleaseFeedTransport` (the one real implementation, platform-neutral:
+  both Windows and Linux use this same fetch, unlike D5's per-OS
+  mechanisms), and `ReleaseFeed` — the single cooldown holder D3 requires.
+  `ReleaseFeed` takes an `IReleaseFeedTransport` and the existing `IClock`
+  seam in its constructor and holds `_rateLimitedUntilUtc` as an **instance**
+  field, so the cooldown survives across every `CheckAsync` call made
+  through that one instance, however many skins call it — the shell must
+  construct exactly one `ReleaseFeed` at startup and route every skin's
+  check through it, never one per call (the source repo's Windows head's
+  named bug, ADR-0001 D4's 2026-09-26/OVI-140 amendment). Scope stays the
+  release feed only, per this slice's boundary: no `RateCardFeed`
+  counterpart, since `RateCardSource` has no network member on the contract.
+  `tests/O-view.App.Tests/Updates/ReleaseFeedTests.cs` adds 5 tests against
+  a fake `IReleaseFeedTransport` and the existing `FakeClock` pattern,
+  including the one the done-when criteria named directly:
+  `Repeated_checks_within_the_cooldown_window_do_not_re_fetch` asserts the
+  fake transport's call count stays at 1 across two `CheckAsync` calls
+  inside the recorded cooldown window, plus a same-instance-two-callers test
+  standing in for two skins sharing the one holder. `tests/O-view.Core.Tests/Updates/`
+  adds `ReleaseVersionTests`, `RateLimitResponseTests` and `UpdateCheckTests`
+  (23 tests) against the ported pure logic. `dotnet test O-view.slnx` passes
+  in full (Core.Tests 239, App.Tests 44, up from 216/39 pre-slice; Tray.Tests
+  65, Linux.Tests 64, CrossSkin.Tests 9 unchanged). `LayeringStructuralTests`
+  passes unmodified — `O-view.App.csproj` still references only
+  `O-view.Core`. No composition root wires `ReleaseFeed` into a real running
+  skin yet, same deferred status as slices 1–6's seams. Not verified: no
+  real network call against GitHub's API was made — the cooldown and outcome
+  behaviour are proven against the fake transport only, and
+  `HttpReleaseFeedTransport` itself carries no test beyond compiling, same
+  as the source repo's own `ReleaseFeed` had no integration test against
+  live GitHub.
