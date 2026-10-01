@@ -304,7 +304,7 @@ shell-level hint would be a competing opinion about the same figure.
 | # | Slice | Depends on | Risk |
 |---|---|---|---|
 | 1 | `O-view.App` project + `IClock`/`IAppTimer` + the layering structural test (shell references Core, never a skin; Core references neither) — **landed** (PR #50, 2026-09-30, OVI-261) | — | **Lowest** — a project, two interfaces, one test. Start here |
-| 2 | The poll loop: composition + cadence + failed-poll-keeps-previous-state, against a fake provider — **landed** (PR #TBD, 2026-10-01, OVI-268) | 1, ADR-0005 slice 1 | Low — no real I/O |
+| 2 | The poll loop: composition + cadence + failed-poll-keeps-previous-state, against a fake provider — **landed** (PR #51, 2026-10-01, OVI-268) | 1, ADR-0005 slice 1 | Low — no real I/O |
 | 3 | D6's two seams, with one skin wired to a fake shell and vice versa | 1 | Low |
 | 4 | Store lifetime + injected directory (ADR-0006 D2) | 1, ADR-0006 slice 1 | Low |
 | 5 | Shell settings file (D4, behaviour settings only) | 1 | Low |
@@ -354,7 +354,7 @@ to ship unverified and labelled as such.
   individually on this Windows machine with `net10.0`, not
   `net10.0-windows`, targets).
 
-- **2026-10-01 update — slice 2 landed (Kit the Builder, OVI-268, PR #TBD).**
+- **2026-10-01 update — slice 2 landed (Kit the Builder, OVI-268, PR #51).**
   `IAppTimer` gained an `Elapsed` event, which slice 1 did not ship — a
   repeating timer with no way to be notified of a tick cannot drive a poll
   loop. This is a deliberate, documented extension of slice 1's shape, not a
