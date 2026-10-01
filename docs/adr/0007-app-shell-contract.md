@@ -308,7 +308,7 @@ shell-level hint would be a competing opinion about the same figure.
 | 3 | D6's two seams, with one skin wired to a fake shell and vice versa — **landed** (PR #52, 2026-10-01, OVI-273) | 1 | Low |
 | 4 | Store lifetime + injected directory (ADR-0006 D2) — **landed** (PR #53, 2026-10-01, OVI-277) | 1, ADR-0006 slice 1 | Low |
 | 5 | Shell settings file (D4, behaviour settings only) — **landed** (PR #54, 2026-10-01, OVI-280) | 1 | Low |
-| 6 | Single-instance + startup registration per D5, one skin at a time | 1, 3 | Medium — first real OS mechanism; Windows first, since Linux is unverifiable here |
+| 6 | Single-instance + startup registration per D5, one skin at a time — **landed** (PR #55, 2026-10-01, OVI-283) | 1, 3 | Medium — first real OS mechanism; Windows first, since Linux is unverifiable here |
 | 7 | Update-check fetch + one-cooldown-per-process (D3) | 1, 2 | Medium — first HTTP in this repository |
 | 8 | Diagnostics bundle + redaction | 1, 4 | Low |
 
@@ -524,3 +524,59 @@ to ship unverified and labelled as such.
   here; same CONFIRMED/INFERRED boundary as prior slices) and no real
   Windows `%LOCALAPPDATA%` profile was exercised end-to-end — same boundary
   as slice 4's note, same reason.
+- **2026-10-01 update — slice 6 landed (Kit the Builder, OVI-283, PR #55).**
+  Adds D5's two shell-side interfaces — `src/O-view.App/ISingleInstanceGuard.cs`
+  (`IDisposable`, one member: `TryAcquire()`) and
+  `src/O-view.App/IStartupRegistration.cs` (`IsEnabled()`, `Enable()`,
+  `Disable()`, and a default-interface `Apply(bool)` that reports the state
+  as it actually stands afterwards, never the state requested) — both
+  carrying no implementation and no per-OS branch, per D1's admission rule
+  and D5's "the shell declares the capability, the skin implements it."
+  Each skin gets its own concrete mechanism, named for the mechanism it
+  serves rather than a shared abstraction: `src/O-view.Tray/Platform/MutexSingleInstanceGuard.cs`
+  (a named `Mutex`, left session-local rather than `Global`-prefixed) and
+  `src/O-view.Tray/Platform/RegistryStartupRegistration.cs` (the HKCU
+  `...\CurrentVersion\Run` value, subkey/value-name/executable-path all
+  injectable so tests round-trip a disposable scratch subkey under
+  `HKCU\Software`, never the real Run key); `src/O-view.Linux/Platform/FileLockSingleInstanceGuard.cs`
+  (an exclusively-held lock file under `$XDG_RUNTIME_DIR`) and
+  `src/O-view.Linux/Platform/XdgAutostartRegistration.cs` (a `.desktop` file
+  under `$XDG_CONFIG_HOME/autostart`), both carrying the wording a `.desktop`
+  entry needs (`Name=O-view`, a one-line `Comment=`) — permitted only
+  because it sits in the Linux skin, never in the shell. Both skins'
+  concrete classes are the same shape as the source's
+  (`FileLockSingleInstanceGuard`/`XdgAutostartRegistration`/
+  `MutexSingleInstanceGuard`/`RegistryStartupRegistration`, CONFIRMED
+  against the source tree) but relocated out of a project both skins
+  reference and into the skin that actually uses each one, which is this
+  ADR's explicit divergence from the source (D5, and the admission-rule
+  table's rejection of exactly these two Linux classes sitting in a shared
+  project). `O-view.Tray.csproj` and `O-view.Linux.csproj` each add a
+  `ProjectReference` to `O-view.App` (previously `O-view.Core` only) so
+  each skin can implement the shell's interfaces; `LayeringStructuralTests`
+  needed no change; it only forbids the reverse direction (`O-view.App`
+  referencing a skin), which remains untouched. No composition root wires
+  either mechanism into a running process yet — none exists in either skin
+  (same gap slice 5's note left open for the settings store); invoking
+  `TryAcquire()`/`Apply()` from an actual `Main` is deferred to whichever
+  slice adds one, flagged here for Chief Gary II same as before. Tests:
+  `tests/O-view.Tray.Tests/Platform/MutexSingleInstanceGuardTests.cs` (6
+  tests) and `RegistryStartupRegistrationTests.cs` (7 tests, each against a
+  GUID-suffixed scratch subkey, cleaned up via `DeleteSubKeyTree` in
+  `Dispose`); `tests/O-view.Linux.Tests/Platform/FileLockSingleInstanceGuardTests.cs`
+  (8 tests) and `XdgAutostartRegistrationTests.cs` (8 tests). All four are
+  ordinary file IO or a real Windows registry/mutex call — no fakes — so
+  they ran for real on this (Windows) development machine as part of
+  `dotnet test O-view.slnx`: 416 tests pass (up from 387 at slice 5),
+  including 78 in `O-view.Tray.Tests` (up from 65) and 80 in
+  `O-view.Linux.Tests` (up from 64). That confirms the file-lock and
+  `.desktop`-file protocols and the registry/mutex calls execute correctly
+  on this machine (CONFIRMED) — it does **not** confirm either mechanism
+  against a real Linux desktop session (whether a GNOME/KDE session
+  actually launches the `.desktop` entry, whether `$XDG_RUNTIME_DIR` holds
+  the expected value on a real login), which this repository has never had
+  a Linux runner to observe (ADR-0002/0004's "never observed" caveat,
+  INFERRED only). Deferred to later slices, per the slicing table: the
+  update-check fetch (7), the diagnostics bundle (8), the settings UI, and
+  the composition root that would call any of slices 4-6's pieces from a
+  real `Main`.
