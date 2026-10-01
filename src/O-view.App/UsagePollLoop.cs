@@ -19,9 +19,11 @@ namespace OView.App;
 /// poll that returns normally — including <see cref="UsageSnapshot.Unavailable"/>, which is
 /// a legitimate "no data" answer, not a failure — always replaces <see cref="CurrentSnapshot"/>.</para>
 ///
-/// <para>Cadence is a constructor parameter, not a constant: slice 5's settings file does
-/// not exist yet, so this type takes whatever cadence its caller already decided on rather
-/// than inventing a default of its own.</para>
+/// <para>Cadence is a constructor parameter, not a constant: this type takes whatever cadence
+/// its caller already decided on rather than inventing a default of its own. The default a
+/// caller falls back to when no settings have been saved yet lives in
+/// <see cref="ShellSettings.Default"/> (slice 5), not here — no composition root wires the
+/// two together yet.</para>
 /// </summary>
 public sealed class UsagePollLoop : IDisposable
 {
