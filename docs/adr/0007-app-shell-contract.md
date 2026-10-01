@@ -305,7 +305,7 @@ shell-level hint would be a competing opinion about the same figure.
 |---|---|---|---|
 | 1 | `O-view.App` project + `IClock`/`IAppTimer` + the layering structural test (shell references Core, never a skin; Core references neither) — **landed** (PR #50, 2026-09-30, OVI-261) | — | **Lowest** — a project, two interfaces, one test. Start here |
 | 2 | The poll loop: composition + cadence + failed-poll-keeps-previous-state, against a fake provider — **landed** (PR #51, 2026-10-01, OVI-268) | 1, ADR-0005 slice 1 | Low — no real I/O |
-| 3 | D6's two seams, with one skin wired to a fake shell and vice versa | 1 | Low |
+| 3 | D6's two seams, with one skin wired to a fake shell and vice versa — **landed** (PR #TBD, 2026-10-01, OVI-273) | 1 | Low |
 | 4 | Store lifetime + injected directory (ADR-0006 D2) | 1, ADR-0006 slice 1 | Low |
 | 5 | Shell settings file (D4, behaviour settings only) | 1 | Low |
 | 6 | Single-instance + startup registration per D5, one skin at a time | 1, 3 | Medium — first real OS mechanism; Windows first, since Linux is unverifiable here |
@@ -389,3 +389,43 @@ to ship unverified and labelled as such.
   off-plan event decisions (D2 point 6, out of scope for this ADR's shell
   layer as currently sliced). Not verified: an actual Linux run (no Linux
   runner available here; same CONFIRMED/INFERRED boundary as slice 1).
+
+- **2026-10-01 update — slice 3 landed (Kit the Builder, OVI-273, PR #TBD).**
+  D6's two interfaces, with the exact members the table above names:
+  `IShellToSkin` (`src/O-view.App/IShellToSkin.cs`: `ShowSnapshot`,
+  `RaiseEvent`, `SetVisible`, `Shutdown`) and `ISkinToShell`
+  (`src/O-view.App/ISkinToShell.cs`: `RefreshNow`, `SetThresholdPercent`,
+  `SetAutoUpdate`, `WriteDiagnosticsBundle`, `Quit`). `UsageEvent`
+  (`src/O-view.App/UsageEvent.cs`) is the enum-plus-data type `RaiseEvent`
+  carries: a `UsageEventKind` (`ThresholdCrossed`, `OffPlanEntered`,
+  `UpdateAvailable`, `InputDegraded`) plus nullable payload properties drawn
+  only from types ADR-0001/ADR-0005 already define — `UsageLevel` for a
+  threshold crossing, `DivergenceReading` for off-plan entry, `ProviderHealth`
+  for input degradation. `UpdateAvailable` carries no payload in this slice:
+  ADR-0001 names an `UpdateCheckOutcome` enum in its contract table, but no
+  Core type implements it yet (D3's update-check fetch is slice 7, not built),
+  and this slice's boundaries forbid Core changes — adding that enum here
+  would be inventing a Core contract field mid-slice, which is exactly the
+  case this ADR's authoring agent is told to escalate rather than resolve
+  unilaterally. The kind constant exists so the seam is complete; the
+  producer that fills in update-check data is deferred to slice 7. No
+  threshold/off-plan/update/health *detection* logic ships here either (D2
+  point 6 stays deferred, as slice 2's note already recorded) — this slice is
+  the seam's shape and wiring, not the decision logic that calls it.
+  `tests/O-view.App.Tests/ShellToSkinSeamTests.cs` and
+  `tests/O-view.App.Tests/SkinToShellSeamTests.cs` are structural/contract
+  tests against fakes, not a real UI integration: each has a driving harness
+  typed to the interface (never the concrete fake) that calls every member in
+  turn, and a fake implementation (`FakeSkin`, `FakeShell`) that records what
+  it received, asserting the exact snapshot/event/value crossed the seam.
+  `dotnet test O-view.slnx` passes in full: 369 tests (up from 360 at slice
+  2), including 21 in `O-view.App.Tests` (up from 12, +9: 4 shell-to-skin, 5
+  skin-to-shell). Deferred to later slices, per the slicing table: store/
+  anchor lifetime (4), a settings file or settings-driven cadence (5),
+  single-instance/startup registration (6), the update-check fetch and its
+  `UsageEvent.UpdateAvailable` payload (7), the diagnostics bundle (8), and
+  all threshold/off-plan/update/health *event-decision* logic (D2 point 6).
+  No real skin (WPF/Avalonia) wiring and no shared widget/window base class
+  (G4 stays closed) — both explicitly out of scope per this slice's
+  boundaries. Not verified: an actual Linux run (no Linux runner available
+  here; same CONFIRMED/INFERRED boundary as slices 1 and 2).
