@@ -75,7 +75,17 @@ public sealed class FileLockSingleInstanceGuard : ISingleInstanceGuard
 
     public void Dispose()
     {
-        _held?.Dispose();
+        // Only a guard that actually held the lock may delete the file. unlink() does not
+        // check other processes' open locks, so a losing instance (TryAcquire returned false,
+        // or was never called) deleting the path removes the winner's directory entry — a
+        // third process can then recreate it and acquire its own lock while the winner is
+        // still running, defeating single-instance.
+        if (_held is null)
+        {
+            return;
+        }
+
+        _held.Dispose();
         _held = null;
 
         try

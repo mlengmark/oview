@@ -106,6 +106,28 @@ public class FileLockSingleInstanceGuardTests : IDisposable
         guard.Dispose();
     }
 
+    /// <summary>
+    /// A losing instance's Dispose must not touch the file at all. unlink() does not check
+    /// other processes' open locks, so a naive unconditional delete removes the winner's
+    /// directory entry — a third process could then recreate the path and acquire its own
+    /// lock while the winner is still running, defeating single-instance entirely.
+    /// </summary>
+    [Fact]
+    public void DisposingALoserDoesNotDeleteTheWinnersLockFile()
+    {
+        using var winner = new FileLockSingleInstanceGuard(LockPath);
+        Assert.True(winner.TryAcquire());
+
+        var loser = new FileLockSingleInstanceGuard(LockPath);
+        Assert.False(loser.TryAcquire());
+        loser.Dispose();
+
+        Assert.True(File.Exists(LockPath));
+
+        using var third = new FileLockSingleInstanceGuard(LockPath);
+        Assert.False(third.TryAcquire());   // winner still holds it
+    }
+
     [Fact]
     public void DefaultPathPrefersXdgRuntimeDir()
     {
