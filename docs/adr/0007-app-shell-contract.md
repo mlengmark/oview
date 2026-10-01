@@ -306,7 +306,7 @@ shell-level hint would be a competing opinion about the same figure.
 | 1 | `O-view.App` project + `IClock`/`IAppTimer` + the layering structural test (shell references Core, never a skin; Core references neither) — **landed** (PR #50, 2026-09-30, OVI-261) | — | **Lowest** — a project, two interfaces, one test. Start here |
 | 2 | The poll loop: composition + cadence + failed-poll-keeps-previous-state, against a fake provider — **landed** (PR #51, 2026-10-01, OVI-268) | 1, ADR-0005 slice 1 | Low — no real I/O |
 | 3 | D6's two seams, with one skin wired to a fake shell and vice versa — **landed** (PR #52, 2026-10-01, OVI-273) | 1 | Low |
-| 4 | Store lifetime + injected directory (ADR-0006 D2) — **landed** (PR #TBD, 2026-10-01, OVI-277) | 1, ADR-0006 slice 1 | Low |
+| 4 | Store lifetime + injected directory (ADR-0006 D2) — **landed** (PR #53, 2026-10-01, OVI-277) | 1, ADR-0006 slice 1 | Low |
 | 5 | Shell settings file (D4, behaviour settings only) | 1 | Low |
 | 6 | Single-instance + startup registration per D5, one skin at a time | 1, 3 | Medium — first real OS mechanism; Windows first, since Linux is unverifiable here |
 | 7 | Update-check fetch + one-cooldown-per-process (D3) | 1, 2 | Medium — first HTTP in this repository |
@@ -430,7 +430,7 @@ to ship unverified and labelled as such.
   boundaries. Not verified: an actual Linux run (no Linux runner available
   here; same CONFIRMED/INFERRED boundary as slices 1 and 2).
 
-- **2026-10-01 update — slice 4 landed (Kit the Builder, OVI-277, PR #TBD).**
+- **2026-10-01 update — slice 4 landed (Kit the Builder, OVI-277, PR #53).**
   `src/O-view.App/StoreDirectoryResolver.cs` resolves ADR-0006 D2's documented
   default directory once at startup: `%LOCALAPPDATA%\O-view\` on Windows
   (CONFIRMED), `$XDG_DATA_HOME/O-view/` falling back to
