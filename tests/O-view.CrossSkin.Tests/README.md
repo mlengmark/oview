@@ -72,6 +72,23 @@ time is rendered when it did not, and — in both cases — that the notice
 reassures the reader their own connection/install is not at fault. See
 ADR-0003's 2026-09-22 (OVI-98) amendment.
 
+**2026-10-02 update (OVI-324) — Phase 3 slice 1: two more families, pure data only.**
+`Fixtures/DetailWindowFixture.cs`/`Fixtures/DetailWindowFixtures.cs` and
+`Fixtures/AlertFixture.cs`/`Fixtures/AlertFixtures.cs` pin the content facts
+ADR-0008 D2 requires the detail window and alerts surfaces to state. Unlike
+every family above, **neither carries a `Render`/`SkinUnderTest` or a
+`*GoldenMasterCrossSkinTests` file** — no presenter exists yet for either
+surface (ADR-0008 slices 6/7/10/11 wire that later); see
+`DetailWindowAndAlertFixtureDataTests.cs` for the data-only sanity checks this
+slice runs instead. Per Chief Gary II's OVI-325 scoping decision:
+`DetailWindowFixture` is scoped to what `UsageSnapshot` already carries today
+(session/weekly percent, resets, `DataSourceKind`, `ExtraUsage`) — the
+per-model split and 31-day statistics ADR-0008 D2 also requires are not
+covered, because carrying them needs a widened `IShellToSkin`/Core type this
+fixtures-only slice cannot decide on its own; that widening is its own,
+separate task. `AlertFixture` has no such gap: `UsageEvent`/`UsageEventKind`
+already cover everything D2 requires an alert to state.
+
 ## Why this project targets `net10.0-windows`
 
 `O-view.Tray` targets `net10.0-windows`. A `net10.0-windows` project
@@ -97,18 +114,21 @@ only home.
 
 ## How to add a fixture
 
-Six fixture families exist so far: `GoldenMasterFixture` (`UsageSnapshot`,
+Eight fixture families exist so far: `GoldenMasterFixture` (`UsageSnapshot`,
 the tooltip's slice), `UsageStatisticsFixture` (`UsageStatistics`, the
 usage-figures/history-coverage slice, OVI-27), `FreshnessFixture`
 (`UsageSnapshot` plus `UtcNow`, OVI-29), `PanelTextResetFixture` (four
 raw-scalar members, OVI-29), `BoostNoticeFixture` (`BoostNotice` plus
 one `DateTimeOffset` and one `TimeZoneInfo`, shared by `BoostChip` and
-`BoostCard`, OVI-92), and `RateLimitedNoticeFixture` (one
-`DateTimeOffset?`/`TimeZoneInfo` raw-scalar member, OVI-98). Add to
-whichever family already matches the shape your fixture needs; only add a
-new parallel family for a genuinely new shape, and read ADR-0003's
-amendments first — a new family is the point that ADR flags as worth
-Chief Gary II's and Quinn's sign-off rather than a unilateral call.
+`BoostCard`, OVI-92), `RateLimitedNoticeFixture` (one
+`DateTimeOffset?`/`TimeZoneInfo` raw-scalar member, OVI-98), and — as of
+Phase 3 slice 1 (OVI-324) — `DetailWindowFixture` (`UsageSnapshot` plus
+`TimeZoneInfo`, no `Render`/`SkinUnderTest` yet) and `AlertFixture`
+(`UsageEvent`, no `Render`/`SkinUnderTest` yet). Add to whichever family
+already matches the shape your fixture needs; only add a new parallel family
+for a genuinely new shape, and read ADR-0003's amendments first — a new
+family is the point that ADR flags as worth Chief Gary II's and Quinn's
+sign-off rather than a unilateral call.
 
 1. **Add the fixture** as a new `GoldenMasterFixture` entry in
    `Fixtures/GoldenMasterFixtures.cs`'s `All` list. A fixture is:
