@@ -227,6 +227,21 @@ cadence observed).
 G4. This section is now a standing constraint on the shell slices, not a
 question.
 
+> **2026-10-02 amendment — G4 is now answered, as A. This section's
+> prohibitions become permanent rather than provisional.** The board accepted
+> card `gate:G4:ui-unification:v1` on OVI-1 at 08:00:32Z: **keep two native
+> windows (WPF on Windows, Avalonia on Linux); no shared UI layer investment.**
+> The "board flag, not a request" paragraph below is therefore resolved — the
+> board was asked and declined to move a shared widget into the shell. Nothing
+> in this record changes: the shell still owns window lifecycle and never a
+> pixel, and D1's admission rule plus the `Rendering/` prohibition now stand on
+> an accepted gate rather than on an open one. What a reader should take from
+> this section today is that adding any shared window base class, view model,
+> layout, geometry or palette to `O-view.App` is a **reversal of an accepted
+> board decision**, not a design call available to a slice.
+> See [ADR-0008](0008-presentation-skin-contract.md) for the Phase 3 design
+> this answer unblocked.
+
 **What this ADR does:** the shell owns window *lifecycle events* — "show
 the widget," "hide it," "shut down." Each skin keeps its own window, its own
 toolkit (WPF / Avalonia), its own layout and its own draggable-widget
