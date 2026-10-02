@@ -518,6 +518,19 @@ them, per that ADR's own rule.
   `RollupStore`, never from `IUsageProvider`); this amendment writes the seam
   down rather than inventing one.
 
+  > **2026-10-02 amendment (OVI-326, [ADR-0008](0008-presentation-skin-contract.md)
+  > D9).** This seam is still unimplemented — nothing in `src/` produces a
+  > `UsageStatistics` (CONFIRMED). Phase 3 needs it, and needs a second query
+  > beside it, so D6c is extended rather than re-decided: **one interface over
+  > the ledger with two queries**, `GetStatistics(utcNow)` and
+  > `GetModelBreakdown(utcNow)`, both under D1's same four obligations. The
+  > per-model query returns ADR-0008 D9a's `ModelUsageBreakdown` — Core-side
+  > aggregation per model over a stated window, never the storage record
+  > `DailyModelUsage` and never per-(date × model) rows for a skin to total.
+  > Both are built in ADR-0008's slice 5a. Nothing above changes: it is still
+  > not an `IUsageProvider`, still not part of composition, still has no
+  > `DataSourceKind`.
+
   **Rejected: widening `IUsageProvider` to return both** (a second method, a
   tuple, or a combined record). D1's single method is accepted board contract,
   and widening it would force `PlanHistoryProvider` and
