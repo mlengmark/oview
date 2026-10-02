@@ -530,6 +530,19 @@ them, per that ADR's own rule.
   > Both are built in ADR-0008's slice 5a. Nothing above changes: it is still
   > not an `IUsageProvider`, still not part of composition, still has no
   > `DataSourceKind`.
+  >
+  > **2026-10-02, as built (OVI-332):** both queries also take a
+  > `TimeZoneInfo zone` parameter — `GetStatistics(utcNow, zone)` and
+  > `GetModelBreakdown(utcNow, zone)` — not shown in the signature above. Local-day
+  > bucketing (today vs. the 31-day window) cannot happen without one, and this
+  > repository's one other local-day aggregator, `UsageLedgerStore.QueryDailyUsage`,
+  > already established that the zone is always a caller-supplied parameter, never
+  > `TimeZoneInfo.Local` read internally (ADR-0006 D2). The interface is
+  > `IUsageStatisticsSource` (`src/O-view.Core/Statistics/`), implemented by
+  > `LedgerUsageStatisticsSource`. No rate table exists in this repository yet
+  > (`RateCardSource` is reserved, nothing emits a `RateCardStamp`), so every
+  > `EstimatedUsd` both queries produce is `UsageValueStatus.Unavailable` —
+  > honest, not a placeholder; pricing is a later amendment with its own seam.
 
   **Rejected: widening `IUsageProvider` to return both** (a second method, a
   tuple, or a combined record). D1's single method is accepted board contract,
