@@ -159,6 +159,24 @@ public sealed class LedgerUsageStatisticsSourceTests : IDisposable
     }
 
     [Fact]
+    public void GetModelBreakdownAggregatesCacheTokensPerModel()
+    {
+        var store = new UsageLedgerStore(_directory);
+        var source = new LedgerUsageStatisticsSource(store);
+        var utcNow = new DateTimeOffset(2026, 10, 2, 12, 0, 0, TimeSpan.Zero);
+        store.Upsert(Record(
+            "req-1", utcNow, cacheCreationInputTokens: 40, cacheReadInputTokens: 10));
+        store.Upsert(Record(
+            "req-2", utcNow.AddDays(-1), cacheCreationInputTokens: 60, cacheReadInputTokens: 15));
+
+        var breakdown = source.GetModelBreakdown(utcNow, TimeZoneInfo.Utc);
+
+        var row = Assert.Single(breakdown.Rows);
+        Assert.Equal(100, row.CacheCreationTokens.Value);
+        Assert.Equal(25, row.CacheReadTokens.Value);
+    }
+
+    [Fact]
     public void GetModelBreakdownLeavesEstimatedSpendUnavailableForAnUnpricedModel()
     {
         var store = new UsageLedgerStore(_directory);
