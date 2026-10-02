@@ -6,34 +6,29 @@ usage allowance you've used, and when it resets. This repository is the
 taken into a new codebase with a stronger data/presentation boundary and a
 documentation trail from the first commit.
 
-> **Status:** early implementation. Gate **G0** (this repository) and gate
-> **G1** (target-architecture sign-off) have both passed board review.
-> Phase 1 slice 1 has landed `O-view.Core` and `O-view.Tray` with exactly
-> the surface `TooltipFormatter`'s extraction needed. `O-view.Linux` exists
-> as a minimal scaffold (OVI-30) — its own `TooltipFormatter`, no UI, no
-> tray icon, no D-Bus integration — added only to unblock the cross-skin
-> golden-master harness. That harness, `O-view.CrossSkin.Tests` (OVI-25),
-> now exists too, with one smoke fixture proving it invokes both skins'
-> string-construction code and catches a deliberate content mismatch.
-> Phase 1 slice 2 (OVI-27) has since extracted `UsageFormatter.cs`'s and
-> `PanelStatistics.cs`'s one presentation leak the same way — a new
-> `UsageStatistics` contract type in `O-view.Core`, and each skin's own
-> `UsageFormatter`/`PanelStatisticsFormatter`. Phase 1 slice 3.1 (OVI-29)
-> has since extracted the first slice of `PanelText.cs` —
-> `Freshness`/`Countdown`/`SessionReset`/`WeeklyReset`/`WeeklyResetConflict`
-> — into each skin's own `PanelTextFormatter`, with `DataSourceKind.Stale`
-> and a required `UsageSnapshot.LastIngestAt` now in the contract.
-> Phase 1 slice 3.3 (OVI-92) has since extracted the boost chip
-> (`BoostChip`/`BoostCard`) against a new `BoostNotice` contract type, and
-> slice 3.4 (OVI-98) the GitHub rate-limit notice (`RateLimitedNotice`),
-> which needed no new Core surface. The usage-tile caveat and the off-plan
-> banner are the last not-yet-extracted `PanelText.cs` members.
-> `O-view.App` does not exist yet. See
+> **Status (2026-10-02).** **Phase 1 — text extraction — is complete**:
+> every confirmed display-string leak has moved out of the shared data layer
+> into each skin's own formatter. **Phase 2 is fully landed**: every slice in
+> ADR-0005's, ADR-0006's and ADR-0007's slicing tables is merged, so Core now
+> reads Claude's data off this machine, persists what it cannot recompute, and
+> is driven by an application shell (`O-view.App`). **Phase 3 — the status
+> icon, tooltip, detail window and alerts — is designed and has started**:
+> [ADR-0008](docs/adr/0008-presentation-skin-contract.md) is **Accepted**
+> (board-merged, 2026-10-02) and the first slice, cross-skin test fixtures
+> for the detail window and the four alert kinds, is merged. No window and no
+> alert UI exists yet.
+>
+> Board gates: **G0** (this repository), **G1** (target-architecture
+> sign-off) and **G4** (UI unification — **option A**: keep two native
+> windows, WPF on Windows and Avalonia on Linux, no shared UI layer) are all
+> decided. **G3** (macOS) and **G5** (a second AI source) remain open, and
+> Phase 3 needs neither. See
 > [`docs/adr/`](docs/adr/) for the
 > Core-to-skin data contract, the cross-platform capability matrix, and the
-> mechanism that replaces `PanelText.cs`'s centralization once its display
-> strings move out of the shared layer — and the approved PDR (linked from
-> the ADRs) for the full target architecture.
+> mechanism that replaced `PanelText.cs`'s centralization when its display
+> strings moved out of the shared layer, the Phase 2 provider/storage/shell
+> contracts and the Phase 3 presentation contract — and the approved PDR
+> (linked from the ADRs) for the full target architecture.
 
 ## What O-view does
 
@@ -135,6 +130,11 @@ the full standard this repository follows from commit one. In short:
 | [`docs/adr/0001-core-to-skin-data-contract.md`](docs/adr/0001-core-to-skin-data-contract.md) | Every value Core can hand a skin: type, unit, status flag. What Core must never emit. |
 | [`docs/adr/0002-cross-platform-capability-matrix.md`](docs/adr/0002-cross-platform-capability-matrix.md) | Per OS capability (tray icon, notifications, startup, self-update, ...): what every skin must provide, and what each platform actually, currently guarantees. |
 | [`docs/adr/0003-paneltext-anti-drift-mechanism.md`](docs/adr/0003-paneltext-anti-drift-mechanism.md) | How the rebuild lets each skin own its own wording without reintroducing the bug (issues [#55](https://github.com/mlengmark/O-view/issues/55)/[#56](https://github.com/mlengmark/O-view/issues/56) on the source repo) that `PanelText.cs`'s centralization existed to prevent. |
+| [`docs/adr/0004-what-non-windows-ci-could-and-could-not-prove.md`](docs/adr/0004-what-non-windows-ci-could-and-could-not-prove.md) | What a Linux CI job can and cannot prove for this solution, and the two-job workflow that follows from it. |
+| [`docs/adr/0005-data-provider-contract.md`](docs/adr/0005-data-provider-contract.md) | Phase 2. How Core reads Claude's data off this machine: one input seam, three named providers, composition by information value, provider health as contract data. Opened gate **G6**. |
+| [`docs/adr/0006-local-storage-contract.md`](docs/adr/0006-local-storage-contract.md) | Phase 2. What Core persists on this machine, where, and who owns each file — and why SQLite is the first third-party runtime dependency. |
+| [`docs/adr/0007-app-shell-contract.md`](docs/adr/0007-app-shell-contract.md) | Phase 2. `O-view.App` — a third layer between Core and the skins, its admission rule, and what it may never contain. |
+| [`docs/adr/0008-presentation-skin-contract.md`](docs/adr/0008-presentation-skin-contract.md) | Phase 3. Four surfaces (status icon, tooltip, detail window, alerts), two native skins, no shared UI layer — gate **G4 = A**. Read **D9** before touching the detail window. |
 | [`CLAUDE.md`](CLAUDE.md) | Contributor guidance — what may be assumed, what must be re-verified, and the evidence-labelling discipline this repository runs on. |
 
 ## Relationship to `mlengmark/O-view`
@@ -148,18 +148,42 @@ of this rebuild.
 
 ## Status of the build
 
-Phase 1 slice 1 has landed: `TooltipFormatter.cs`'s display-string
-construction is extracted out of the platform-neutral layer. `O-view.Core`
-(`net10.0`) defines the tooltip-relevant slice of the Core-to-skin contract
-([ADR-0001](docs/adr/0001-core-to-skin-data-contract.md)) as structured,
-status-flagged values; `O-view.Tray` (`net10.0-windows`) owns turning those
-values into tooltip text, including the 127-character `NotifyIcon.Text`
-cap. Build and test with `dotnet build O-view.slnx` / `dotnet test
-O-view.slnx`. `O-view.App` is a separate, later slice and does not exist
-here yet. `UsageFormatter.cs`'s and `PanelStatistics.cs`'s presentation
-leaks were extracted in Phase 1 slice 2 (OVI-27), and `PanelText.cs` is
-being extracted member-family by member-family in slices 3.1, 3.3 and 3.4
-— all below.
+Four projects and five test projects exist and build: `O-view.Core`
+(`net10.0`, the canonical data layer), `O-view.App` (`net10.0`, the
+application shell), `O-view.Tray` (`net10.0-windows`) and `O-view.Linux`
+(`net10.0`) as the two skins, plus `O-view.Core.Tests`,
+`O-view.App.Tests`, `O-view.Tray.Tests`, `O-view.Linux.Tests` and the
+cross-skin anti-drift harness `O-view.CrossSkin.Tests`. Build and test with
+`dotnet build O-view.slnx` / `dotnet test O-view.slnx`.
+
+- **Phase 1 — text extraction: complete.** Every confirmed presentation
+  leak in the source repository's `O-view.Core.Models` —
+  `TooltipFormatter.cs`, `UsageFormatter.cs`, `PanelStatistics.cs`, and all
+  of `PanelText.cs` including the usage-tile caveat (OVI-165) and the
+  off-plan banner (OVI-168) — now lives in each skin's own formatter, with
+  the wording pinned by content rather than by exact string per
+  [ADR-0003](docs/adr/0003-paneltext-anti-drift-mechanism.md).
+- **Phase 2 — reading, storing and running: complete.** Every slice in
+  [ADR-0005](docs/adr/0005-data-provider-contract.md)'s,
+  [ADR-0006](docs/adr/0006-local-storage-contract.md)'s and
+  [ADR-0007](docs/adr/0007-app-shell-contract.md)'s slicing tables is
+  merged: three Claude providers behind one input seam, composition into a
+  single reading with a health signal, three local stores, and the
+  `O-view.App` shell with its poll loop, settings file, single-instance
+  guard, update check and redacted diagnostics bundle.
+- **Phase 3 — the four presentation surfaces: designed, started.**
+  [ADR-0008](docs/adr/0008-presentation-skin-contract.md) is **Accepted**
+  (2026-10-02, board-merged PR #58; amended the same day by **D9**, which
+  adds the detail window's `ShowDetail(UsageDetail)` data path). Its first
+  slice — cross-skin fixtures for the detail window and the four alert
+  kinds, as pure data with no presenter — is merged. **No status-icon,
+  tooltip, detail-window or alert UI exists in this repository yet**, and no
+  skin has been run on real hardware.
+
+### Changelog
+
+Dated entries below are a historical log: each states what was true when it
+was written, not the current state. For that, read the summary above.
 
 **2026-09-10 — `O-view.Linux` scaffolded (OVI-30).** `src/O-view.Linux`
 (`net10.0`) exists with its own minimal `Presentation/TooltipFormatter.cs`,
@@ -249,4 +273,65 @@ alongside `BoostChip`/`BoostCard`. A sixth parallel fixture family
 was added to `O-view.CrossSkin.Tests` — see
 [ADR-0003](docs/adr/0003-paneltext-anti-drift-mechanism.md)'s matching
 entry. The usage-tile caveat and the off-plan banner are the last
-not-yet-extracted `PanelText.cs` members.
+not-yet-extracted `PanelText.cs` members. *(Both have since landed — see the
+2026-09-27 entry.)*
+
+**2026-09-26 — CI, and the contract corrections found by building it.**
+A two-job GitHub Actions workflow (Windows: the whole solution; Linux: the
+`net10.0` projects) is live (OVI-124), designed by
+[ADR-0004](docs/adr/0004-what-non-windows-ci-could-and-could-not-prove.md),
+which states plainly what a Linux job cannot prove: not the Tray skin, not
+the anti-drift harness. Several small contract corrections landed in the
+same window: an `Unavailable` reading may not carry a value (OVI-146/149),
+tooltips omit a reset flagged `Unavailable` even when one is present
+(OVI-144), and the session-reset, weekly-reset and update-check decisions
+D2/D3/D4 were written into ADR-0001/0002 (OVI-135/139).
+
+**2026-09-27 — Phase 1 is complete (OVI-165, OVI-168).** The usage-tile
+caveat and the off-plan banner — the last two `PanelText.cs` members — are
+worded by the skins, and `O-view.Core` holds data only. No display string,
+format, locale, OS branch or platform limit remains in the shared layer.
+
+**2026-09-28 — Phase 2 designed (OVI-178, PR #33).** Three accepted
+records: [ADR-0005](docs/adr/0005-data-provider-contract.md) (the data
+providers, which also opened gate **G6** — the app may invoke the vendor's
+own documented, read-shaped command, under three stated limits),
+[ADR-0006](docs/adr/0006-local-storage-contract.md) (local storage, which
+authorised SQLite as this repository's first third-party runtime
+dependency, for the usage ledger only) and
+[ADR-0007](docs/adr/0007-app-shell-contract.md) (the `O-view.App` shell and
+its admission rule).
+
+**2026-09-29 — 2026-10-01 — Phase 2 built, slice by slice.** Core gained
+the `IUsageProvider` seam and three Claude providers (transcript JSONL,
+Claude Desktop's plan history, Claude Code's usage cache), composition of
+the three into one reading with a provider-health signal, and three local
+stores (usage ledger, weekly-reset anchor, poll history) that move a
+corrupt file aside rather than overwrite it. `O-view.App` gained its poll
+loop with graceful degradation, the shell-to-skin seam in both directions,
+store-directory ownership, a behaviour-settings file, a single-instance
+guard with startup registration, the update-check fetch with one cooldown
+per process, and a redacted diagnostics bundle. Nothing presentational
+entered the shell.
+
+**2026-10-02 — gate G4 answered and Phase 3 designed (OVI-318, PR #58;
+OVI-326, PR #60).** The board decided **G4 = option A**: keep two native
+windows — WPF on Windows, Avalonia on Linux — and build no shared UI layer.
+[ADR-0008](docs/adr/0008-presentation-skin-contract.md) is the Phase 3
+design that follows: four surfaces (status icon, tooltip, detail window,
+alerts), each stated in terms of what it must say rather than how it looks,
+with the draggable widget as the design on **both** platforms instead of an
+icon-anchored panel on one and a compromise on the other. Its **D9**
+amendment adds `ShowDetail(UsageDetail)` and `RequestWidget(bool)`, because
+a snapshot alone could not carry the usage statistics or the per-model
+split. Gates **G3** (macOS) and **G5** (a second AI source) stay open;
+Phase 3 needs neither.
+
+**2026-10-02 — Phase 3's first slice: detail-window and alert fixtures
+(OVI-324, PR #59).** `O-view.CrossSkin.Tests` gains `DetailWindowFixture`
+and `AlertFixture` — pinned facts for what the detail window must state and
+for each of the four alert kinds — as pure data, with no `Render` and no
+skin under test, because neither surface has a presenter to wire yet. The
+detail-window fixture covers only what `UsageSnapshot` carries; the
+statistics and per-model split arrive through D9's `UsageDetail` in a later
+slice.
