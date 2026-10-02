@@ -9,16 +9,14 @@ namespace OView.CrossSkin.Tests.Fixtures;
 /// carries no <c>Render</c>/<c>SkinUnderTest</c> — a real cross-skin test is wired against
 /// each fixture once a presenter does (OVI-324, per Chief Gary II's OVI-325 scoping decision).
 ///
-/// <para>Scoped to what <see cref="UsageSnapshot"/> already carries today: session/weekly
-/// percent, their resets, <see cref="UsageSnapshot.DataSourceKind"/>, and
-/// <see cref="UsageSnapshot.ExtraUsage"/>. ADR-0008 D2 also requires the detail window to
-/// show the per-model split, the statistics, and the no-data explanation — the first two need
-/// a widened <c>IShellToSkin</c>/Core type this slice is not scoped to invent (that is a
-/// separate Core/shell contract task); the no-data case is covered here via
-/// <see cref="UsageSnapshot.Unavailable"/>, which the current contract already expresses.</para>
+/// <para>Carries the full <see cref="UsageDetail"/> the detail window actually receives
+/// (ADR-0008 D9a, OVI-329): the plan-meter snapshot, the 31-day statistics, and the per-model
+/// breakdown, pushed together so the window can never pair a percent from one poll with
+/// statistics from another. Earlier (OVI-324) this fixture carried only a bare
+/// <see cref="UsageSnapshot"/>, before <see cref="UsageDetail"/> existed.</para>
 /// </summary>
 public sealed record DetailWindowFixture(
     string Name,
-    UsageSnapshot Snapshot,
+    UsageDetail Detail,
     TimeZoneInfo DisplayZone,
     IReadOnlyList<ContentFact> ContentFacts);
