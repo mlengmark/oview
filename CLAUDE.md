@@ -130,9 +130,23 @@ its own PR and its own review. The answers:
   question C). It is not a general appetite for dependencies, and the
   `*.csproj` change remains a **board** merge.
 - **Gate G4 stays closed.** No shared widget, no shared window base class;
-  each skin keeps its own.
+  each skin keeps its own. *(Superseded 2026-10-02 — see below.)*
 - **Gate G5 unchanged.** No second AI source may be audited, designed for,
   or named.
+
+**2026-10-02 — Phase 2 is fully landed and Phase 3 is designed, not started.**
+Every slice in ADR-0005, 0006 and 0007's slicing tables is merged (last: PR
+#56). **Gate G4 is answered: Option A, keep two native windows** — WPF on
+Windows, Avalonia on Linux, no shared UI layer (board card
+`gate:G4:ui-unification:v1`, accepted 08:00:32Z). Phase 3 — the status icon,
+tooltip, detail window, alerts, and wiring Phase 2 into each native window — is
+designed in [ADR-0008](docs/adr/0008-presentation-skin-contract.md), **Proposed
+and awaiting board sign-off**; no Phase 3 slice is authorized until that lands.
+ADR-0007's "Gate flag" section carries a dated amendment saying the same thing
+from the shell's side: nothing presentational may enter `O-view.App`, and adding
+it is now a reversal of an accepted gate rather than an open design call.
+**Gates G3 (macOS) and G5 (second AI source) remain open and Phase 3 does not
+need either.**
 
 **Do not assume this repository contains working code.** If you are looking
 for the current, running implementation, that is
@@ -218,7 +232,7 @@ not assumed from a design document alone:
 | G1 | Target-architecture / PDR sign-off — **passed** |
 | G2 | Per-slice merge approval |
 | G3 | Platform ambition (Windows + Linux now, macOS deferred) |
-| G4 | UI unification (keep two native windows, or unify) |
+| G4 | UI unification (keep two native windows, or unify) — **answered 2026-10-02: A, keep two native windows.** No shared UI layer; adding one is a reversal of a board decision. See [ADR-0008](docs/adr/0008-presentation-skin-contract.md) |
 | G5 | Any second AI usage source — requires its own dedicated audit first |
 | G6 | Invoking a vendor's own command to make the vendor refresh its own cache — **opened 2026-09-28**, under the three limits in [ADR-0005](docs/adr/0005-data-provider-contract.md) |
 
