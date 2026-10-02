@@ -207,10 +207,26 @@ Two narrow interfaces, replacing "the shell knows about a window":
 | `RaiseEvent(UsageEvent)` | An enum-plus-data event: threshold crossed, off-plan entered, update available, input degraded | Never a sentence, never a title, never a severity colour |
 | `SetVisible(bool)` | The widget's requested visibility | Lifecycle only — the shell says "the user asked for the widget," not where or how big |
 | `Shutdown()` | — | Skin tears down its OS integration; shell then disposes Core |
+| `ShowDetail(UsageDetail)` | The snapshot plus the ledger-derived statistics and per-model split ([ADR-0008](0008-presentation-skin-contract.md) D9a) | Added 2026-10-02 (OVI-326). Pushed when the widget becomes visible and on each successful poll while it stays visible — never while it is hidden |
 
 **Skin → shell** (the shell implements; the skin calls): `RefreshNow()`,
 `SetThresholdPercent(int)`, `SetAutoUpdate(bool)`, `WriteDiagnosticsBundle()`,
-`Quit()`.
+`Quit()`, and `RequestWidget(bool)` (added 2026-10-02, OVI-326 — the user
+activated or dismissed the icon; the shell decides and replies with
+`SetVisible`).
+
+> **2026-10-02 amendment (OVI-326, [ADR-0008](0008-presentation-skin-contract.md)
+> D9) — one member added in each direction.** Shell → skin gains
+> `ShowDetail(UsageDetail)`: the statistics and the per-model split the detail
+> window must state (ADR-0008 D2) are ledger-derived and are not on
+> `UsageSnapshot`, so "one snapshot per poll is the whole data path" below is
+> **corrected** — it is now *"what the shell pushes is the whole data path."*
+> Skin → shell gains `RequestWidget(bool)`, the user's icon activation or
+> dismissal; the shell still decides and still answers with `SetVisible`.
+> The shell assembles the detail from ADR-0005 D6c's ledger seam **only while
+> the widget is visible**. The two rejections below are untouched and both still
+> hold: the skin still never sees Core or the store, and it still does not poll —
+> `RequestWidget` is a one-shot user gesture, not a schedule.
 
 **Rejected: handing the skin a reference to Core, or to the store.** PDR
 §3.2 is explicit that a skin talks to Core only through the contract and

@@ -140,8 +140,12 @@ Every slice in ADR-0005, 0006 and 0007's slicing tables is merged (last: PR
 Windows, Avalonia on Linux, no shared UI layer (board card
 `gate:G4:ui-unification:v1`, accepted 08:00:32Z). Phase 3 — the status icon,
 tooltip, detail window, alerts, and wiring Phase 2 into each native window — is
-designed in [ADR-0008](docs/adr/0008-presentation-skin-contract.md), **Proposed
-and awaiting board sign-off**; no Phase 3 slice is authorized until that lands.
+designed in [ADR-0008](docs/adr/0008-presentation-skin-contract.md), **Accepted**
+(the board merged PR #58 itself, 2026-10-02T11:02:23Z), so its slicing table is
+open for decomposition. **Read its D9 before touching the detail window**
+(amended 2026-10-02, OVI-326): the statistics and the per-model split reach a
+skin through `ShowDetail(UsageDetail)`, not through `UsageSnapshot`, and slices
+5a/5b build that before slice 6 can.
 ADR-0007's "Gate flag" section carries a dated amendment saying the same thing
 from the shell's side: nothing presentational may enter `O-view.App`, and adding
 it is now a reversal of an accepted gate rather than an open design call.
