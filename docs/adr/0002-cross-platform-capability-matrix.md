@@ -3,7 +3,8 @@
 - **Status:** Accepted — living document; update evidence labels as real
   hardware verification happens. Do not compress a label upward without a
   new, dated verification event.
-- **Date:** 2026-09-08
+- **Date:** 2026-09-08 · **Amended** 2026-09-10 (OVI-30), 2026-09-25 (OVI-135),
+  2026-09-26 (OVI-140), 2026-10-02 (OVI-342 — seam cross-references only)
 - **Deciders:** Adrian II the Architect, per board sign-off at gate G1
   (2026-09-08T19:53:12Z)
 - **Formalizes:** the approved PDR (rev. 2, `oview-pdr-reissued`), §4
@@ -46,10 +47,10 @@ not re-tested" or "never observed" into "supported."
 | Tray/status icon rendering | Render `UsageLevel` as a small icon; launch the widget on activation | **CONFIRMED** — `NotifyIcon`, per-monitor DPI v2 re-render (source repo ADR-0003) | **CONFIRMED, narrow** — StatusNotifierItem via D-Bus, seen working on KDE Plasma/Wayland tarball installs (2 hardware reports). GNOME without an AppIndicator extension and X11 are **INFERRED**, not observed |
 | Tooltip display | Own text, format, and any length limit; render session/weekly percent + resets | **CONFIRMED** — `NotifyIcon.Text`, 127-char OS limit (Windows-only; must not travel to other skins per [ADR-0001](0001-core-to-skin-data-contract.md)) | **Never observed on real hardware** — desktop-environment-dependent SNI tooltip support, untested |
 | Detail window launch & positioning | Draggable widget, launched from the tray/menu-bar icon; skin remembers last position (a skin preference, not Core data) | Can additionally use `Shell_NotifyIconGetRect` for icon-anchored placement — this target design deliberately does not rely on this (see "Alternatives considered") | **Cannot report icon position at all** — protocol limitation, StatusNotifierItem has no equivalent. Current fallback is a fixed work-area corner (source repo ADR-0013). **Never observed rendering on real hardware in any form** — blocked historically by a deadlock (#124), then a segfault (#143) |
-| Notifications | Fire on a user-set threshold crossing, from `NotificationThresholdCrossed` only | **CONFIRMED** — balloon/toast, shipped | Freedesktop notification implemented; **never observed firing on real hardware** |
-| Startup registration | Register/unregister at login via the OS's own canonical mechanism; sole source of truth (no shadow copy in Core settings) | **CONFIRMED** — `HKCU\...\Run` key (source repo ADR-0009) | XDG autostart file implemented; **hardware-unverified** that login actually triggers launch (INFERRED from code) |
+| Notifications | Fire on a user-set threshold crossing, and nothing else. Expressed by the shell↔skin seam ([ADR-0007](0007-app-shell-contract.md) D6, shipped OVI-273): the shell pushes `IShellToSkin.RaiseEvent(UsageEvent)` with `UsageEventKind.ThresholdCrossed`; the skin sets the threshold back via `ISkinToShell.SetThresholdPercent`. The skin decides nothing about *when* — see [ADR-0008](0008-presentation-skin-contract.md) D2, "present `RaiseEvent` and nothing else" | **CONFIRMED** — balloon/toast, shipped | Freedesktop notification implemented; **never observed firing on real hardware** |
+| Startup registration | Register/unregister at login via the OS's own canonical mechanism; the OS is the sole source of truth (no shadow copy in Core settings — [ADR-0007](0007-app-shell-contract.md) D4). Expressed by `IStartupRegistration` ([ADR-0007](0007-app-shell-contract.md) D5, shipped OVI-283): the shell declares the capability, the skin implements it — `RegistryStartupRegistration` on Windows, `XdgAutostartRegistration` on Linux | **CONFIRMED** — `HKCU\...\Run` key (source repo ADR-0009) | XDG autostart file implemented; **hardware-unverified** that login actually triggers launch (INFERRED from code) |
 | Theme-following | Match OS light/dark preference automatically | **CONFIRMED** — reads `AppsUseLightTheme` | Desktop theme portal implemented; **never observed on real hardware** |
-| Single-instance enforcement | Guarantee exactly one running copy per user session | **CONFIRMED** — named mutex | No equivalent primitive exists; needs its own mechanism (file lock or socket) — genuinely a different implementation, not a shared API |
+| Single-instance enforcement | Guarantee exactly one running copy per user session. Expressed by `ISingleInstanceGuard.TryAcquire()` ([ADR-0007](0007-app-shell-contract.md) D5, shipped OVI-283) — `MutexSingleInstanceGuard` on Windows, `FileLockSingleInstanceGuard` on Linux. One capability, two unrelated primitives; the seam is the only thing they share | **CONFIRMED** — named mutex | No equivalent primitive exists; needs its own mechanism (file lock or socket) — genuinely a different implementation, not a shared API |
 | Install & distribution | Get itself onto the machine via the OS's native packaging convention; register uninstall | **CONFIRMED** — Inno Setup installer, per-user, Start Menu shortcut, uninstall registry entry | Headless CI (Ubuntu/Debian/Fedora containers) **confirms install-and-start only** — proves nothing about UI, since containers have no compositor. Hardware reports used a tarball, not the `.deb`; `.deb`-on-real-hardware is untested |
 | Self-update | Act on the shared update check's result: self-replace only if the OS's package model allows it, else notify-only. The check itself (fetch, rate-limit detection, `retryAfterUtc`) is **not** per-skin — see the 2026-09-25 (OVI-135) note below | **CONFIRMED** — installer self-replaces via Restart Manager, checksum-verified first | **Must never self-replace** under a package-manager install (the package manager owns those files) — getting this wrong already shipped a real bug once (source repo ADR-0009 amendment) |
 | Menu-dismiss-on-outside-click | Dismiss the widget/menu on an outside click | **CONFIRMED** — Win32 `AttachThreadInput`-based fix | No direct equivalent; compositor-dependent. One hardware-found bug here (#129, panel self-dismissing on an unfocused compositor) fixed but not re-tested |
@@ -94,6 +95,36 @@ back into GitHub's limit before issue #176 moved the cooldown into the shared la
 **2026-09-26 (OVI-140):** the shared cooldown must also last for the whole process. The
 source's Windows head builds a new `ReleaseFeed` per check and so drops it (CONFIRMED at
 `897777b`). See ADR-0001's D4 amendment, same date, for the evidence and the rule.
+
+### 2026-10-02 amendment — three rows now name the seam that expresses them (OVI-342)
+
+When this matrix was written, "every skin must provide" could only be prose: no seam
+existed. Three of those rows now have one in code, and the table did not say so — found by
+OVI-335's drift check. **Correction only.** The three rows' "every skin must provide"
+column now points at its interface:
+
+- **Notifications** → `IShellToSkin.RaiseEvent(UsageEvent)` / `ISkinToShell.SetThresholdPercent`
+  ([ADR-0007](0007-app-shell-contract.md) D6; `src/O-view.App/`, PR #52, OVI-273).
+- **Startup registration** → `IStartupRegistration` ([ADR-0007](0007-app-shell-contract.md)
+  D5; PR #55, OVI-283).
+- **Single-instance enforcement** → `ISingleInstanceGuard` (same ADR, same PR).
+
+**No Windows or Linux guarantee cell changed, and no evidence label moved.** Nothing was
+re-verified on hardware for this entry, and a seam existing is not evidence that a platform
+does the thing — the Linux cells still read exactly as Rae II's OVI-4 pass left them. The
+seam makes the *obligation* checkable in code; it does not make the *behaviour* observed.
+
+**Where the rest of the capability story now lives**, since this ADR predates all four:
+
+| Read this for | ADR |
+|---|---|
+| The shell↔skin seam, who owns persisted state, the shared update check | [ADR-0007](0007-app-shell-contract.md) D3–D6 |
+| What each skin must state on each surface, and the draggable-widget design (G4 = A) | [ADR-0008](0008-presentation-skin-contract.md) D1–D5, D9 |
+| Where the numbers come from, and the degraded/unavailable cases a skin must survive | [ADR-0005](0005-data-provider-contract.md) D1, D4 |
+| What is persisted locally, and the local-machine-only boundary | [ADR-0006](0006-local-storage-contract.md) |
+
+This matrix stays the register of **per-OS variance and evidence**; those four own the
+contracts. Where they disagree with a row here, the row here is the one to fix.
 
 ### Reading the Linux column honestly
 

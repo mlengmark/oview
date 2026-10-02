@@ -568,6 +568,43 @@ code, to keep the two heads honest against each other.
   - See [ADR-0001](0001-core-to-skin-data-contract.md)'s 2026-09-27 note for the Core and
     per-skin surface this family exercises.
 
+- **2026-10-02 note (OVI-342) — the fixture inventory, reconciled against the directory.**
+  The running count above drifted: this entry replaces it with what
+  `tests/O-view.CrossSkin.Tests/Fixtures/` actually contains. Correction only, no decision.
+
+  **Ten fixture families exist** (CONFIRMED by directory read, `main` at `d2aa91d`), in two
+  kinds:
+
+  | Family | Canonical input | Skin render | Added by |
+  |---|---|---|---|
+  | `GoldenMasterFixture` | `UsageSnapshot` (tooltip) | `SkinUnderTest` | OVI-25 |
+  | `UsageStatisticsFixture` | `UsageStatistics` | `UsageStatisticsSkinUnderTest` | OVI-27 |
+  | `FreshnessFixture` | `UsageSnapshot` + `utcNow` + zone | `FreshnessSkinUnderTest` | OVI-29 item 1 |
+  | `PanelTextResetFixture` | four raw-scalar members, member-selecting `Render` | `PanelTextResetSkinUnderTest` | OVI-29 item 2 |
+  | `BoostNoticeFixture` | `BoostNotice` + `DateTimeOffset` + zone | `BoostNoticeSkinUnderTest` | OVI-82/OVI-92 |
+  | `RateLimitedNoticeFixture` | fixed raw-scalar shape | `RateLimitedNoticeSkinUnderTest` | OVI-98 |
+  | `UsageCaveatFixture` | `UsageStatistics` / `RateCardStamp` / constant | `UsageCaveatSkinUnderTest` | OVI-100/OVI-165 |
+  | `OffPlanFixture` | off-plan state, five member-selecting entry points | `OffPlanSkinUnderTest` | OVI-168 |
+  | `DetailWindowFixture` | `UsageSnapshot` + zone | **none** | OVI-324 |
+  | `AlertFixture` | `UsageEvent` | **none** | OVI-324 |
+
+  **Eight render families, two data-only.** The last two carry `ContentFact`s but no
+  `Render`/`SkinUnderTest`, because no presenter exists for the detail window or the alerts
+  surface yet — see [ADR-0008](0008-presentation-skin-contract.md) D7's 2026-10-02 note for
+  why, and for the `UsageSnapshot`-vs-`UsageDetail` re-scope still open on them. A data-only
+  family is **not** a precedent for dropping the render half of a normal family; it is what a
+  content set looks like before its presenter exists.
+
+  **Two corrections to earlier entries, for the record:** the 2026-09-27 note calls
+  `OffPlanFixture` "a ninth family" while listing seven before it — it was the **eighth**
+  (the 2026-09-23 entry's "this proposal is a seventh" for `UsageCaveatFixture` is the
+  correct sequence). And its "all 9 `O-view.CrossSkin.Tests` pass (up from 7)" counts **test
+  methods**, not families. That count is now **13** (CONFIRMED by source read of the
+  `[Fact]` attributes; OVI-324 added 4). Documentation only — no test run is claimed here.
+
+  The 2026-09-23 ruling still stands and is unaffected: a new differently-shaped family needs
+  Quinn's explicit sign-off before a slice builds against it.
+
 ## Alternatives considered
 
 **Shared non-Core text-resource module, consumed by both skins.**
