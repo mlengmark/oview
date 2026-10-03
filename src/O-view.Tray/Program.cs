@@ -12,9 +12,10 @@ namespace OView.Tray;
 /// <see cref="TraySkinHost.Compose"/> and keeps the process alive with a windowless WPF
 /// message loop — <c>UseWPF</c> is this skin's own framework choice (ADR-0007/0008 name no UI
 /// framework above this project). Slice 4 (OVI-371) adds the first thing this process renders:
-/// a <see cref="TrayStatusIcon"/>. The detail window, the tooltip, and the first call into
-/// <see cref="ISkinToShell"/> that would let a user ask to quit remain slices 5-7 — until then
-/// this process exits only by being killed from outside, and clicking the icon calls
+/// a <see cref="TrayStatusIcon"/>. Slice 5 (OVI-376) adds its tooltip, formatted from the same
+/// snapshot. The detail window and the first call into <see cref="ISkinToShell"/> that would
+/// let a user ask to quit remain slices 6-7 — until then this process exits only by being
+/// killed from outside, and clicking the icon calls
 /// <see cref="ISkinToShell.RequestWidget"/> against a placeholder shell that shows nothing yet
 /// (see <see cref="PendingSkinToShell"/>).
 /// </summary>
@@ -30,8 +31,8 @@ internal static class Program
             ShellSettings.Default.PollCadence);
 
         using var statusIcon = new TrayStatusIcon(new PendingSkinToShell());
-        statusIcon.OnSnapshotUpdated(pollLoop.CurrentSnapshot.UsageLevel);
-        pollLoop.SnapshotUpdated += (_, snapshot) => statusIcon.OnSnapshotUpdated(snapshot.UsageLevel);
+        statusIcon.OnSnapshotUpdated(pollLoop.CurrentSnapshot);
+        pollLoop.SnapshotUpdated += (_, snapshot) => statusIcon.OnSnapshotUpdated(snapshot);
 
         // UsagePollLoop.Dispose() stops and disposes the IAppTimer it was given (ADR-0007
         // slice 2), so disposing the loop is enough — there is no separate timer to dispose.
