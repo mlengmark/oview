@@ -17,12 +17,16 @@ namespace OView.Tray.Presentation;
 /// has a window of its own to intercept. Not unit-tested (no interactive Windows desktop in
 /// this environment — the same "not verified" boundary ADR-0008 slice 3 already recorded for
 /// its own WPF message loop); proved only by this PR's documented manual run.
+/// Slice 5 (OVI-376) adds the tooltip: <see cref="TooltipTextController"/> owns the same
+/// "decision logic testable, adapter not" split and pushes the already-capped
+/// <see cref="TooltipFormatter"/> output to <c>NotifyIcon.Text</c>.
 /// </summary>
 internal sealed class TrayStatusIcon : IDisposable
 {
     private const int WM_DPICHANGED = 0x02E0;
 
     private readonly StatusIconController _controller;
+    private readonly TooltipTextController _tooltip;
     private readonly NotifyIcon _notifyIcon;
     private readonly MessageSink _messageSink;
     private readonly int _taskbarCreatedMessage;
@@ -36,6 +40,7 @@ internal sealed class TrayStatusIcon : IDisposable
 
         _notifyIcon = new NotifyIcon { Visible = false };
         _notifyIcon.MouseClick += (_, _) => _controller.OnActivated();
+        _tooltip = new TooltipTextController(text => _notifyIcon.Text = text);
 
         _messageSink = new MessageSink(this);
 
@@ -43,9 +48,14 @@ internal sealed class TrayStatusIcon : IDisposable
         _notifyIcon.Visible = true;
     }
 
-    /// <summary>Forwards the shell's latest snapshot's <see cref="UsageLevel"/>. Wired by the
-    /// composition root to <c>UsagePollLoop.SnapshotUpdated</c>.</summary>
-    public void OnSnapshotUpdated(UsageLevel level) => _controller.OnSnapshotUpdated(level);
+    /// <summary>Forwards the shell's latest snapshot: re-renders the icon for its
+    /// <see cref="UsageLevel"/> and reformats <c>NotifyIcon.Text</c> from the full snapshot.
+    /// Wired by the composition root to <c>UsagePollLoop.SnapshotUpdated</c>.</summary>
+    public void OnSnapshotUpdated(UsageSnapshot snapshot)
+    {
+        _controller.OnSnapshotUpdated(snapshot.UsageLevel);
+        _tooltip.OnSnapshotUpdated(snapshot);
+    }
 
     private void Render(UsageLevel level, double dpiScale)
     {
