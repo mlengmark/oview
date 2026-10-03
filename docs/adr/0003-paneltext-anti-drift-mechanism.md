@@ -572,7 +572,7 @@ code, to keep the two heads honest against each other.
   The running count above drifted: this entry replaces it with what
   `tests/O-view.CrossSkin.Tests/Fixtures/` actually contains. Correction only, no decision.
 
-  **Ten fixture families exist** (CONFIRMED by directory read, `main` at `d2aa91d`), in two
+  **Ten fixture families exist** (CONFIRMED by directory read, `main` at `48e0c9f`), in two
   kinds:
 
   | Family | Canonical input | Skin render | Added by |
@@ -585,15 +585,20 @@ code, to keep the two heads honest against each other.
   | `RateLimitedNoticeFixture` | fixed raw-scalar shape | `RateLimitedNoticeSkinUnderTest` | OVI-98 |
   | `UsageCaveatFixture` | `UsageStatistics` / `RateCardStamp` / constant | `UsageCaveatSkinUnderTest` | OVI-100/OVI-165 |
   | `OffPlanFixture` | off-plan state, five member-selecting entry points | `OffPlanSkinUnderTest` | OVI-168 |
-  | `DetailWindowFixture` | `UsageSnapshot` + zone | **none** | OVI-324 |
+  | `DetailWindowFixture` | `UsageDetail` + zone | **none** | OVI-324, widened OVI-329 |
   | `AlertFixture` | `UsageEvent` | **none** | OVI-324 |
 
   **Eight render families, two data-only.** The last two carry `ContentFact`s but no
   `Render`/`SkinUnderTest`, because no presenter exists for the detail window or the alerts
   surface yet — see [ADR-0008](0008-presentation-skin-contract.md) D7's 2026-10-02 note for
-  why, and for the `UsageSnapshot`-vs-`UsageDetail` re-scope still open on them. A data-only
-  family is **not** a precedent for dropping the render half of a normal family; it is what a
-  content set looks like before its presenter exists.
+  why. A data-only family is **not** a precedent for dropping the render half of a normal
+  family; it is what a content set looks like before its presenter exists.
+
+  `DetailWindowFixture` was created against `UsageSnapshot` (OVI-324, PR #59) and **widened to
+  D9's `UsageDetail` by OVI-329 (PR #63, merged 2026-10-02)**, growing from four fixtures to
+  eight. That re-scope is closed, not open. Note that OVI-329 itself recorded nothing in
+  `docs/adr/` — a separate record gap, raised to OVI-335/OVI-340's drift triage rather than
+  patched here.
 
   **Two corrections to earlier entries, for the record:** the 2026-09-27 note calls
   `OffPlanFixture` "a ninth family" while listing seven before it — it was the **eighth**
