@@ -6,7 +6,7 @@
   closed). The slicing table is therefore open for decomposition. Living
   document: amend in place, as [ADR-0001](0001-core-to-skin-data-contract.md)
   does.
-- **Date:** 2026-10-02 · **Amended** 2026-10-02 (D9, OVI-326)
+- **Date:** 2026-10-02 · **Amended** 2026-10-02 (D9, OVI-326; D7 note, OVI-324/OVI-342)
 - **Deciders:** Adrian II the Architect, signed off by the board
 - **Scope:** Phase 3 — the tray/status icon, the tooltip, the detail window, the
   alerts, and wiring Phase 2's providers and app shell into each platform's own
@@ -270,6 +270,39 @@ each keeps its own wording.
 facts, not pixels. It cannot tell you an icon is legible, a window landed where
 it asked, a tooltip is readable, or a notification appeared. Those remain
 hardware questions, and on Linux they remain **never observed**.
+
+**2026-10-02 note (OVI-324, PR #59) — slice 1's fixtures landed, and what they
+actually cover.** Recorded here because PR #59 shipped without a record in
+`docs/adr/` (found by OVI-335's drift check); this entry is that record, not a new
+decision. CONFIRMED by source read of `tests/O-view.CrossSkin.Tests/`:
+
+- The two content sets exist as `DetailWindowFixture`/`DetailWindowFixtures` (four
+  fixtures as PR #59 shipped them; **eight today** — see the last bullet) and
+  `AlertFixture`/`AlertFixtures` (four fixtures: `ThresholdCrossedIntoRed`,
+  `OffPlanEnteredWithMeasurableRise`, `UpdateAvailable`, `InputDegradedNeverSucceeded` —
+  one per `UsageEventKind`).
+- They are **pure data, with no `Render` and no `SkinUnderTest`**, unlike the eight
+  render families ADR-0003 inventories. No presenter exists for either surface yet
+  (slices 6/7/10/11), so there is nothing to render against; the cross-skin test is
+  wired per fixture once a presenter lands. That shape was Chief Gary II's scoping
+  decision on OVI-325.
+- `DetailWindowAndAlertFixtureDataTests` adds **4 test methods**, taking
+  `O-view.CrossSkin.Tests` from 9 to 13. They assert fixture-set invariants — names
+  unique, every fixture pins at least one `ContentFact` (`UpdateAvailable` exempt,
+  as it carries no reading) — not skin output.
+- **As shipped, the detail-window fixtures took a `UsageSnapshot`, not D9's `UsageDetail`** —
+  PR #59 predates D9 (same day, OVI-326), which amended the slicing table's slice 1 row to
+  require `UsageDetail` plus an empty-but-`Real` breakdown, an unpriced model, and a fully
+  `Unavailable` detail. **That gap is now closed:** OVI-329 (PR #63, merged 2026-10-02)
+  widened `DetailWindowFixture` to carry a `UsageDetail` and grew the set to eight fixtures,
+  adding `StaleDetailOldLastIngestAt`, `RecordedWindowNoActivity`, `ModelBreakdownUnavailable`,
+  and `UnpricedModelInWindow` (CONFIRMED by source read at `main` `48e0c9f`). No coverage
+  discrepancy remains to escalate. OVI-329 recorded nothing in `docs/adr/` itself; that
+  record gap belongs to OVI-335/OVI-340's drift triage, not to this note.
+
+Nothing in this note is verified by execution — documentation only; the 9→13 count and the
+fixture shapes are from a source read of the `[Fact]` attributes and the fixture files, not
+from a test run. OVI-329 added no new `[Fact]`, so 13 still stands.
 
 ### D8 — Out of scope, and staying out
 
