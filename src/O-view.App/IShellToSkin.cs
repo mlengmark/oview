@@ -18,6 +18,12 @@ public interface IShellToSkin
     /// sentence, never a title, never a severity colour.</summary>
     void RaiseEvent(UsageEvent usageEvent);
 
+    /// <summary>Everything the detail window needs for one render (ADR-0008 D9a), pushed once
+    /// when the widget becomes visible and again on every successful poll while it stays
+    /// visible — never while hidden (D9b). <see cref="UsageDetail.Unavailable"/> when the
+    /// ledger read behind it failed.</summary>
+    void ShowDetail(UsageDetail detail);
+
     /// <summary>The widget's requested visibility. Lifecycle only — the shell says "the
     /// user asked for the widget," not where or how big.</summary>
     void SetVisible(bool visible);

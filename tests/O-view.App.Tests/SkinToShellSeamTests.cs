@@ -20,6 +20,16 @@ public class SkinToShellSeamTests
     }
 
     [Fact]
+    public void Driving_skin_calls_RequestWidget_and_the_shell_receives_the_exact_visibility()
+    {
+        var shell = new FakeShell();
+
+        DriveAsSkin(shell).RequestWidget(true);
+
+        Assert.True(shell.LastRequestedWidgetVisible);
+    }
+
+    [Fact]
     public void Driving_skin_calls_SetThresholdPercent_and_the_shell_receives_the_exact_value()
     {
         var shell = new FakeShell();
@@ -67,6 +77,8 @@ public class SkinToShellSeamTests
     {
         public bool RefreshNowCalled { get; private set; }
 
+        public bool? LastRequestedWidgetVisible { get; private set; }
+
         public int? LastThresholdPercent { get; private set; }
 
         public bool? LastAutoUpdate { get; private set; }
@@ -76,6 +88,8 @@ public class SkinToShellSeamTests
         public bool QuitCalled { get; private set; }
 
         public void RefreshNow() => RefreshNowCalled = true;
+
+        public void RequestWidget(bool visible) => LastRequestedWidgetVisible = visible;
 
         public void SetThresholdPercent(int percent) => LastThresholdPercent = percent;
 

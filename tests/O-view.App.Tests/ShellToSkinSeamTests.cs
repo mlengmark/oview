@@ -43,6 +43,17 @@ public class ShellToSkinSeamTests
     }
 
     [Fact]
+    public void Driving_shell_calls_ShowDetail_and_the_skin_receives_the_exact_detail()
+    {
+        var skin = new FakeSkin();
+        var detail = new UsageDetail(Snapshot(), UsageStatistics.Unavailable, ModelUsageBreakdown.Unavailable);
+
+        DriveAsShell(skin).ShowDetail(detail);
+
+        Assert.Equal(detail, skin.LastDetail);
+    }
+
+    [Fact]
     public void Driving_shell_calls_SetVisible_and_the_skin_receives_the_requested_visibility()
     {
         var skin = new FakeSkin();
@@ -72,6 +83,8 @@ public class ShellToSkinSeamTests
 
         public UsageEvent? LastEvent { get; private set; }
 
+        public UsageDetail? LastDetail { get; private set; }
+
         public bool? LastVisible { get; private set; }
 
         public bool ShutdownCalled { get; private set; }
@@ -79,6 +92,8 @@ public class ShellToSkinSeamTests
         public void ShowSnapshot(UsageSnapshot snapshot) => LastSnapshot = snapshot;
 
         public void RaiseEvent(UsageEvent usageEvent) => LastEvent = usageEvent;
+
+        public void ShowDetail(UsageDetail detail) => LastDetail = detail;
 
         public void SetVisible(bool visible) => LastVisible = visible;
 
