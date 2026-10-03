@@ -107,6 +107,44 @@ public class UsagePollLoopTests
     }
 
     [Fact]
+    public void A_normal_tick_raises_SnapshotUpdated_with_the_exact_new_snapshot()
+    {
+        var clock = new FakeClock(DateTimeOffset.UnixEpoch);
+        var timer = new FakeAppTimer();
+        var expected = Snapshot(clock.UtcNow);
+        UsageSnapshot? observed = null;
+
+        using var loop = new UsagePollLoop(
+            new FakeUsageProvider(_ => expected),
+            clock,
+            timer,
+            TimeSpan.FromMinutes(5));
+        loop.SnapshotUpdated += (_, snapshot) => observed = snapshot;
+
+        timer.RaiseElapsed();
+
+        Assert.Equal(expected, observed);
+    }
+
+    [Fact]
+    public void A_throwing_provider_does_not_raise_SnapshotUpdated()
+    {
+        var timer = new FakeAppTimer();
+        var raised = false;
+
+        using var loop = new UsagePollLoop(
+            new FakeUsageProvider(_ => throw new InvalidOperationException("simulated provider failure")),
+            new FakeClock(DateTimeOffset.UnixEpoch),
+            timer,
+            TimeSpan.FromMinutes(5));
+        loop.SnapshotUpdated += (_, _) => raised = true;
+
+        timer.RaiseElapsed();
+
+        Assert.False(raised);
+    }
+
+    [Fact]
     public void Dispose_stops_and_disposes_the_timer()
     {
         var timer = new FakeAppTimer();
