@@ -12,6 +12,13 @@ public interface ISkinToShell
     /// <summary>The user asked for an immediate poll instead of waiting for the next tick.</summary>
     void RefreshNow();
 
+    /// <summary>The user activated the icon (<paramref name="visible"/> = <c>true</c>) or
+    /// dismissed the detail window (<c>false</c>) (ADR-0008 D9b). The skin reports the gesture;
+    /// the shell decides and answers with <see cref="IShellToSkin.SetVisible"/> followed by
+    /// <see cref="IShellToSkin.ShowDetail"/> — the skin never calls <c>SetVisible</c> on
+    /// itself.</summary>
+    void RequestWidget(bool visible);
+
     /// <summary>The user changed the alert threshold percent (D4: a shell-owned behaviour
     /// setting).</summary>
     void SetThresholdPercent(int percent);
