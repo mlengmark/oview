@@ -24,6 +24,13 @@ namespace OView.App;
 /// caller falls back to when no settings have been saved yet lives in
 /// <see cref="ShellSettings.Default"/> (slice 5), not here — no composition root wires the
 /// two together yet.</para>
+///
+/// <para><see cref="SnapshotUpdated"/> was added for ADR-0008 slice 3 (OVI-360), alongside
+/// the first consumer that needs to be notified of a new snapshot rather than polling
+/// <see cref="CurrentSnapshot"/> itself: a skin host composing this loop with
+/// <c>IShellToSkin.ShowSnapshot</c>. This is the same kind of deliberate, documented
+/// extension of an existing shape that slice 2 made to <see cref="IAppTimer"/> — a type with
+/// no way to notify a consumer of a new value cannot drive a push-based seam.</para>
 /// </summary>
 public sealed class UsagePollLoop : IDisposable
 {
@@ -52,11 +59,18 @@ public sealed class UsagePollLoop : IDisposable
     /// </summary>
     public UsageSnapshot CurrentSnapshot { get; private set; } = UsageSnapshot.Unavailable;
 
+    /// <summary>Raised after <see cref="CurrentSnapshot"/> is replaced by a poll that
+    /// returned normally — the exact same snapshot, never a copy or a transformation. Never
+    /// raised for a poll that throws (D2 point 9: the previous snapshot stands, so there is
+    /// nothing new to announce).</summary>
+    public event EventHandler<UsageSnapshot>? SnapshotUpdated;
+
     private void OnTimerElapsed(object? sender, EventArgs e)
     {
         try
         {
             CurrentSnapshot = _provider.GetSnapshot(_clock.UtcNow);
+            SnapshotUpdated?.Invoke(this, CurrentSnapshot);
         }
         catch
         {

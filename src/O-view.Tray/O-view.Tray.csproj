@@ -9,6 +9,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- ADR-0008 slice 3 (OVI-360): this is now the first executable in the repo.
+         UseWPF is the skin's own framework choice (ADR-0007/0008 name no UI framework
+         anywhere above this project) and is why this slice is a board merge. -->
+    <OutputType>WinExe</OutputType>
+    <UseWPF>true</UseWPF>
   </PropertyGroup>
 
   <ItemGroup>
