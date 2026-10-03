@@ -43,6 +43,17 @@ public class TrayShellToSkinTests
     }
 
     [Fact]
+    public void ShowDetail_records_the_exact_detail()
+    {
+        var skin = new TrayShellToSkin();
+        var detail = UsageDetail.Unavailable;
+
+        skin.ShowDetail(detail);
+
+        Assert.Equal(detail, skin.LastDetail);
+    }
+
+    [Fact]
     public void SetVisible_records_the_requested_visibility()
     {
         var skin = new TrayShellToSkin();
@@ -69,6 +80,7 @@ public class TrayShellToSkinTests
 
         Assert.Null(skin.LastSnapshot);
         Assert.Null(skin.LastEvent);
+        Assert.Null(skin.LastDetail);
         Assert.Null(skin.LastVisible);
         Assert.False(skin.ShutdownCalled);
     }
