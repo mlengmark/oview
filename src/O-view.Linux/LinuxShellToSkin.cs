@@ -9,8 +9,8 @@ namespace OView.Linux;
 /// independently implemented, not shared (D1). Proves the shell-to-skin seam reaches a real
 /// Linux skin project end to end: every call the shell makes is recorded exactly as received
 /// and nothing renders. The status icon (slice 9) and detail window (slice 10) render from
-/// separate types that subscribe to <see cref="DetailShown"/>/<see cref="VisibilityChanged"/>;
-/// alerts are a separately scoped, later slice (11); this type only has to outlive this one.
+/// separate types that subscribe to <see cref="DetailShown"/>/<see cref="VisibilityChanged"/>/
+/// <see cref="EventRaised"/>; this type only has to outlive this one.
 ///
 /// <para><see cref="DetailShown"/>/<see cref="VisibilityChanged"/> (slice 10, OVI-408) let the
 /// composition root drive a real <c>DetailWindow</c> off the same calls this type already
@@ -18,6 +18,13 @@ namespace OView.Linux;
 /// <c>TrayShellToSkin</c>, a documented, deliberate extension of ADR-0007 D6's shape, not a new
 /// seam. Every existing recorder keeps recording exactly as before; the events are additive and
 /// no-ops when nothing has subscribed.</para>
+///
+/// <para><see cref="EventRaised"/> (slice 11, OVI-417) lets the composition root drive a real
+/// freedesktop notification off the same <see cref="RaiseEvent"/> call this type already
+/// recorded — the same widening-by-event shape <c>O-view.Tray</c>'s own slice 7 used for
+/// <c>TrayShellToSkin</c>, independently added here per D1. <see cref="LastEvent"/> keeps
+/// recording exactly as before; the event is additive and a no-op when nothing has
+/// subscribed.</para>
 /// </summary>
 public sealed class LinuxShellToSkin : IShellToSkin
 {
@@ -48,9 +55,17 @@ public sealed class LinuxShellToSkin : IShellToSkin
     /// requested — the real detail window subscribes to show/hide itself (slice 10).</summary>
     public event Action<bool>? VisibilityChanged;
 
+    /// <summary>Raised after every <see cref="RaiseEvent"/> call, with the exact event
+    /// raised — the real notification controller subscribes to send it (slice 11).</summary>
+    public event Action<UsageEvent>? EventRaised;
+
     public void ShowSnapshot(UsageSnapshot snapshot) => LastSnapshot = snapshot;
 
-    public void RaiseEvent(UsageEvent usageEvent) => LastEvent = usageEvent;
+    public void RaiseEvent(UsageEvent usageEvent)
+    {
+        LastEvent = usageEvent;
+        EventRaised?.Invoke(usageEvent);
+    }
 
     public void ShowDetail(UsageDetail detail)
     {
