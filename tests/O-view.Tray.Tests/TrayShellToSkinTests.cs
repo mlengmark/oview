@@ -43,6 +43,30 @@ public class TrayShellToSkinTests
     }
 
     [Fact]
+    public void RaiseEvent_raises_EventRaised_with_the_exact_event_exactly_once()
+    {
+        var skin = new TrayShellToSkin();
+        var usageEvent = new UsageEvent(UsageEventKind.ThresholdCrossed) { UsageLevel = UsageLevel.Red };
+        var received = new List<UsageEvent>();
+        skin.EventRaised += received.Add;
+
+        skin.RaiseEvent(usageEvent);
+
+        var raised = Assert.Single(received);
+        Assert.Equal(usageEvent, raised);
+    }
+
+    [Fact]
+    public void EventRaised_is_a_no_op_when_nothing_has_subscribed()
+    {
+        var skin = new TrayShellToSkin();
+
+        var exception = Record.Exception(() => skin.RaiseEvent(new UsageEvent(UsageEventKind.UpdateAvailable)));
+
+        Assert.Null(exception);
+    }
+
+    [Fact]
     public void ShowDetail_records_the_exact_detail()
     {
         var skin = new TrayShellToSkin();
