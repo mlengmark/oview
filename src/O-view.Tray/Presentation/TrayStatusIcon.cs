@@ -19,11 +19,16 @@ namespace OView.Tray.Presentation;
 /// its own WPF message loop); proved only by this PR's documented manual run.
 /// Slice 5 (OVI-376) adds the tooltip: <see cref="TooltipTextController"/> owns the same
 /// "decision logic testable, adapter not" split and pushes the already-capped
-/// <see cref="TooltipFormatter"/> output to <c>NotifyIcon.Text</c>.
+/// <see cref="TooltipFormatter"/> output to <c>NotifyIcon.Text</c>. Slice 7 (OVI-391) adds
+/// <see cref="ShowToast"/>: <c>NotifyIcon.ShowBalloonTip</c> is the toast surface tied to this
+/// same icon (Windows has no toast API independent of a notification-area icon), so it lives
+/// here rather than a new standalone adapter; <see cref="AlertToastController"/> owns the
+/// "which event, what text" decision and is the only caller.
 /// </summary>
 internal sealed class TrayStatusIcon : IDisposable
 {
     private const int WM_DPICHANGED = 0x02E0;
+    private const int ToastTimeoutMs = 10_000;
 
     private readonly StatusIconController _controller;
     private readonly TooltipTextController _tooltip;
@@ -56,6 +61,12 @@ internal sealed class TrayStatusIcon : IDisposable
         _controller.OnSnapshotUpdated(snapshot.UsageLevel);
         _tooltip.OnSnapshotUpdated(snapshot);
     }
+
+    /// <summary>Shows a toast balloon tied to this icon. Wired by the composition root as
+    /// <see cref="AlertToastController"/>'s injected sink, called from
+    /// <c>TrayShellToSkin.EventRaised</c>.</summary>
+    public void ShowToast(string title, string body) =>
+        _notifyIcon.ShowBalloonTip(ToastTimeoutMs, title, body, ToolTipIcon.Info);
 
     private void Render(UsageLevel level, double dpiScale)
     {

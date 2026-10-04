@@ -13,18 +13,25 @@ namespace OView.Tray;
 /// message loop — <c>UseWPF</c> is this skin's own framework choice (ADR-0007/0008 name no UI
 /// framework above this project). Slice 4 (OVI-371) adds the first thing this process renders:
 /// a <see cref="TrayStatusIcon"/>. Slice 5 (OVI-376) adds its tooltip, formatted from the same
-/// snapshot. The detail window and the first call into <see cref="ISkinToShell"/> that would
-/// let a user ask to quit remain slices 6-7 — until then this process exits only by being
-/// killed from outside, and clicking the icon calls
+/// snapshot. Slice 7 (OVI-391) adds the toast: <see cref="Presentation.AlertToastController"/>
+/// subscribes to <see cref="TrayShellToSkin.EventRaised"/> and shows exactly one
+/// <c>NotifyIcon.ShowBalloonTip</c> per raised event. The detail window and the first call into
+/// <see cref="ISkinToShell"/> that would let a user ask to quit remain slice 6 — until then this
+/// process exits only by being killed from outside, and clicking the icon calls
 /// <see cref="ISkinToShell.RequestWidget"/> against a placeholder shell that shows nothing yet
-/// (see <see cref="PendingSkinToShell"/>).
+/// (see <see cref="PendingSkinToShell"/>). No shell logic yet decides *that* an alert is due
+/// (ADR-0007 D2 point 6 is a separate, unbuilt slice), so <see cref="TrayShellToSkin.RaiseEvent"/>
+/// has no real production caller today — this wiring is proven by
+/// <c>AlertToastControllerTests</c> and <c>TrayShellToSkinTests</c> against fakes, the same
+/// "wired, not yet driven" state slice 6's <c>DetailShown</c>/<c>VisibilityChanged</c> events
+/// are in until a shell event-decision slice exists.
 /// </summary>
 internal static class Program
 {
     [STAThread]
     private static void Main()
     {
-        var (pollLoop, _) = TraySkinHost.Compose(
+        var (pollLoop, skin) = TraySkinHost.Compose(
             BuildUsageProvider(),
             new SystemClock(),
             new AppTimer(),
@@ -33,6 +40,9 @@ internal static class Program
         using var statusIcon = new TrayStatusIcon(new PendingSkinToShell());
         statusIcon.OnSnapshotUpdated(pollLoop.CurrentSnapshot);
         pollLoop.SnapshotUpdated += (_, snapshot) => statusIcon.OnSnapshotUpdated(snapshot);
+
+        var alertToast = new AlertToastController(statusIcon.ShowToast);
+        skin.EventRaised += alertToast.OnEventRaised;
 
         // UsagePollLoop.Dispose() stops and disposes the IAppTimer it was given (ADR-0007
         // slice 2), so disposing the loop is enough — there is no separate timer to dispose.

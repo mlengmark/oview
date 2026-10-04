@@ -6,13 +6,19 @@ namespace OView.Tray;
 /// <summary>
 /// The Windows skin's <see cref="IShellToSkin"/> implementation (ADR-0008 slice 3, OVI-360).
 /// Proves the shell-to-skin seam reaches a real skin project end to end: every call the shell
-/// makes is recorded exactly as received. A tooltip, a detail window, a toast remain out of
-/// scope (slices 5-7) and do not exist here. <see cref="ShowDetail"/> was added to fix a build
-/// break: slice 5b (OVI-364) widened <see cref="IShellToSkin"/> with this member but never
-/// implemented it here, so <c>main</c> did not compile — this PR (OVI-371) is the first to
-/// touch this file since. The status icon itself (ADR-0008 slice 4) renders from
-/// <see cref="ShowSnapshot"/>'s pushed <c>UsageLevel</c> via a separate
-/// <c>Presentation.TrayStatusIcon</c>, not from this no-op recorder.
+/// makes is recorded exactly as received. A tooltip, a detail window remain out of scope
+/// (slice 6) and do not exist here. <see cref="ShowDetail"/> was added to fix a build break:
+/// slice 5b (OVI-364) widened <see cref="IShellToSkin"/> with this member but never implemented
+/// it here, so <c>main</c> did not compile — OVI-371 was the first PR to touch this file since.
+/// The status icon itself (ADR-0008 slice 4) renders from <see cref="ShowSnapshot"/>'s pushed
+/// <c>UsageLevel</c> via a separate <c>Presentation.TrayStatusIcon</c>, not from this type.
+///
+/// <para><see cref="EventRaised"/> (slice 7, OVI-391) lets the composition root drive a real
+/// toast off the same <see cref="RaiseEvent"/> call this type already recorded — the same
+/// widening-by-event <c>TraySkinHost.Compose</c> already used for
+/// <c>UsagePollLoop.SnapshotUpdated</c>, a documented, deliberate extension of ADR-0007 D6's
+/// shape, not a new seam. <see cref="LastEvent"/> keeps recording exactly as before; the event
+/// is additive and a no-op when nothing has subscribed.</para>
 /// </summary>
 public sealed class TrayShellToSkin : IShellToSkin
 {
@@ -35,9 +41,17 @@ public sealed class TrayShellToSkin : IShellToSkin
     /// first call.</summary>
     public UsageDetail? LastDetail { get; private set; }
 
+    /// <summary>Raised after every <see cref="RaiseEvent"/> call, with the exact event
+    /// raised — the real toast controller subscribes to render it (slice 7).</summary>
+    public event Action<UsageEvent>? EventRaised;
+
     public void ShowSnapshot(UsageSnapshot snapshot) => LastSnapshot = snapshot;
 
-    public void RaiseEvent(UsageEvent usageEvent) => LastEvent = usageEvent;
+    public void RaiseEvent(UsageEvent usageEvent)
+    {
+        LastEvent = usageEvent;
+        EventRaised?.Invoke(usageEvent);
+    }
 
     public void ShowDetail(UsageDetail detail) => LastDetail = detail;
 
