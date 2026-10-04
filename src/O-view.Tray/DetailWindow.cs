@@ -1,0 +1,175 @@
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+using OView.App;
+using OView.Core.Models;
+using OView.Tray.Presentation;
+
+namespace OView.Tray;
+
+/// <summary>
+/// The Windows detail window (ADR-0008 slice 6, OVI-386): a draggable, borderless widget that
+/// renders only the last <see cref="UsageDetail"/> the shell pushed through
+/// <see cref="IShellToSkin.ShowDetail"/> — it totals or formats nothing itself (D9c); every
+/// figure on screen is <see cref="DetailWindowContentBuilder.Build"/>'s output, already run
+/// through the existing formatters. Built in plain C# rather than XAML: this project has no
+/// other <c>.xaml</c> file yet (<c>TrayStatusIcon</c>'s GDI icon is the only other rendering
+/// surface), and a dozen bound <c>TextBlock</c>s do not need a markup compiler.
+///
+/// <para>Not unit-tested (no interactive Windows desktop in this environment — the same
+/// "not verified" boundary slices 3/4/5 already recorded for their own OS adapters). Every
+/// decision this window merely carries out — which position to open at, when that position
+/// changed, what to say — is pulled out into <see cref="DetailWindowContentBuilder"/> and
+/// <see cref="DetailWindowPositionController"/>, both proven against fakes with no window
+/// involved.</para>
+/// </summary>
+internal sealed class DetailWindow : Window
+{
+    /// <summary>This window's fixed size, named so the composition root can feed the same
+    /// figures into <see cref="DetailWindowPlacement.Compute"/> without constructing the
+    /// window first (the position controller is built before the window is, since the
+    /// window's constructor takes the controller).</summary>
+    public const double DefaultWidth = 320;
+    public const double DefaultHeight = 360;
+
+    private readonly ISkinToShell _skinToShell;
+    private readonly DetailWindowPositionController _position;
+    private readonly TextBlock _freshness = NewLine();
+    private readonly TextBlock _session = NewLine();
+    private readonly TextBlock _weekly = NewLine();
+    private readonly TextBlock _extraUsage = NewLine();
+    private readonly TextBlock _today = NewLine();
+    private readonly TextBlock _window31d = NewLine();
+    private readonly TextBlock _caveat = NewLine();
+    private readonly TextBlock _modelNote = NewLine();
+    private readonly ItemsControl _modelRows = new();
+    private bool _dragging;
+    private System.Windows.Point _dragStartMouse;
+    private System.Windows.Point _dragStartWindow;
+
+    public DetailWindow(ISkinToShell skinToShell, DetailWindowPositionController position)
+    {
+        ArgumentNullException.ThrowIfNull(skinToShell);
+        ArgumentNullException.ThrowIfNull(position);
+
+        _skinToShell = skinToShell;
+        _position = position;
+
+        Title = "O-view";
+        Width = DefaultWidth;
+        Height = DefaultHeight;
+        WindowStyle = WindowStyle.None;
+        ResizeMode = ResizeMode.NoResize;
+        ShowInTaskbar = false;
+        Topmost = true;
+        Background = System.Windows.Media.Brushes.White;
+        BorderBrush = System.Windows.Media.Brushes.Gray;
+        BorderThickness = new Thickness(1);
+        Content = BuildLayout();
+
+        MouseLeftButtonDown += OnMouseLeftButtonDown;
+        MouseLeftButtonUp += OnMouseLeftButtonUp;
+        MouseMove += OnMouseMove;
+        Deactivated += (_, _) => _skinToShell.RequestWidget(false);
+    }
+
+    /// <summary>
+    /// Shows the window at the position <see cref="DetailWindowPositionController.ResolveShowPosition"/>
+    /// resolves (the first-run corner, or the last dragged spot). Called from
+    /// <see cref="TrayShellToSkin.VisibilityChanged"/> when the shell answers
+    /// <see langword="true"/> — never called by this window on itself (ADR-0008 D9b).
+    /// </summary>
+    public void SetVisible(bool visible)
+    {
+        if (!visible)
+        {
+            Hide();
+            return;
+        }
+
+        var (x, y) = _position.ResolveShowPosition();
+        Left = x;
+        Top = y;
+        Show();
+        Activate();
+    }
+
+    /// <summary>Renders the exact pushed detail and nothing else — see the type remarks.</summary>
+    public void ShowDetail(UsageDetail detail)
+    {
+        var content = DetailWindowContentBuilder.Build(detail, DateTimeOffset.UtcNow, TimeZoneInfo.Local);
+
+        _freshness.Text = content.Freshness;
+        _session.Text = content.SessionLine;
+        _weekly.Text = content.WeeklyLine;
+        _extraUsage.Text = content.ExtraUsageLine;
+        _extraUsage.Visibility = string.IsNullOrEmpty(content.ExtraUsageLine) ? Visibility.Collapsed : Visibility.Visible;
+        _today.Text = content.TodayLine;
+        _window31d.Text = content.Window31dLine;
+        _caveat.Text = content.Caveat;
+        _caveat.Visibility = string.IsNullOrEmpty(content.Caveat) ? Visibility.Collapsed : Visibility.Visible;
+        _modelNote.Text = content.ModelSectionNote;
+        _modelNote.Visibility = string.IsNullOrEmpty(content.ModelSectionNote) ? Visibility.Collapsed : Visibility.Visible;
+        _modelRows.ItemsSource = content.ModelRows.Select(ModelRowText).ToList();
+    }
+
+    private static string ModelRowText(DetailWindowModelRow row) =>
+        $"{row.ModelId} — {row.Requests} req · in {row.InputTokens} · out {row.OutputTokens} " +
+        $"· cache w {row.CacheWriteTokens} · cache r {row.CacheReadTokens} · {row.EstimatedSpend}";
+
+    private UIElement BuildLayout()
+    {
+        var modelSection = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
+        modelSection.Children.Add(new TextBlock { Text = "By model", FontWeight = FontWeights.Bold });
+        modelSection.Children.Add(_modelNote);
+        modelSection.Children.Add(_modelRows);
+
+        var stack = new StackPanel { Margin = new Thickness(12) };
+        stack.Children.Add(_freshness);
+        stack.Children.Add(_session);
+        stack.Children.Add(_weekly);
+        stack.Children.Add(_extraUsage);
+        stack.Children.Add(new Separator { Margin = new Thickness(0, 8, 0, 8) });
+        stack.Children.Add(_today);
+        stack.Children.Add(_window31d);
+        stack.Children.Add(_caveat);
+        stack.Children.Add(modelSection);
+
+        return new ScrollViewer { Content = stack, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+    }
+
+    private static TextBlock NewLine() => new() { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 2) };
+
+    private void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        _dragging = true;
+        _dragStartMouse = PointToScreen(e.GetPosition(this));
+        _dragStartWindow = new System.Windows.Point(Left, Top);
+        CaptureMouse();
+    }
+
+    private void OnMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (!_dragging)
+        {
+            return;
+        }
+
+        var current = PointToScreen(e.GetPosition(this));
+        Left = _dragStartWindow.X + (current.X - _dragStartMouse.X);
+        Top = _dragStartWindow.Y + (current.Y - _dragStartMouse.Y);
+    }
+
+    private void OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (!_dragging)
+        {
+            return;
+        }
+
+        _dragging = false;
+        ReleaseMouseCapture();
+        _position.OnDragEnd(Left, Top);
+    }
+}
