@@ -81,4 +81,41 @@ public class LinuxShellToSkinTests
 
         Assert.True(skin.ShutdownCalled);
     }
+
+    [Fact]
+    public void ShowDetail_raises_DetailShown_with_the_exact_detail()
+    {
+        var skin = new LinuxShellToSkin();
+        var detail = UsageDetail.Unavailable;
+        UsageDetail? raised = null;
+        skin.DetailShown += d => raised = d;
+
+        skin.ShowDetail(detail);
+
+        Assert.Equal(detail, raised);
+    }
+
+    [Fact]
+    public void SetVisible_raises_VisibilityChanged_with_the_exact_visibility()
+    {
+        var skin = new LinuxShellToSkin();
+        bool? raised = null;
+        skin.VisibilityChanged += v => raised = v;
+
+        skin.SetVisible(true);
+
+        Assert.True(raised);
+    }
+
+    [Fact]
+    public void ShowDetail_and_SetVisible_do_not_throw_when_nothing_has_subscribed()
+    {
+        var skin = new LinuxShellToSkin();
+
+        skin.ShowDetail(UsageDetail.Unavailable);
+        skin.SetVisible(true);
+
+        Assert.Equal(UsageDetail.Unavailable, skin.LastDetail);
+        Assert.True(skin.LastVisible);
+    }
 }
