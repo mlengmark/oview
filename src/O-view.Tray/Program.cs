@@ -1,7 +1,9 @@
+using System.IO;
 using System.Windows;
 using OView.App;
 using OView.Core.Providers;
 using OView.Core.Providers.Jsonl;
+using OView.Core.Statistics;
 using OView.Tray.Presentation;
 
 namespace OView.Tray;
@@ -13,18 +15,20 @@ namespace OView.Tray;
 /// message loop — <c>UseWPF</c> is this skin's own framework choice (ADR-0007/0008 name no UI
 /// framework above this project). Slice 4 (OVI-371) adds the first thing this process renders:
 /// a <see cref="TrayStatusIcon"/>. Slice 5 (OVI-376) adds its tooltip, formatted from the same
-/// snapshot. Slice 7 (OVI-391) adds the toast: <see cref="Presentation.AlertToastController"/>
-/// subscribes to <see cref="TrayShellToSkin.EventRaised"/> and shows exactly one
-/// <c>NotifyIcon.ShowBalloonTip</c> per raised event. The detail window and the first call into
-/// <see cref="ISkinToShell"/> that would let a user ask to quit remain slice 6 — until then this
-/// process exits only by being killed from outside, and clicking the icon calls
-/// <see cref="ISkinToShell.RequestWidget"/> against a placeholder shell that shows nothing yet
-/// (see <see cref="PendingSkinToShell"/>). No shell logic yet decides *that* an alert is due
-/// (ADR-0007 D2 point 6 is a separate, unbuilt slice), so <see cref="TrayShellToSkin.RaiseEvent"/>
-/// has no real production caller today — this wiring is proven by
-/// <c>AlertToastControllerTests</c> and <c>TrayShellToSkinTests</c> against fakes, the same
-/// "wired, not yet driven" state slice 6's <c>DetailShown</c>/<c>VisibilityChanged</c> events
-/// are in until a shell event-decision slice exists.
+/// snapshot. Slice 6 (OVI-386) adds the detail window: this is the first slice to build a real
+/// <see cref="DetailPushCoordinator"/> over a real <see cref="LedgerUsageStatisticsSource"/>
+/// (via <see cref="StoreLifetime"/>) and wire <see cref="ISkinToShell.RequestWidget"/> to it, so
+/// <see cref="PendingSkinToShell"/> now forwards that one member instead of recording nothing.
+/// Slice 7 (OVI-391) adds the toast: <see cref="Presentation.AlertToastController"/> subscribes
+/// to <see cref="TrayShellToSkin.EventRaised"/> and shows exactly one
+/// <c>NotifyIcon.ShowBalloonTip</c> per raised event. No shell logic yet decides *that* an alert
+/// is due (ADR-0007 D2 point 6 is a separate, unbuilt slice), so
+/// <see cref="TrayShellToSkin.RaiseEvent"/> has no real production caller today — this wiring is
+/// proven by <c>AlertToastControllerTests</c> and <c>TrayShellToSkinTests</c> against fakes. The
+/// first call into <see cref="ISkinToShell"/> that would let a user ask to quit remains
+/// unbuilt — until then this process exits only by being killed from outside, and every
+/// <see cref="ISkinToShell"/> member besides <see cref="ISkinToShell.RequestWidget"/> still
+/// throws.
 /// </summary>
 internal static class Program
 {
@@ -37,7 +41,30 @@ internal static class Program
             new AppTimer(),
             ShellSettings.Default.PollCadence);
 
-        using var statusIcon = new TrayStatusIcon(new PendingSkinToShell());
+        var storeLifetime = StoreLifetime.CreateDefault();
+        var statisticsSource = new LedgerUsageStatisticsSource(storeLifetime.UsageLedgerStore);
+        var detailCoordinator = new DetailPushCoordinator(statisticsSource, skin, new SystemClock(), TimeZoneInfo.Local);
+        pollLoop.SnapshotUpdated += (_, snapshot) => detailCoordinator.OnPollSucceeded(snapshot);
+
+        var skinToShell = new PendingSkinToShell(detailCoordinator.OnRequestWidget);
+
+        var preferenceStore = new DetailWindowPreferenceStore(ResolvePreferenceDirectory());
+        var positionController = new DetailWindowPositionController(
+            preferenceStore.Load,
+            () => DetailWindowPlacement.Compute(
+                SystemParameters.WorkArea.Left,
+                SystemParameters.WorkArea.Top,
+                SystemParameters.WorkArea.Width,
+                SystemParameters.WorkArea.Height,
+                DetailWindow.DefaultWidth,
+                DetailWindow.DefaultHeight),
+            (x, y) => preferenceStore.Save(x, y));
+
+        var detailWindow = new DetailWindow(skinToShell, positionController);
+        skin.DetailShown += detailWindow.ShowDetail;
+        skin.VisibilityChanged += detailWindow.SetVisible;
+
+        using var statusIcon = new TrayStatusIcon(skinToShell);
         statusIcon.OnSnapshotUpdated(pollLoop.CurrentSnapshot);
         pollLoop.SnapshotUpdated += (_, snapshot) => statusIcon.OnSnapshotUpdated(snapshot);
 
@@ -55,6 +82,22 @@ internal static class Program
             var application = new System.Windows.Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
             application.Run();
         }
+    }
+
+    /// <summary>
+    /// The directory this skin's own detail-window position preference lives in — a sibling
+    /// of the shell/Core store directory, but its own subfolder and its own file, never the
+    /// shared <c>ShellSettingsStore</c> (ADR-0007 D4 reserves that for shell-owned behaviour
+    /// settings, not a per-skin perceptual preference). Reads <c>LOCALAPPDATA</c> directly,
+    /// matching <see cref="BuildUsageProvider"/>'s own reasoning: this skin is the one place
+    /// allowed to ask the real Windows environment for anything.
+    /// </summary>
+    private static string ResolvePreferenceDirectory()
+    {
+        var localAppData = Environment.GetEnvironmentVariable("LOCALAPPDATA")
+            ?? throw new InvalidOperationException("LOCALAPPDATA is not set; cannot resolve this skin's preference directory.");
+
+        return Path.Combine(localAppData, "O-view", "Tray");
     }
 
     /// <summary>
@@ -78,21 +121,25 @@ internal static class Program
     }
 
     /// <summary>
-    /// Stands in for the real shell until a composition-root slice wires
-    /// <c>DetailPushCoordinator</c>/<c>UsagePollLoop</c> into a real <see cref="ISkinToShell"/>
-    /// (slice 5b's own note: "no composition root exists yet to wire it ... that wiring is
-    /// left to whichever slice first needs a running process" — this is that slice, but only
-    /// for the one member the status icon calls). <see cref="RequestWidget"/> is the only
-    /// member <see cref="TrayStatusIcon"/> reaches; every other member throws so a future
-    /// composition gap fails loudly instead of silently doing nothing.
+    /// Stands in for the real shell until a later slice wires the rest of
+    /// <see cref="ISkinToShell"/> into a real composition root (slice 5b's own note: "no
+    /// composition root exists yet ... that wiring is left to whichever slice first needs a
+    /// running process"). <see cref="RequestWidget"/> is now wired for real (slice 6, OVI-386):
+    /// it forwards to <see cref="DetailPushCoordinator.OnRequestWidget"/>, which both answers
+    /// <see cref="IShellToSkin.SetVisible"/> and pushes a detail on becoming visible. Every
+    /// other member still throws so a future composition gap fails loudly instead of silently
+    /// doing nothing.
     /// </summary>
     private sealed class PendingSkinToShell : ISkinToShell
     {
-        public void RequestWidget(bool visible)
+        private readonly Action<bool> _onRequestWidget;
+
+        public PendingSkinToShell(Action<bool> onRequestWidget)
         {
-            // No shell exists yet to show the widget (slices 5b/6); the status icon's own
-            // "done when" is this call happening, not anything appearing on screen.
+            _onRequestWidget = onRequestWidget;
         }
+
+        public void RequestWidget(bool visible) => _onRequestWidget(visible);
 
         public void RefreshNow() => throw NoCompositionRoot();
 
@@ -105,6 +152,6 @@ internal static class Program
         public void Quit() => throw NoCompositionRoot();
 
         private static NotSupportedException NoCompositionRoot() =>
-            new("No shell composition root exists yet (ADR-0008 slice 4, OVI-371); only RequestWidget is wired.");
+            new("No shell composition root exists yet (ADR-0008 slice 6, OVI-386); only RequestWidget is wired.");
     }
 }
