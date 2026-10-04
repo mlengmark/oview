@@ -32,6 +32,14 @@ namespace OView.Linux;
 /// <see cref="PendingSkinToShell"/> now forwards that one member instead of doing nothing beyond
 /// recording the request. Every other <see cref="ISkinToShell"/> member still throws so a future
 /// composition gap fails loudly instead of silently doing nothing.</para>
+///
+/// <para>Slice 11 (OVI-417) wires <see cref="LinuxShellToSkin.EventRaised"/> to a real
+/// <see cref="AlertNotificationController"/> over <see cref="DBusNotificationSender"/> — the
+/// same shape <see cref="LinuxStatusIcon"/>'s snapshot wiring already uses, and the same
+/// "no dedupe/threshold logic here" boundary <c>O-view.Tray</c>'s slice 7 drew for its own
+/// toast wiring. <see cref="LinuxStatusIcon"/>'s tooltip (also slice 11) needs no separate
+/// wiring here: it is pushed from inside <see cref="LinuxStatusIcon.OnSnapshotUpdated"/>,
+/// already called on every poll tick below.</para>
 /// </summary>
 internal static class Program
 {
@@ -69,6 +77,11 @@ internal static class Program
             statusIcon.OnHostAppeared();
         };
         _ = monitor.StartAsync(CancellationToken.None);
+
+        var notificationSender = new DBusNotificationSender();
+        var notificationController = new AlertNotificationController(
+            (summary, body) => notificationSender.SendAsync(summary, body));
+        skin.EventRaised += notificationController.OnEventRaised;
 
         using (pollLoop)
         using (statusIcon)

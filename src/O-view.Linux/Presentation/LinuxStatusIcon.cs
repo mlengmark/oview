@@ -24,10 +24,17 @@ namespace OView.Linux.Presentation;
 /// <see cref="Dispatcher.UIThread"/> before touching <see cref="_trayIcon"/>, because
 /// <see cref="OView.App.AppTimer"/>'s own doc places that responsibility on the caller, not the
 /// timer, and <see cref="TrayIcon"/> is an Avalonia UI object.</para>
+///
+/// <para><see cref="TooltipTextController"/> (ADR-0008 slice 11, OVI-417) pushes
+/// <c>TrayIcon.ToolTipText</c> from the same snapshot <see cref="OnSnapshotUpdated"/> already
+/// forwards to <see cref="StatusIconController"/> — both run inside the same UI-thread
+/// dispatch, so the icon and its tooltip never disagree about which snapshot they rendered.
+/// </para>
 /// </summary>
 internal sealed class LinuxStatusIcon : IDisposable
 {
     private readonly StatusIconController _controller;
+    private readonly TooltipTextController _tooltip;
     private readonly TrayIcon _trayIcon;
     private bool _disposed;
 
@@ -35,12 +42,17 @@ internal sealed class LinuxStatusIcon : IDisposable
     {
         _controller = new StatusIconController(skinToShell, Render, RegisterIcon);
         _trayIcon = new TrayIcon { IsVisible = false };
+        _tooltip = new TooltipTextController(text => _trayIcon.ToolTipText = text);
         _trayIcon.Clicked += (_, _) => _controller.OnActivated();
     }
 
     /// <summary>Forwards the shell's latest snapshot onto the UI thread.</summary>
     public void OnSnapshotUpdated(UsageSnapshot snapshot) =>
-        Dispatcher.UIThread.Post(() => _controller.OnSnapshotUpdated(snapshot.UsageLevel));
+        Dispatcher.UIThread.Post(() =>
+        {
+            _controller.OnSnapshotUpdated(snapshot.UsageLevel);
+            _tooltip.OnSnapshotUpdated(snapshot);
+        });
 
     /// <summary>Forwards <see cref="OView.Linux.Platform.NotificationHostMonitor.ProbeCompleted"/>
     /// onto the UI thread.</summary>
