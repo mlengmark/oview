@@ -1,12 +1,15 @@
 # ADR-0009: Phase 4A — the control surface: one menu, three settings, and a theme the OS owns
 
-- **Status:** **Proposed** — awaiting the board's explicit sign-off. The slicing
-  table at the foot of this record is **not** open for decomposition until that
-  sign-off lands, the same bar [ADR-0008](0008-presentation-skin-contract.md)
+- **Status:** **Accepted** — the board signed this record off by approving and
+  merging PR #76 (CONFIRMED: approval card
+  `6c233a56-bb67-464c-8b38-3ea847e36703`, tracked on OVI-436, now closed; merged
+  by the board account `mlengmark`, 2026-10-05T10:35:06Z, merge commit
+  `3172e63`). The slicing table at the foot of this record is therefore open for
+  decomposition, the same bar [ADR-0008](0008-presentation-skin-contract.md)
   held to. Living document: amend in place, as
   [ADR-0001](0001-core-to-skin-data-contract.md) does.
-- **Date:** 2026-10-05
-- **Deciders:** Adrian II the Architect; board sign-off pending
+- **Date:** 2026-10-05 · **Amended** 2026-10-05 (sign-off recorded, OVI-443)
+- **Deciders:** Adrian II the Architect, signed off by the board
 - **Scope:** Phase 4A — the right-click menu, the notification-threshold picker,
   the run-at-startup toggle, user-facing settings, and following the OS
   light/dark theme. On Windows and Linux only.
@@ -406,8 +409,9 @@ rather than by omission.
 ## Slicing guidance for decomposition
 
 One slice = one PR. Ordered lowest-risk first; shell before skins, Windows
-before Linux, per ADR-0008's own ordering rationale. **This table is not open
-for decomposition until the board signs this record off** (see **Status**).
+before Linux, per ADR-0008's own ordering rationale. **This table is open for
+decomposition** — the board signed this record off on 2026-10-05 (see
+**Status**).
 
 | # | Slice | Depends on | Risk | Merge |
 |---|---|---|---|---|
