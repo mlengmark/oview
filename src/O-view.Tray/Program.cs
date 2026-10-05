@@ -17,36 +17,42 @@ namespace OView.Tray;
 /// a <see cref="TrayStatusIcon"/>. Slice 5 (OVI-376) adds its tooltip, formatted from the same
 /// snapshot. Slice 6 (OVI-386) adds the detail window: this is the first slice to build a real
 /// <see cref="DetailPushCoordinator"/> over a real <see cref="LedgerUsageStatisticsSource"/>
-/// (via <see cref="StoreLifetime"/>) and wire <see cref="ISkinToShell.RequestWidget"/> to it, so
-/// <see cref="PendingSkinToShell"/> now forwards that one member instead of recording nothing.
+/// (via <see cref="StoreLifetime"/>) and wire <see cref="ISkinToShell.RequestWidget"/> to it.
 /// Slice 7 (OVI-391) adds the toast: <see cref="Presentation.AlertToastController"/> subscribes
 /// to <see cref="TrayShellToSkin.EventRaised"/> and shows exactly one
 /// <c>NotifyIcon.ShowBalloonTip</c> per raised event. No shell logic yet decides *that* an alert
 /// is due (ADR-0007 D2 point 6 is a separate, unbuilt slice), so
 /// <see cref="TrayShellToSkin.RaiseEvent"/> has no real production caller today — this wiring is
-/// proven by <c>AlertToastControllerTests</c> and <c>TrayShellToSkinTests</c> against fakes. The
-/// first call into <see cref="ISkinToShell"/> that would let a user ask to quit remains
-/// unbuilt — until then this process exits only by being killed from outside, and every
-/// <see cref="ISkinToShell"/> member besides <see cref="ISkinToShell.RequestWidget"/> still
-/// throws.
+/// proven by <c>AlertToastControllerTests</c> and <c>TrayShellToSkinTests</c> against fakes.
+/// ADR-0009 slice 2 (OVI-447) replaces the former local <c>PendingSkinToShell</c> stub with a
+/// real <see cref="AppShell"/>, loading <see cref="ShellSettings"/> from
+/// <see cref="ShellSettingsStore"/> before composing the poll loop so it starts on the loaded
+/// cadence. <see cref="AppShell.Quit"/> still throws — that ordering is a separate, board-merge
+/// slice (ADR-0009 slicing table row 4) — so this process still exits only by being killed from
+/// outside.
 /// </summary>
 internal static class Program
 {
     [STAThread]
     private static void Main()
     {
+        var directory = StoreDirectoryResolver.ResolveDefault();
+        var settingsStore = new ShellSettingsStore(directory);
+        var settings = settingsStore.Load();
+
         var (pollLoop, skin) = TraySkinHost.Compose(
             BuildUsageProvider(),
             new SystemClock(),
             new AppTimer(),
-            ShellSettings.Default.PollCadence);
+            settings.PollCadence);
 
-        var storeLifetime = StoreLifetime.CreateDefault();
+        var storeLifetime = new StoreLifetime(directory);
         var statisticsSource = new LedgerUsageStatisticsSource(storeLifetime.UsageLedgerStore);
         var detailCoordinator = new DetailPushCoordinator(statisticsSource, skin, new SystemClock(), TimeZoneInfo.Local);
         pollLoop.SnapshotUpdated += (_, snapshot) => detailCoordinator.OnPollSucceeded(snapshot);
 
-        var skinToShell = new PendingSkinToShell(detailCoordinator.OnRequestWidget);
+        var diagnosticsWriter = new DiagnosticsBundleWriter(directory, new SystemClock());
+        var skinToShell = new AppShell(settingsStore, settings, pollLoop, detailCoordinator, diagnosticsWriter);
 
         var preferenceStore = new DetailWindowPreferenceStore(ResolvePreferenceDirectory());
         var positionController = new DetailWindowPositionController(
@@ -118,40 +124,5 @@ internal static class Program
             LocalAppDataDirectory: Environment.GetEnvironmentVariable("LOCALAPPDATA"));
 
         return new JsonlUsageProvider(ClaudeDataRoots.CandidateRoots(inputs));
-    }
-
-    /// <summary>
-    /// Stands in for the real shell until a later slice wires the rest of
-    /// <see cref="ISkinToShell"/> into a real composition root (slice 5b's own note: "no
-    /// composition root exists yet ... that wiring is left to whichever slice first needs a
-    /// running process"). <see cref="RequestWidget"/> is now wired for real (slice 6, OVI-386):
-    /// it forwards to <see cref="DetailPushCoordinator.OnRequestWidget"/>, which both answers
-    /// <see cref="IShellToSkin.SetVisible"/> and pushes a detail on becoming visible. Every
-    /// other member still throws so a future composition gap fails loudly instead of silently
-    /// doing nothing.
-    /// </summary>
-    private sealed class PendingSkinToShell : ISkinToShell
-    {
-        private readonly Action<bool> _onRequestWidget;
-
-        public PendingSkinToShell(Action<bool> onRequestWidget)
-        {
-            _onRequestWidget = onRequestWidget;
-        }
-
-        public void RequestWidget(bool visible) => _onRequestWidget(visible);
-
-        public void RefreshNow() => throw NoCompositionRoot();
-
-        public void SetThresholdPercent(int percent) => throw NoCompositionRoot();
-
-        public void SetAutoUpdate(bool enabled) => throw NoCompositionRoot();
-
-        public void WriteDiagnosticsBundle() => throw NoCompositionRoot();
-
-        public void Quit() => throw NoCompositionRoot();
-
-        private static NotSupportedException NoCompositionRoot() =>
-            new("No shell composition root exists yet (ADR-0008 slice 6, OVI-386); only RequestWidget is wired.");
     }
 }

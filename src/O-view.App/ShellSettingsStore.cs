@@ -16,10 +16,18 @@ namespace OView.App;
 /// have been saved yet, so <see cref="Load"/> returns <see cref="ShellSettings.Default"/>
 /// rather than throwing. Writes are atomic (temp file, then replace) for the same reason
 /// Core's stores are.</para>
+///
+/// <para><b>ADR-0009 D4</b> — a settings file found corrupt or unparseable (including a
+/// structurally valid file with an out-of-range poll cadence) is moved aside to
+/// <c>settings.json.corrupt</c> rather than left in place or silently overwritten by the next
+/// <see cref="Save"/> — the same move-aside convention <c>CorruptStoreRecovery</c> already
+/// gives every Core store (ADR-0006 D3.3, OVI-236/238). A missing file is not corruption and
+/// is not moved; there is nothing to move.</para>
 /// </summary>
 public sealed class ShellSettingsStore
 {
     private const string FileName = "settings.json";
+    private const string CorruptSuffix = ".corrupt";
 
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
@@ -41,7 +49,9 @@ public sealed class ShellSettingsStore
 
     /// <summary>
     /// The persisted settings, or <see cref="ShellSettings.Default"/> when no file exists yet
-    /// or the file could not be parsed. Never throws.
+    /// or the file could not be parsed. Never throws. A file found corrupt — unparseable, or
+    /// parseable with an out-of-range poll cadence — is moved aside (ADR-0009 D4) rather than
+    /// left in place for a later <see cref="Save"/> to silently overwrite.
     /// </summary>
     public ShellSettings Load()
     {
@@ -62,6 +72,7 @@ public sealed class ShellSettingsStore
 
             if (file is null || file.PollCadenceSeconds <= 0)
             {
+                MoveAside(path);
                 return ShellSettings.Default;
             }
 
@@ -72,7 +83,29 @@ public sealed class ShellSettingsStore
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {
+            MoveAside(path);
             return ShellSettings.Default;
+        }
+    }
+
+    /// <summary>
+    /// Relocates a corrupt settings file to <c>{path}.corrupt</c>, same fixed-name convention
+    /// as <c>CorruptStoreRecovery</c> (ADR-0006 D3.3): a second corruption later overwrites the
+    /// previous backup rather than accumulating one file per incident. Never throws — if the
+    /// move itself fails (file locked, permissions), the corrupt file simply stays in place and
+    /// the next <see cref="Load"/> will try again.
+    /// </summary>
+    private static void MoveAside(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.Move(path, path + CorruptSuffix, overwrite: true);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
         }
     }
 

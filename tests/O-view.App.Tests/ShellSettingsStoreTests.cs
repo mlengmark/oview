@@ -97,4 +97,77 @@ public class ShellSettingsStoreTests : IDisposable
 
         Assert.Equal(ShellSettings.Default, settings);
     }
+
+    [Fact]
+    public void Load_moves_an_unparseable_file_aside_rather_than_leaving_it_in_place()
+    {
+        Directory.CreateDirectory(_directory);
+        var path = Path.Combine(_directory, "settings.json");
+        File.WriteAllText(path, "{ not valid json");
+        var store = new ShellSettingsStore(_directory);
+
+        store.Load();
+
+        Assert.False(File.Exists(path));
+        Assert.True(File.Exists(path + ".corrupt"));
+        Assert.Equal("{ not valid json", File.ReadAllText(path + ".corrupt"));
+    }
+
+    [Fact]
+    public void Load_moves_a_file_with_an_invalid_poll_cadence_aside()
+    {
+        Directory.CreateDirectory(_directory);
+        var path = Path.Combine(_directory, "settings.json");
+        File.WriteAllText(
+            path,
+            """{ "version": 1, "alertThresholdPercent": 90, "pollCadenceSeconds": -5, "autoUpdateEnabled": true }""");
+        var store = new ShellSettingsStore(_directory);
+
+        store.Load();
+
+        Assert.False(File.Exists(path));
+        Assert.True(File.Exists(path + ".corrupt"));
+    }
+
+    [Fact]
+    public void A_second_corruption_overwrites_the_previous_corrupt_backup_rather_than_accumulating()
+    {
+        Directory.CreateDirectory(_directory);
+        var path = Path.Combine(_directory, "settings.json");
+        var store = new ShellSettingsStore(_directory);
+
+        File.WriteAllText(path, "{ first corrupt");
+        store.Load();
+        File.WriteAllText(path, "{ second corrupt");
+        store.Load();
+
+        Assert.Equal("{ second corrupt", File.ReadAllText(path + ".corrupt"));
+    }
+
+    [Fact]
+    public void A_missing_file_is_not_treated_as_corrupt()
+    {
+        var store = new ShellSettingsStore(_directory);
+
+        store.Load();
+
+        Assert.False(File.Exists(Path.Combine(_directory, "settings.json") + ".corrupt"));
+    }
+
+    [Fact]
+    public void Save_after_a_corrupt_load_writes_a_fresh_file_without_resurrecting_the_corrupt_one()
+    {
+        Directory.CreateDirectory(_directory);
+        var path = Path.Combine(_directory, "settings.json");
+        File.WriteAllText(path, "{ not valid json");
+        var store = new ShellSettingsStore(_directory);
+        store.Load();
+
+        var saved = store.Save(new ShellSettings(70, TimeSpan.FromSeconds(90), true));
+        var loaded = store.Load();
+
+        Assert.True(saved);
+        Assert.Equal(new ShellSettings(70, TimeSpan.FromSeconds(90), true), loaded);
+        Assert.True(File.Exists(path + ".corrupt"));
+    }
 }

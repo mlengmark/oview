@@ -28,10 +28,7 @@ namespace OView.Linux;
 /// <para>Slice 10 (OVI-408) adds the first thing besides the status icon this process renders:
 /// a <see cref="DetailWindow"/>. This is the first slice to build a real
 /// <see cref="DetailPushCoordinator"/> over a real <see cref="LedgerUsageStatisticsSource"/>
-/// (via <see cref="StoreLifetime"/>) and wire <see cref="ISkinToShell.RequestWidget"/> to it, so
-/// <see cref="PendingSkinToShell"/> now forwards that one member instead of doing nothing beyond
-/// recording the request. Every other <see cref="ISkinToShell"/> member still throws so a future
-/// composition gap fails loudly instead of silently doing nothing.</para>
+/// (via <see cref="StoreLifetime"/>) and wire <see cref="ISkinToShell.RequestWidget"/> to it.</para>
 ///
 /// <para>Slice 11 (OVI-417) wires <see cref="LinuxShellToSkin.EventRaised"/> to a real
 /// <see cref="AlertNotificationController"/> over <see cref="DBusNotificationSender"/> — the
@@ -40,6 +37,13 @@ namespace OView.Linux;
 /// toast wiring. <see cref="LinuxStatusIcon"/>'s tooltip (also slice 11) needs no separate
 /// wiring here: it is pushed from inside <see cref="LinuxStatusIcon.OnSnapshotUpdated"/>,
 /// already called on every poll tick below.</para>
+///
+/// <para>ADR-0009 slice 2 (OVI-447) replaces the former local <c>PendingSkinToShell</c> stub
+/// with a real <see cref="AppShell"/>, loading <see cref="ShellSettings"/> from
+/// <see cref="ShellSettingsStore"/> before composing the poll loop so it starts on the loaded
+/// cadence. <see cref="AppShell.Quit"/> still throws — that ordering is a separate, board-merge
+/// slice (ADR-0009 slicing table row 4) — so this process still exits only by being killed from
+/// outside.</para>
 /// </summary>
 internal static class Program
 {
@@ -47,18 +51,23 @@ internal static class Program
 
     private static void Main(string[] args)
     {
+        var directory = StoreDirectoryResolver.ResolveDefault();
+        var settingsStore = new ShellSettingsStore(directory);
+        var settings = settingsStore.Load();
+
         var (pollLoop, skin) = LinuxSkinHost.Compose(
             BuildUsageProvider(),
             new SystemClock(),
             new AppTimer(),
-            ShellSettings.Default.PollCadence);
+            settings.PollCadence);
 
-        var storeLifetime = StoreLifetime.CreateDefault();
+        var storeLifetime = new StoreLifetime(directory);
         var statisticsSource = new LedgerUsageStatisticsSource(storeLifetime.UsageLedgerStore);
         var detailCoordinator = new DetailPushCoordinator(statisticsSource, skin, new SystemClock(), TimeZoneInfo.Local);
         pollLoop.SnapshotUpdated += (_, snapshot) => detailCoordinator.OnPollSucceeded(snapshot);
 
-        var skinToShell = new PendingSkinToShell(detailCoordinator.OnRequestWidget);
+        var diagnosticsWriter = new DiagnosticsBundleWriter(directory, new SystemClock());
+        var skinToShell = new AppShell(settingsStore, settings, pollLoop, detailCoordinator, diagnosticsWriter);
         var preferenceStore = new DetailWindowPreferenceStore(DetailWindowPreferenceStore.DefaultDirectory);
 
         var statusIcon = new LinuxStatusIcon(skinToShell);
@@ -119,39 +128,5 @@ internal static class Program
             HomeDirectory: Environment.GetEnvironmentVariable("HOME"));
 
         return new JsonlUsageProvider(ClaudeDataRoots.CandidateRoots(inputs));
-    }
-
-    /// <summary>
-    /// Stands in for the real shell, the same role <c>O-view.Tray</c>'s own
-    /// <c>PendingSkinToShell</c> played before its slice 6 built a real composition root.
-    /// <see cref="RequestWidget"/> is now wired for real (slice 10, OVI-408): it forwards to
-    /// <see cref="DetailPushCoordinator.OnRequestWidget"/>, which both answers
-    /// <see cref="IShellToSkin.SetVisible"/> and pushes a detail on becoming visible. Every
-    /// other member still throws so a future composition gap fails loudly instead of silently
-    /// doing nothing.
-    /// </summary>
-    private sealed class PendingSkinToShell : ISkinToShell
-    {
-        private readonly Action<bool> _onRequestWidget;
-
-        public PendingSkinToShell(Action<bool> onRequestWidget)
-        {
-            _onRequestWidget = onRequestWidget;
-        }
-
-        public void RequestWidget(bool visible) => _onRequestWidget(visible);
-
-        public void RefreshNow() => throw NoCompositionRoot();
-
-        public void SetThresholdPercent(int percent) => throw NoCompositionRoot();
-
-        public void SetAutoUpdate(bool enabled) => throw NoCompositionRoot();
-
-        public void WriteDiagnosticsBundle() => throw NoCompositionRoot();
-
-        public void Quit() => throw NoCompositionRoot();
-
-        private static NotSupportedException NoCompositionRoot() =>
-            new("No shell composition root exists yet on this skin; only RequestWidget is wired.");
     }
 }
