@@ -222,6 +222,23 @@ Scope note, to keep that slice from growing: it decides the **four existing
 not add a fifth kind, and `UpdateAvailable`'s *fetch* remains ADR-0007 D3's and
 OVI-433's.
 
+**2026-10-05 update — slice 3 landed (Kit the Builder, OVI-457).** `UsageEventDecider`
+(`src/O-view.App/UsageEventDecider.cs`) decides all four kinds, each edge-triggered
+and re-armed exactly as the source app's `ThresholdWatcher`/`CheckOffPlan` were
+(the only prior art for the dedup shape): raise once on the way up, re-arm on the
+way back down, or once per provider/version. `ThresholdCrossed` compares
+`UsageSnapshot.SessionUtilizationPercent` against the **loaded**
+`ShellSettings.AlertThresholdPercent`, never a constant, and is wired into both
+`Program.cs`s over the existing poll loop — its first production caller.
+`OffPlanEntered` reuses the same `IUsageStatisticsSource` seam
+`DetailPushCoordinator` already reads (ADR-0008 D9a), not a new ledger read, and
+is wired alongside it. `InputDegraded` and `UpdateAvailable` are decided and
+under test but still have **no production caller**: neither `Program.cs` composes
+a `CompositeUsageProvider` yet (both still build a plain `JsonlUsageProvider`), so
+there is no real `ProviderHealth` list to pass, and the update-check fetch stays
+OVI-433's. The sentence above this update — "is unbuilt… no production caller" —
+now holds only for those two kinds.
+
 ### D6 — Theme: the OS owns the preference, the shell carries the fact, the skin owns every colour — and "unknown" is a real answer
 
 This is the one genuinely new capability in Phase 4A.
@@ -417,7 +434,7 @@ decomposition** — the board signed this record off on 2026-10-05 (see
 |---|---|---|---|---|
 | 1 | Cross-skin **menu content fixtures** in `tests/O-view.CrossSkin.Tests/`, in the existing `…Fixture` / `…Fixtures` / `…SkinUnderTest` / `…GoldenMasterCrossSkinTests` shape. Pins the content facts each menu must state — which items exist, that the startup item reports the state the OS returned rather than the one requested (D3), that a failed toggle is stated and not swallowed, that a threshold item shows the shell's persisted value — **not** identical labels, per [ADR-0003](0003-paneltext-anti-drift-mechanism.md). Pure, no toolkit, no UI, runs on both runners | — | **Lowest** — tests only; defines what both menus must say before either exists | agent |
 | 2 | **A real `ISkinToShell` in `O-view.App`**, replacing both `PendingSkinToShell` copies: load `ShellSettings` from `ShellSettingsStore` at composition, compose the poll loop with the **loaded** cadence, implement `RefreshNow` / `SetThresholdPercent` / `SetAutoUpdate` / `WriteDiagnosticsBundle` (D4), delegate `RequestWidget` to the existing `DetailPushCoordinator`, clamp out-of-range percents, degrade a corrupt settings file to `Default` and move it aside. `Quit` still throws — that is slice 4. No UI | — | Low–medium — shell wiring over types that already exist and are tested; the settings round trip and the corrupt-file path are what to test hardest | agent |
-| 3 | **The event decision ([ADR-0007](0007-app-shell-contract.md) D2 point 6)**: decide and raise each of the four existing `UsageEventKind` values at most once per occurrence, with the "already raised for this window" rule, reading the threshold from slice 2's loaded settings. Gives both skins' alert presentation its first production caller. Pure shell logic over an injected clock; no new event kind; no fetch | 2 | Medium — the dedup-per-window rule is the whole slice and is where an off-by-one costs a user a missed alert or a duplicate one | agent |
+| 3 | **The event decision ([ADR-0007](0007-app-shell-contract.md) D2 point 6)**: decide and raise each of the four existing `UsageEventKind` values at most once per occurrence, with the "already raised for this window" rule, reading the threshold from slice 2's loaded settings. Gives both skins' alert presentation its first production caller — **landed** (OVI-457): `ThresholdCrossed` and `OffPlanEntered` are wired into both `Program.cs` composition roots over the existing poll loop and ledger-statistics seam; `InputDegraded` and `UpdateAvailable` are decided and tested but still have no production caller — no `CompositeUsageProvider`/`ProviderHealth` is composed in either process yet, and the update-check fetch is OVI-433's | 2 | Medium — the dedup-per-window rule is the whole slice and is where an off-by-one costs a user a missed alert or a duplicate one | agent |
 | 4 | **Quit (D7)**: `ISkinToShell.Quit()` implemented with the shell's ordering — skin `Shutdown()`, then poll loop, then stores — plus the Windows skin's loop-exit call. Must not dispose the store under an in-flight poll | 2 | **Medium–high** — smallest diff, largest blast radius in the phase: a wrong order is a corrupted ledger, reachable from one click | **board** (process lifetime and store disposal) |
 | 5 | **`IThemeSource` in `O-view.App` + the Windows implementation (D6)**: the three-value preference (light / dark / **unknown**), `AppsUseLightTheme`, `WM_SETTINGCHANGE` for live changes, absent value reported as `Unknown`. No consumer yet — nothing is repainted by this slice | — | Low–medium — a registry read and a window message, both verifiable here | **board** (new shell interface — a seam addition) |
 | 6 | **Windows menu (D1, D2)**: a `ContextMenuStrip` on the existing `NotifyIcon` with the seven items, threshold as a pick-one group reading slice 2's persisted value, run-at-startup read live from `RegistryStartupRegistration` on open and rendered from `Apply`'s return (D3), the failed-toggle statement, and slice 4's quit. Split per item group if it passes ~500 lines | 1, 2, 3, 4 | Medium — first menu; `IStartupRegistration`'s first production construction | agent |
