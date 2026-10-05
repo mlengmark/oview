@@ -134,7 +134,8 @@ the full standard this repository follows from commit one. In short:
 | [`docs/adr/0005-data-provider-contract.md`](docs/adr/0005-data-provider-contract.md) | Phase 2. How Core reads Claude's data off this machine: one input seam, three named providers, composition by information value, provider health as contract data. Opened gate **G6**. |
 | [`docs/adr/0006-local-storage-contract.md`](docs/adr/0006-local-storage-contract.md) | Phase 2. What Core persists on this machine, where, and who owns each file — and why SQLite is the first third-party runtime dependency. |
 | [`docs/adr/0007-app-shell-contract.md`](docs/adr/0007-app-shell-contract.md) | Phase 2. `O-view.App` — a third layer between Core and the skins, its admission rule, and what it may never contain. |
-| [`docs/adr/0008-presentation-skin-contract.md`](docs/adr/0008-presentation-skin-contract.md) | Phase 3. Four surfaces (status icon, tooltip, detail window, alerts), two native skins, no shared UI layer — gate **G4 = A**. Read **D9** before touching the detail window. |
+| [`docs/adr/0008-presentation-skin-contract.md`](docs/adr/0008-presentation-skin-contract.md) | Phase 3. Four surfaces (status icon, tooltip, detail window, alerts), two native skins, no shared UI layer — gate **G4 = A**. Read **D9** before touching the detail window. Its D2 is now **five** surfaces — see that section's 2026-10-05 amendment and 0009. |
+| [`docs/adr/0009-control-surface-contract.md`](docs/adr/0009-control-surface-contract.md) | Phase 4A, **Proposed — board sign-off pending.** The right-click menu as the fifth surface, the three shell settings it exposes, run-at-startup read live from the OS, and `IThemeSource`. No settings window, and the conditions that would re-open that. |
 | [`CLAUDE.md`](CLAUDE.md) | Contributor guidance — what may be assumed, what must be re-verified, and the evidence-labelling discipline this repository runs on. |
 
 ## Relationship to `mlengmark/O-view`
