@@ -117,6 +117,16 @@ ADR adds no guarantee that table does not already carry.
 | **Tooltip** | State session and weekly percent and their resets, from the snapshot, through that skin's own `TooltipFormatter`; apply its own length limit | Let one platform's limit travel to the other (the `NotifyIcon.Text` 127-char cap is a Windows fact — [ADR-0001](0001-core-to-skin-data-contract.md)) |
 | **Detail window** | Be a draggable widget launched from the icon (D5); show the per-model split, the statistics, the data-source provenance, and the explanation when there is no data — all of it from the `UsageDetail` push **D9** adds, because D3's snapshot alone cannot carry them; remember its own last position as a skin preference | Read Core storage or a provider directly; hold a number the shell did not give it; sum, average or re-bucket the per-model rows it was given (D9c) |
 | **Alerts** | Present `RaiseEvent` and nothing else; at most one notification per raised event | Decide *that* an alert is due. Threshold crossing, off-plan entry, update availability and input degradation are all shell decisions ([ADR-0007](0007-app-shell-contract.md) D2 point 6) |
+| **Menu** — added 2026-10-05, see below | Present the items [ADR-0009](0009-control-surface-contract.md) D2 enumerates; read run-at-startup **live from the OS** every time it opens; render the state the OS reported, not the state the user requested; state a failed toggle rather than swallowing it (ADR-0009 D3) | Hold its own copy of a shell setting (ADR-0009 D4), decide what any threshold *means*, or offer a setting [ADR-0007](0007-app-shell-contract.md) D4 did not assign to the shell |
+
+> **2026-10-05 amendment (OVI-432):** this table is now **five** surfaces, not
+> four. The menu is Phase 4A's surface and its obligations are decided in
+> [ADR-0009](0009-control-surface-contract.md) D1–D4; the row above is the
+> summary, that record is the detail. This record's *title* still says "four
+> surfaces" on purpose — it is the name every existing citation, PR and issue
+> uses, and renaming a merged record to keep a count current would break more
+> than it fixes. The count lives in this table, which is the thing that has to
+> be right.
 
 ### D3 — A skin renders the last snapshot and nothing else, and never fabricates a figure
 
@@ -322,6 +332,16 @@ from a test run. OVI-329 added no new `[Fact]`, so 13 still stands.
 
 **Escalation check, per this task's brief: no part of Phase 3 as scoped here
 requires G3 or G5 to be opened first.**
+
+> **2026-10-05 amendment (OVI-432) — where the deferred items went.** The board
+> split Phase 4 in two (option C, card `80339fe7`, OVI-423):
+> **settings, the right-click menu, the threshold picker, run-at-startup and
+> theme following** are Phase 4A,
+> [ADR-0009](0009-control-surface-contract.md). **Packaging, the installer and
+> self-update execution** stay deferred and are Phase 4B, OVI-433 — this
+> record's deferral of them above still stands, and ADR-0009 does not scope
+> them either. macOS (G3), a second AI source (G5) and a shared UI layer (G4,
+> closed as A) remain out of scope in both.
 
 ### D9 — Detail-window data reaches a skin by a second push, `ShowDetail(UsageDetail)` — added 2026-10-02 (OVI-326)
 

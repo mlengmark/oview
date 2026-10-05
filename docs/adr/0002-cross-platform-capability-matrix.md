@@ -49,7 +49,7 @@ not re-tested" or "never observed" into "supported."
 | Detail window launch & positioning | Draggable widget, launched from the tray/menu-bar icon; skin remembers last position (a skin preference, not Core data) | Can additionally use `Shell_NotifyIconGetRect` for icon-anchored placement — this target design deliberately does not rely on this (see "Alternatives considered") | **Cannot report icon position at all** — protocol limitation, StatusNotifierItem has no equivalent. Current fallback is a fixed work-area corner (source repo ADR-0013). **Never observed rendering on real hardware in any form** — blocked historically by a deadlock (#124), then a segfault (#143) |
 | Notifications | Fire on a user-set threshold crossing, and nothing else. Expressed by the shell↔skin seam ([ADR-0007](0007-app-shell-contract.md) D6, shipped OVI-273): the shell pushes `IShellToSkin.RaiseEvent(UsageEvent)` with `UsageEventKind.ThresholdCrossed`; the skin sets the threshold back via `ISkinToShell.SetThresholdPercent`. The skin decides nothing about *when* — see [ADR-0008](0008-presentation-skin-contract.md) D2, "present `RaiseEvent` and nothing else" | **CONFIRMED** — balloon/toast, shipped | Freedesktop notification implemented; **never observed firing on real hardware** |
 | Startup registration | Register/unregister at login via the OS's own canonical mechanism; the OS is the sole source of truth (no shadow copy in Core settings — [ADR-0007](0007-app-shell-contract.md) D4). Expressed by `IStartupRegistration` ([ADR-0007](0007-app-shell-contract.md) D5, shipped OVI-283): the shell declares the capability, the skin implements it — `RegistryStartupRegistration` on Windows, `XdgAutostartRegistration` on Linux | **CONFIRMED** — `HKCU\...\Run` key (source repo ADR-0009) | XDG autostart file implemented; **hardware-unverified** that login actually triggers launch (INFERRED from code) |
-| Theme-following | Match OS light/dark preference automatically | **CONFIRMED** — reads `AppsUseLightTheme` | Desktop theme portal implemented; **never observed on real hardware** |
+| Theme-following | Match OS light/dark preference automatically. To be expressed by `IThemeSource` ([ADR-0009](0009-control-surface-contract.md) D6, Phase 4A — **designed, not yet built**): the shell declares the capability and carries one of three values (light / dark / **unknown**), each skin implements the read and owns every colour. An absent registry value or absent portal is reported as `Unknown`, never guessed | **CONFIRMED** — reads `AppsUseLightTheme` | Desktop theme portal implemented; **never observed on real hardware** |
 | Single-instance enforcement | Guarantee exactly one running copy per user session. Expressed by `ISingleInstanceGuard.TryAcquire()` ([ADR-0007](0007-app-shell-contract.md) D5, shipped OVI-283) — `MutexSingleInstanceGuard` on Windows, `FileLockSingleInstanceGuard` on Linux. One capability, two unrelated primitives; the seam is the only thing they share | **CONFIRMED** — named mutex | No equivalent primitive exists; needs its own mechanism (file lock or socket) — genuinely a different implementation, not a shared API |
 | Install & distribution | Get itself onto the machine via the OS's native packaging convention; register uninstall | **CONFIRMED** — Inno Setup installer, per-user, Start Menu shortcut, uninstall registry entry | Headless CI (Ubuntu/Debian/Fedora containers) **confirms install-and-start only** — proves nothing about UI, since containers have no compositor. Hardware reports used a tarball, not the `.deb`; `.deb`-on-real-hardware is untested |
 | Self-update | Act on the shared update check's result: self-replace only if the OS's package model allows it, else notify-only. The check itself (fetch, rate-limit detection, `retryAfterUtc`) is **not** per-skin — see the 2026-09-25 (OVI-135) note below | **CONFIRMED** — installer self-replaces via Restart Manager, checksum-verified first | **Must never self-replace** under a package-manager install (the package manager owns those files) — getting this wrong already shipped a real bug once (source repo ADR-0009 amendment) |
@@ -113,6 +113,17 @@ column now points at its interface:
 re-verified on hardware for this entry, and a seam existing is not evidence that a platform
 does the thing — the Linux cells still read exactly as Rae II's OVI-4 pass left them. The
 seam makes the *obligation* checkable in code; it does not make the *behaviour* observed.
+
+> **2026-10-05 addition (OVI-432):** the **Theme-following** row now points at
+> `IThemeSource` too ([ADR-0009](0009-control-surface-contract.md) D6) — the
+> fourth and last row in this table whose "must provide" column was still prose
+> only. It is marked **designed, not yet built**, which the three rows above it
+> were not: ADR-0009 awaits board sign-off and no implementation exists. Every
+> word of the paragraph above applies unchanged — **no guarantee cell changed
+> and no evidence label moved.** The Linux theme cell still reads "never
+> observed on real hardware" and is expected to still read that after Phase 4A
+> ships, since no interactive Linux display is reachable from this environment
+> or from CI ([ADR-0004](0004-what-non-windows-ci-could-and-could-not-prove.md)).
 
 **Where the rest of the capability story now lives**, since this ADR predates all four:
 
