@@ -122,8 +122,18 @@ as a warning. **Two tests are mandatory in the slice that introduces
 
 - For every `InstallKind`, on a published architecture, `DetectionAsset` is not
   `ReleaseAssets.None` — i.e. every install kind can see an update.
-- `DetectionAsset` and `MayDownloadAndRun` disagree for at least
-  `LinuxPackage` — i.e. the two concepts have not been collapsed back together.
+- Over **all four** enum values,
+  `MayDownloadAndRun(kind) == (kind == InstallKind.WindowsInstaller)` — the whole
+  truth table of D1, pinned in one assertion. A weaker test that only checks the
+  two concepts disagree for `LinuxPackage` would re-prove the source's one
+  historical bug while leaving `WindowsPortable` and `LinuxTarball` free to be
+  granted download permission by a later edit.
+
+The second test is why the separation cannot be collapsed back together: every
+install kind keeps its own detection asset, and exactly one of them may act on
+it. New enum values are a deliberate amendment to this record, not a test fix —
+adding a case makes the test fail until the permission is decided here in
+writing.
 
 An architecture this project does not publish for yields `ReleaseAssets.None`
 and therefore `Unknown`, rather than pointing a user at a package that would not
