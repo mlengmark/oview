@@ -145,6 +145,73 @@ public class UsagePollLoopTests
     }
 
     [Fact]
+    public void PollNow_polls_immediately_without_waiting_for_the_timer()
+    {
+        var clock = new FakeClock(DateTimeOffset.UnixEpoch);
+        var timer = new FakeAppTimer();
+        var expected = Snapshot(clock.UtcNow);
+
+        using var loop = new UsagePollLoop(
+            new FakeUsageProvider(_ => expected),
+            clock,
+            timer,
+            TimeSpan.FromMinutes(5));
+
+        loop.PollNow();
+
+        Assert.Equal(expected, loop.CurrentSnapshot);
+    }
+
+    [Fact]
+    public void PollNow_raises_SnapshotUpdated_with_the_exact_new_snapshot()
+    {
+        var clock = new FakeClock(DateTimeOffset.UnixEpoch);
+        var timer = new FakeAppTimer();
+        var expected = Snapshot(clock.UtcNow);
+        UsageSnapshot? observed = null;
+
+        using var loop = new UsagePollLoop(
+            new FakeUsageProvider(_ => expected),
+            clock,
+            timer,
+            TimeSpan.FromMinutes(5));
+        loop.SnapshotUpdated += (_, snapshot) => observed = snapshot;
+
+        loop.PollNow();
+
+        Assert.Equal(expected, observed);
+    }
+
+    [Fact]
+    public void A_throwing_PollNow_leaves_the_previous_snapshot_untouched_and_does_not_raise_SnapshotUpdated()
+    {
+        var clock = new FakeClock(DateTimeOffset.UnixEpoch);
+        var timer = new FakeAppTimer();
+        var firstSnapshot = Snapshot(clock.UtcNow);
+        var callCount = 0;
+        var raised = false;
+
+        using var loop = new UsagePollLoop(
+            new FakeUsageProvider(utcNow =>
+            {
+                callCount++;
+                return callCount == 1
+                    ? firstSnapshot
+                    : throw new InvalidOperationException("simulated provider failure");
+            }),
+            clock,
+            timer,
+            TimeSpan.FromMinutes(5));
+        timer.RaiseElapsed();
+        loop.SnapshotUpdated += (_, _) => raised = true;
+
+        loop.PollNow();
+
+        Assert.Equal(firstSnapshot, loop.CurrentSnapshot);
+        Assert.False(raised);
+    }
+
+    [Fact]
     public void Dispose_stops_and_disposes_the_timer()
     {
         var timer = new FakeAppTimer();

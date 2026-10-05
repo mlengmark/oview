@@ -65,7 +65,18 @@ public sealed class UsagePollLoop : IDisposable
     /// nothing new to announce).</summary>
     public event EventHandler<UsageSnapshot>? SnapshotUpdated;
 
-    private void OnTimerElapsed(object? sender, EventArgs e)
+    /// <summary>
+    /// Polls immediately instead of waiting for the next timer tick (ADR-0009
+    /// <c>ISkinToShell.RefreshNow</c>'s shell-side implementation, OVI-447). Same graceful-
+    /// degradation rule as a timer-driven tick (D2 point 9): a throwing poll leaves
+    /// <see cref="CurrentSnapshot"/> untouched and never raises <see cref="SnapshotUpdated"/>.
+    /// Does not reset the timer's own schedule — the next tick still fires on cadence.
+    /// </summary>
+    public void PollNow() => Poll();
+
+    private void OnTimerElapsed(object? sender, EventArgs e) => Poll();
+
+    private void Poll()
     {
         try
         {
