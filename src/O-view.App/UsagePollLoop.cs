@@ -38,6 +38,16 @@ public sealed class UsagePollLoop : IDisposable
     private readonly IClock _clock;
     private readonly IAppTimer _timer;
 
+    /// <summary>
+    /// Guards <see cref="Poll"/> so <see cref="Dispose"/> (ADR-0009 D7, OVI-469) can block
+    /// until a poll already in flight — started by a timer tick or <see cref="PollNow"/> on
+    /// another thread — finishes, instead of racing it. <see cref="AppShell.Quit"/> relies on
+    /// this: it disposes the stores only after this type's <see cref="Dispose"/> returns, and
+    /// a quit path that disposed a store mid-poll would be a corrupted-ledger bug.
+    /// </summary>
+    private readonly object _pollGate = new();
+    private bool _disposed;
+
     public UsagePollLoop(IUsageProvider provider, IClock clock, IAppTimer timer, TimeSpan cadence)
     {
         ArgumentNullException.ThrowIfNull(provider);
@@ -78,24 +88,48 @@ public sealed class UsagePollLoop : IDisposable
 
     private void Poll()
     {
-        try
+        lock (_pollGate)
         {
-            CurrentSnapshot = _provider.GetSnapshot(_clock.UtcNow);
-            SnapshotUpdated?.Invoke(this, CurrentSnapshot);
-        }
-        catch
-        {
-            // D2 point 9: a failed poll keeps the previous state and never crashes the
-            // process. Intentionally swallowed — there is no diagnostics bundle to log to
-            // in this slice (ADR-0007 slice 8), and CompositeUsageProvider already reports
-            // per-provider failures through its own Health seam (ADR-0005 D4).
+            if (_disposed)
+            {
+                return;
+            }
+
+            try
+            {
+                CurrentSnapshot = _provider.GetSnapshot(_clock.UtcNow);
+                SnapshotUpdated?.Invoke(this, CurrentSnapshot);
+            }
+            catch
+            {
+                // D2 point 9: a failed poll keeps the previous state and never crashes the
+                // process. Intentionally swallowed — there is no diagnostics bundle to log to
+                // in this slice (ADR-0007 slice 8), and CompositeUsageProvider already reports
+                // per-provider failures through its own Health seam (ADR-0005 D4).
+            }
         }
     }
 
+    /// <summary>
+    /// Stops the timer so no new poll starts, then blocks until any poll already in flight on
+    /// another thread — <see cref="_pollGate"/>'s lock holder — finishes, before disposing the
+    /// timer (ADR-0009 D7, OVI-469). Idempotent: a second call returns immediately.
+    /// </summary>
     public void Dispose()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         _timer.Stop();
         _timer.Elapsed -= OnTimerElapsed;
+
+        lock (_pollGate)
+        {
+            _disposed = true;
+        }
+
         _timer.Dispose();
     }
 }

@@ -42,9 +42,10 @@ namespace OView.Linux;
 /// <para>ADR-0009 slice 2 (OVI-447) replaces the former local <c>PendingSkinToShell</c> stub
 /// with a real <see cref="AppShell"/>, loading <see cref="ShellSettings"/> from
 /// <see cref="ShellSettingsStore"/> before composing the poll loop so it starts on the loaded
-/// cadence. <see cref="AppShell.Quit"/> still throws — that ordering is a separate, board-merge
-/// slice (ADR-0009 slicing table row 4) — so this process still exits only by being killed from
-/// outside.</para>
+/// cadence. ADR-0009 slice 4 (OVI-469) implements <see cref="AppShell.Quit"/>'s shutdown order
+/// (skin, then poll loop, then stores), but this process wires no production caller for it —
+/// the Linux half of the loop-exit call is its own, separate slice (ADR-0009 slicing table row
+/// 9), so this process still exits only by being killed from outside.</para>
 ///
 /// <para>ADR-0009 slice 3 (OVI-457) gives <see cref="LinuxShellToSkin.RaiseEvent"/> — wired
 /// since slice 11 but never called in production until now — its first real caller: a
@@ -80,7 +81,7 @@ internal static class Program
         pollLoop.SnapshotUpdated += (_, snapshot) => detailCoordinator.OnPollSucceeded(snapshot);
 
         var diagnosticsWriter = new DiagnosticsBundleWriter(directory, new SystemClock());
-        var skinToShell = new AppShell(settingsStore, settings, pollLoop, detailCoordinator, diagnosticsWriter);
+        var skinToShell = new AppShell(settingsStore, settings, pollLoop, detailCoordinator, diagnosticsWriter, skin, storeLifetime);
 
         // ADR-0009 slice 3 (OVI-457): no CompositeUsageProvider is composed in this process yet
         // (see BuildUsageProvider below), so there is no real ProviderHealth list — an empty one

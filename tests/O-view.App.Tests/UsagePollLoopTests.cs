@@ -228,6 +228,41 @@ public class UsagePollLoopTests
     }
 
     [Fact]
+    public async Task Dispose_waits_for_an_in_flight_poll_to_finish_before_returning()
+    {
+        // ADR-0009 D7 (OVI-469): AppShell.Quit disposes the stores only after this type's
+        // Dispose returns, so Dispose must not return while another thread is still inside
+        // Poll — a quit that let it return early could let the shell dispose a store while
+        // that poll is still reading from (or about to write to) it.
+        var pollEntered = new ManualResetEventSlim(false);
+        var releasePoll = new ManualResetEventSlim(false);
+        var timer = new FakeAppTimer();
+        var loop = new UsagePollLoop(
+            new FakeUsageProvider(_ =>
+            {
+                pollEntered.Set();
+                releasePoll.Wait(TimeSpan.FromSeconds(5));
+                return UsageSnapshot.Unavailable;
+            }),
+            new FakeClock(DateTimeOffset.UnixEpoch),
+            timer,
+            TimeSpan.FromMinutes(5));
+
+        var pollTask = Task.Run(loop.PollNow);
+        Assert.True(pollEntered.Wait(TimeSpan.FromSeconds(5)), "the poll never started");
+
+        var disposeTask = Task.Run(loop.Dispose);
+        var disposeFinishedEarly = await Task.WhenAny(disposeTask, Task.Delay(TimeSpan.FromMilliseconds(200))) == disposeTask;
+        Assert.False(disposeFinishedEarly, "Dispose returned while the poll was still in flight");
+
+        releasePoll.Set();
+
+        await disposeTask.WaitAsync(TimeSpan.FromSeconds(5));
+        await pollTask.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.True(timer.Disposed);
+    }
+
+    [Fact]
     public void Dispose_unsubscribes_so_a_later_tick_does_not_update_the_snapshot()
     {
         var timer = new FakeAppTimer();
