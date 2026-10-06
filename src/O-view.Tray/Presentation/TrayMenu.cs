@@ -1,4 +1,6 @@
+using System.Drawing;
 using System.Windows.Forms;
+using OView.App;
 
 namespace OView.Tray.Presentation;
 
@@ -9,6 +11,13 @@ namespace OView.Tray.Presentation;
 /// against fakes; this type only owns the <c>ToolStripMenuItem</c>s and their checked state —
 /// not unit-tested, the same "adapter, not decision logic" split <c>TrayStatusIcon</c> already
 /// uses, and for the same reason (no interactive Windows desktop in this environment).
+///
+/// <para>ADR-0009 slice 7 (OVI-489) adds <see cref="ApplyTheme"/>: the composition root wires a
+/// <see cref="ThemeRepaintController"/> to call it with every live <see cref="IThemeSource"/>
+/// reading. This type owns converting <see cref="WindowThemePalette"/>'s plain RGB values into
+/// <see cref="System.Drawing.Color"/> and painting every item in the strip, including nested
+/// drop-down items (the threshold picker) — the WinForms half of the same conversion
+/// <c>DetailWindow.ApplyTheme</c> does for WPF.</para>
 /// </summary>
 internal sealed class TrayMenu : IDisposable
 {
@@ -84,6 +93,35 @@ internal sealed class TrayMenu : IDisposable
         _runAtStartupItem.Checked = snapshot.StartupEnabled;
         _autoUpdateItem.Checked = snapshot.AutoUpdateEnabled;
     }
+
+    /// <summary>Paints the strip and every item in it, recursing into drop-down items (the
+    /// threshold picker) so a live theme change reaches the whole menu, not just its top
+    /// level.</summary>
+    public void ApplyTheme(WindowThemeColors colors)
+    {
+        var background = ToColor(colors.Background);
+        var foreground = ToColor(colors.Foreground);
+
+        _strip.BackColor = background;
+        _strip.ForeColor = foreground;
+        ApplyThemeToItems(_strip.Items, background, foreground);
+    }
+
+    private static void ApplyThemeToItems(ToolStripItemCollection items, Color background, Color foreground)
+    {
+        foreach (ToolStripItem item in items)
+        {
+            item.BackColor = background;
+            item.ForeColor = foreground;
+
+            if (item is ToolStripMenuItem { HasDropDownItems: true } menuItem)
+            {
+                ApplyThemeToItems(menuItem.DropDownItems, background, foreground);
+            }
+        }
+    }
+
+    private static Color ToColor(RgbColor color) => Color.FromArgb(color.R, color.G, color.B);
 
     private void OnThresholdClicked(int percent) => _controller.OnSetThresholdPercent(percent);
 

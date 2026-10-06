@@ -29,6 +29,9 @@ namespace OView.Tray.Presentation;
 /// reuses <see cref="ShowToast"/> as the surface for its run-at-startup failed-toggle
 /// statement (D3 point 3) — the same balloon tip <see cref="AlertToastController"/> already
 /// uses, not a new one.
+/// ADR-0009 slice 7 (OVI-489) wires a <see cref="ThemeRepaintController"/> to
+/// <see cref="TrayMenu.ApplyTheme"/> so the menu repaints on every live
+/// <see cref="IThemeSource"/> change, disposed alongside everything else this type owns.
 /// </summary>
 internal sealed class TrayStatusIcon : IDisposable
 {
@@ -39,12 +42,13 @@ internal sealed class TrayStatusIcon : IDisposable
     private readonly TooltipTextController _tooltip;
     private readonly NotifyIcon _notifyIcon;
     private readonly TrayMenu _menu;
+    private readonly ThemeRepaintController _menuTheme;
     private readonly MessageSink _messageSink;
     private readonly int _taskbarCreatedMessage;
     private Icon? _currentIcon;
     private bool _disposed;
 
-    public TrayStatusIcon(ISkinToShell skinToShell, Func<ShellSettings> currentSettings, IStartupRegistration startupRegistration)
+    public TrayStatusIcon(ISkinToShell skinToShell, Func<ShellSettings> currentSettings, IStartupRegistration startupRegistration, IThemeSource themeSource)
     {
         _controller = new StatusIconController(skinToShell, Render, Reregister);
         _taskbarCreatedMessage = RegisterWindowMessage("TaskbarCreated");
@@ -56,6 +60,7 @@ internal sealed class TrayStatusIcon : IDisposable
         var menuController = new TrayMenuController(skinToShell, currentSettings, startupRegistration);
         _menu = new TrayMenu(menuController, ShowToast);
         _notifyIcon.ContextMenuStrip = _menu.Strip;
+        _menuTheme = new ThemeRepaintController(themeSource, _menu.ApplyTheme);
 
         _messageSink = new MessageSink(this);
 
@@ -109,6 +114,7 @@ internal sealed class TrayStatusIcon : IDisposable
         _messageSink.Dispose();
         _notifyIcon.Visible = false;
         _notifyIcon.ContextMenuStrip = null;
+        _menuTheme.Dispose();
         _menu.Dispose();
         _notifyIcon.Dispose();
         _currentIcon?.Dispose();

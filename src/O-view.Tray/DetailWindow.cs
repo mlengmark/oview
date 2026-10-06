@@ -23,6 +23,13 @@ namespace OView.Tray;
 /// changed, what to say — is pulled out into <see cref="DetailWindowContentBuilder"/> and
 /// <see cref="DetailWindowPositionController"/>, both proven against fakes with no window
 /// involved.</para>
+///
+/// <para>ADR-0009 slice 7 (OVI-489) adds <see cref="ApplyTheme"/>: a
+/// <see cref="ThemeRepaintController"/> applies the current <see cref="IThemeSource"/> reading
+/// immediately on construction and again on every live change, converting
+/// <see cref="WindowThemePalette"/>'s plain RGB values into the <see cref="SolidColorBrush"/>es
+/// this window actually paints with — a conversion that belongs here, in the WPF adapter, not in
+/// the shared palette.</para>
 /// </summary>
 internal sealed class DetailWindow : Window
 {
@@ -35,6 +42,7 @@ internal sealed class DetailWindow : Window
 
     private readonly ISkinToShell _skinToShell;
     private readonly DetailWindowPositionController _position;
+    private readonly ThemeRepaintController _theme;
     private readonly TextBlock _freshness = NewLine();
     private readonly TextBlock _session = NewLine();
     private readonly TextBlock _weekly = NewLine();
@@ -48,10 +56,11 @@ internal sealed class DetailWindow : Window
     private System.Windows.Point _dragStartMouse;
     private System.Windows.Point _dragStartWindow;
 
-    public DetailWindow(ISkinToShell skinToShell, DetailWindowPositionController position)
+    public DetailWindow(ISkinToShell skinToShell, DetailWindowPositionController position, IThemeSource themeSource)
     {
         ArgumentNullException.ThrowIfNull(skinToShell);
         ArgumentNullException.ThrowIfNull(position);
+        ArgumentNullException.ThrowIfNull(themeSource);
 
         _skinToShell = skinToShell;
         _position = position;
@@ -63,8 +72,6 @@ internal sealed class DetailWindow : Window
         ResizeMode = ResizeMode.NoResize;
         ShowInTaskbar = false;
         Topmost = true;
-        Background = System.Windows.Media.Brushes.White;
-        BorderBrush = System.Windows.Media.Brushes.Gray;
         BorderThickness = new Thickness(1);
         Content = BuildLayout();
 
@@ -72,7 +79,24 @@ internal sealed class DetailWindow : Window
         MouseLeftButtonUp += OnMouseLeftButtonUp;
         MouseMove += OnMouseMove;
         Deactivated += (_, _) => _skinToShell.RequestWidget(false);
+
+        _theme = new ThemeRepaintController(themeSource, ApplyTheme);
     }
+
+    /// <summary>Repaints this window's background, border and text colour from a live
+    /// <see cref="IThemeSource"/> reading (ADR-0009 slice 7). <see cref="TextBlock.Foreground"/>
+    /// is set once here, at the window root, and reaches every child <see cref="TextBlock"/> in
+    /// <see cref="BuildLayout"/> through WPF's own property-value inheritance — none of them set
+    /// a local <c>Foreground</c> that would shadow it.</summary>
+    private void ApplyTheme(WindowThemeColors colors)
+    {
+        Background = ToBrush(colors.Background);
+        BorderBrush = ToBrush(colors.Border);
+        Foreground = ToBrush(colors.Foreground);
+    }
+
+    private static SolidColorBrush ToBrush(RgbColor color) =>
+        new(System.Windows.Media.Color.FromRgb(color.R, color.G, color.B));
 
     /// <summary>
     /// Shows the window at the position <see cref="DetailWindowPositionController.ResolveShowPosition"/>
