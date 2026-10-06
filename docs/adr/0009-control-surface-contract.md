@@ -319,6 +319,22 @@ caller — this process's `Application.SessionEnding` handler, which runs it the
 calls `Application.Shutdown()` itself (the skin's own loop-exit mechanism, as
 this section's second paragraph describes). Linux wires no caller yet (slice 9).
 
+**2026-10-06 update — slice 9 landed (Kit the Builder, OVI-484, PR TBD).** The
+Linux loop-exit half is now wired in `src/O-view.Linux/Program.cs`: a
+`PosixSignalRegistration` for `SIGTERM` — the session/service-manager
+termination signal, the nearest Linux equivalent of the
+`WM_QUERYENDSESSION`-driven `Application.SessionEnding` slice 4 used on
+Windows, since Avalonia's classic-desktop lifetime raises no "session ending"
+event of its own — cancels the signal's default handling, then marshals onto
+the UI thread to call `skinToShell.Quit()` followed by
+`IClassicDesktopStyleApplicationLifetime.Shutdown()`, the Avalonia member D7's
+second paragraph names as this platform's loop-exit mechanism. Not exercised
+by an automated test: no signal-sending harness runs against this process in
+this environment, the same boundary already drawn for this skin's D-Bus
+adapters. Both skins now have a production, non-menu caller of `Quit()`; the
+menu's own Quit item on Linux is slice 9's own `LinuxTrayMenu`, landed in the
+same PR.
+
 ### D8 — Out of scope, and staying out
 
 - **Auto-update execution and packaging** — OVI-433, the sibling amendment
@@ -452,7 +468,7 @@ decomposition** — the board signed this record off on 2026-10-05 (see
 | 6 | **Windows menu (D1, D2)**: a `ContextMenuStrip` on the existing `NotifyIcon` with the seven items, threshold as a pick-one group reading slice 2's persisted value, run-at-startup read live from `RegistryStartupRegistration` on open and rendered from `Apply`'s return (D3), the failed-toggle statement, and slice 4's quit. Split per item group if it passes ~500 lines — **landed** (Kit the Builder, OVI-480, PR #84): `TrayMenuController` (`src/O-view.Tray/Presentation/TrayMenuController.cs`) decides every item's call and its rendered state, re-reading run-at-startup from `IStartupRegistration.IsEnabled()` and the threshold/auto-update checks from the shell's persisted `ShellSettings` on every `BuildSnapshot()`, never caching either; `TrayMenu` is the untested `ContextMenuStrip` adapter wired to `TrayStatusIcon`, reusing its existing `ShowToast` balloon tip for the failed-toggle statement rather than adding a new surface. `Program.cs` gives `RegistryStartupRegistration` its first production construction. No `ISkinToShell`/`IShellToSkin` member added, per D2 | 1, 2, 3, 4 | Medium — first menu; `IStartupRegistration`'s first production construction | agent |
 | 7 | **Windows theme applied**: the detail window and the menu consume slice 5, repainting on live change. The theme-to-brush mapping is this skin's own and is shared with nothing (D6 point 2) | 5, 6 | Low–medium — verifiable here | agent |
 | 8 | **Linux `IThemeSource` implementation (D6)**: the desktop portal's `org.freedesktop.appearance` `color-scheme` read plus its `SettingChanged` signal, over the existing `Tmds.DBus.Protocol` dependency, **off the UI thread** (ADR-0008 D6's rule), portal-absent reported as `Unknown`. **No new package reference** | 5 | **High** — no session bus reachable here or on CI; proven by fake-backed orchestration tests only, exactly as ADR-0008 slice 8's `DBusSessionBusNameWatcher` was | agent |
-| 9 | **Linux menu (D1, D2) + the Linux loop-exit half of quit**: Avalonia `NativeMenu` on the existing `TrayIcon`, independently implemented from the Windows menu (ADR-0008 D1 — own wording, own structure code), run-at-startup live from `XdgAutostartRegistration`, same D3 rules | 1, 2, 3, 4, 6 (as reference) | **High** — no interactive Linux display reachable; ships labelled unverified | agent |
+| 9 | **Linux menu (D1, D2) + the Linux loop-exit half of quit** — **landed** (Kit the Builder, OVI-484, PR TBD): `LinuxMenuController` (`src/O-view.Linux/Presentation/LinuxMenuController.cs`), written independently of `TrayMenuController` (own structure, own wording), decides every item's call and its rendered state, re-reading run-at-startup from `XdgAutostartRegistration.IsEnabled()` and the threshold/auto-update checks from the shell's persisted `ShellSettings` on every `Snapshot()`, never caching either; `LinuxTrayMenu` is the untested `NativeMenu` adapter assigned to the existing `TrayIcon.Menu`, reusing the existing `DBusNotificationSender` for the failed-toggle statement rather than adding a new surface. `Program.cs` gives `XdgAutostartRegistration` its first production construction and wires a `SIGTERM` `PosixSignalRegistration` as the Linux loop-exit caller of `Quit()` (D7) | 1, 2, 3, 4, 6 (as reference) | **High** — no interactive Linux display reachable; ships labelled unverified | agent |
 | 10 | **Linux theme applied**: the detail window consumes slice 8, repainting on the portal signal. Own mapping, matching nothing in the Windows skin | 8, 9 | **High** — **never observed** on real hardware; ADR-0002's Linux theme row ships **unchanged** | agent |
 
 Slices 1–3 and 6–10 need no board answer beyond this record. Slice 4 changes
