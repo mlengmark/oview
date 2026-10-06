@@ -16,7 +16,7 @@ namespace OView.App;
 /// upfront here means both stores can read immediately after startup without one of them
 /// racing the other to create the directory first.</para>
 /// </summary>
-public sealed class StoreLifetime
+public sealed class StoreLifetime : IDisposable
 {
     public StoreLifetime(string directory)
     {
@@ -43,4 +43,18 @@ public sealed class StoreLifetime
     /// and constructs both stores against it. The composition root the shell calls once at startup.
     /// </summary>
     public static StoreLifetime CreateDefault() => new(StoreDirectoryResolver.ResolveDefault());
+
+    /// <summary>
+    /// Releases this process's ownership of both stores (ADR-0009 D7, OVI-469): the last step
+    /// of <see cref="AppShell.Quit"/>'s shutdown order, after the skin has torn down its OS
+    /// integration and the poll loop has stopped and confirmed no poll is still in flight.
+    /// Neither store holds a resource open between calls today — <see cref="UsageLedgerStore"/>
+    /// opens and closes its SQLite connection per operation and <see cref="WeeklyResetAnchorStore"/>
+    /// opens and closes its file per read/write — so there is nothing to flush or close here
+    /// yet; this method exists so that remains true by contract, not by accident, if either
+    /// store ever starts holding one open.
+    /// </summary>
+    public void Dispose()
+    {
+    }
 }

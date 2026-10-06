@@ -28,9 +28,12 @@ namespace OView.Tray;
 /// ADR-0009 slice 2 (OVI-447) replaces the former local <c>PendingSkinToShell</c> stub with a
 /// real <see cref="AppShell"/>, loading <see cref="ShellSettings"/> from
 /// <see cref="ShellSettingsStore"/> before composing the poll loop so it starts on the loaded
-/// cadence. <see cref="AppShell.Quit"/> still throws — that ordering is a separate, board-merge
-/// slice (ADR-0009 slicing table row 4) — so this process still exits only by being killed from
-/// outside.
+/// cadence.
+/// ADR-0009 slice 4 (OVI-469) implements <see cref="AppShell.Quit"/>'s shutdown order (skin,
+/// then poll loop, then stores) and gives it its first production caller: this process's
+/// <c>Application.SessionEnding</c> handler, below. The menu's own Quit item is still a later
+/// slice (ADR-0009 slicing table row 6), so a running user session still ends this process only
+/// by sign-off/shutdown or being killed from outside.
 /// ADR-0009 slice 3 (OVI-457) gives <see cref="TrayShellToSkin.RaiseEvent"/> — wired since slice
 /// 7 but never called in production until now — its first real caller: a
 /// <see cref="UsageEventDecider"/> over the same <see cref="LedgerUsageStatisticsSource"/> the
@@ -64,7 +67,7 @@ internal static class Program
         pollLoop.SnapshotUpdated += (_, snapshot) => detailCoordinator.OnPollSucceeded(snapshot);
 
         var diagnosticsWriter = new DiagnosticsBundleWriter(directory, new SystemClock());
-        var skinToShell = new AppShell(settingsStore, settings, pollLoop, detailCoordinator, diagnosticsWriter);
+        var skinToShell = new AppShell(settingsStore, settings, pollLoop, detailCoordinator, diagnosticsWriter, skin, storeLifetime);
 
         // ADR-0009 slice 3 (OVI-457): no CompositeUsageProvider is composed in this process yet
         // (see BuildUsageProvider below), so there is no real ProviderHealth list — an empty one
@@ -111,6 +114,22 @@ internal static class Program
             // message loop, not WinForms' — the status icon needs no WinForms message pump of
             // its own.
             var application = new System.Windows.Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+
+            // ADR-0009 D7 (OVI-469): the Windows skin's loop-exit call — the first production
+            // path that invokes ISkinToShell.Quit(). A user signing off or shutting down
+            // Windows is a real "the user asked to quit" event even with no menu Quit item
+            // built yet (that wiring is ADR-0009 slicing table row 6); without this, the
+            // process would keep running past session end until Windows kills it outright,
+            // skipping the shell's shutdown order entirely. Quit() runs the shell's ordering
+            // (skin Shutdown, then poll loop, then stores); only afterwards does this skin call
+            // Application.Shutdown() — the platform-loop-exit mechanism D7 says is the skin's
+            // own, not the shell's.
+            application.SessionEnding += (_, _) =>
+            {
+                skinToShell.Quit();
+                application.Shutdown();
+            };
+
             application.Run();
         }
     }

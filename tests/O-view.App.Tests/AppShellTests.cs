@@ -54,7 +54,7 @@ public class AppShellTests : IDisposable
             new FakeStatisticsSource(), new FakeSkin(), new FakeClock(DateTimeOffset.UnixEpoch), TimeZoneInfo.Utc);
         var diagnosticsWriter = new DiagnosticsBundleWriter(_directory, new FakeClock(DateTimeOffset.UnixEpoch));
 
-        return new AppShell(settingsStore, settings, pollLoop, detailCoordinator, diagnosticsWriter);
+        return new AppShell(settingsStore, settings, pollLoop, detailCoordinator, diagnosticsWriter, new FakeSkin(), new StoreLifetime(_directory));
     }
 
     [Fact]
@@ -79,7 +79,7 @@ public class AppShellTests : IDisposable
         var detailCoordinator = new DetailPushCoordinator(
             new FakeStatisticsSource(), skin, new FakeClock(DateTimeOffset.UnixEpoch), TimeZoneInfo.Utc);
         var diagnosticsWriter = new DiagnosticsBundleWriter(_directory, new FakeClock(DateTimeOffset.UnixEpoch));
-        var shell = new AppShell(settingsStore, ShellSettings.Default, pollLoop, detailCoordinator, diagnosticsWriter);
+        var shell = new AppShell(settingsStore, ShellSettings.Default, pollLoop, detailCoordinator, diagnosticsWriter, skin, new StoreLifetime(_directory));
 
         shell.RequestWidget(true);
 
@@ -139,12 +139,23 @@ public class AppShellTests : IDisposable
     }
 
     [Fact]
-    public void Quit_is_not_implemented_in_this_slice()
+    public void Quit_shuts_down_the_skin_then_stops_the_poll_loop_then_disposes_the_stores()
     {
-        var shell = CreateShell(out var pollLoop, out _);
-        using var pollLoopScope = pollLoop;
+        var order = new List<string>();
+        var skin = new OrderRecordingSkin(order);
+        var timer = new OrderRecordingTimer(order);
+        var storeLifetime = new OrderRecordingDisposable(order);
+        var settingsStore = new ShellSettingsStore(_directory);
+        var pollLoop = new UsagePollLoop(
+            new FakeUsageProvider(_ => UsageSnapshot.Unavailable), new FakeClock(DateTimeOffset.UnixEpoch), timer, TimeSpan.FromMinutes(1));
+        var detailCoordinator = new DetailPushCoordinator(
+            new FakeStatisticsSource(), skin, new FakeClock(DateTimeOffset.UnixEpoch), TimeZoneInfo.Utc);
+        var diagnosticsWriter = new DiagnosticsBundleWriter(_directory, new FakeClock(DateTimeOffset.UnixEpoch));
+        var shell = new AppShell(settingsStore, ShellSettings.Default, pollLoop, detailCoordinator, diagnosticsWriter, skin, storeLifetime);
 
-        Assert.Throws<NotImplementedException>(shell.Quit);
+        shell.Quit();
+
+        Assert.Equal(new[] { "skin-shutdown", "poll-loop-timer-disposed", "stores-disposed" }, order);
     }
 
     [Fact]
@@ -226,5 +237,72 @@ public class AppShellTests : IDisposable
         public void Shutdown()
         {
         }
+    }
+
+    /// <summary>Records to a shared order log on <see cref="Shutdown"/>, for
+    /// <see cref="Quit_shuts_down_the_skin_then_stops_the_poll_loop_then_disposes_the_stores"/>.</summary>
+    private sealed class OrderRecordingSkin : IShellToSkin
+    {
+        private readonly List<string> _order;
+
+        public OrderRecordingSkin(List<string> order) => _order = order;
+
+        public void ShowSnapshot(UsageSnapshot snapshot)
+        {
+        }
+
+        public void RaiseEvent(UsageEvent usageEvent)
+        {
+        }
+
+        public void ShowDetail(UsageDetail detail)
+        {
+        }
+
+        public void SetVisible(bool visible)
+        {
+        }
+
+        public void Shutdown() => _order.Add("skin-shutdown");
+    }
+
+    /// <summary>Records to a shared order log on <see cref="Dispose"/> — the last thing
+    /// <see cref="UsagePollLoop.Dispose"/> does — for
+    /// <see cref="Quit_shuts_down_the_skin_then_stops_the_poll_loop_then_disposes_the_stores"/>.</summary>
+    private sealed class OrderRecordingTimer : IAppTimer
+    {
+        private readonly List<string> _order;
+
+        public OrderRecordingTimer(List<string> order) => _order = order;
+
+        public event EventHandler? Elapsed
+        {
+            add { }
+            remove { }
+        }
+
+        public TimeSpan Interval { get; set; }
+
+        public void Start()
+        {
+        }
+
+        public void Stop()
+        {
+        }
+
+        public void Dispose() => _order.Add("poll-loop-timer-disposed");
+    }
+
+    /// <summary>Records to a shared order log on <see cref="Dispose"/>, standing in for
+    /// <see cref="StoreLifetime"/> in
+    /// <see cref="Quit_shuts_down_the_skin_then_stops_the_poll_loop_then_disposes_the_stores"/>.</summary>
+    private sealed class OrderRecordingDisposable : IDisposable
+    {
+        private readonly List<string> _order;
+
+        public OrderRecordingDisposable(List<string> order) => _order = order;
+
+        public void Dispose() => _order.Add("stores-disposed");
     }
 }

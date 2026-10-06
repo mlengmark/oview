@@ -21,25 +21,33 @@ public sealed class AppShell : ISkinToShell
     private readonly UsagePollLoop _pollLoop;
     private readonly DetailPushCoordinator _detailCoordinator;
     private readonly DiagnosticsBundleWriter _diagnosticsWriter;
+    private readonly IShellToSkin _skin;
+    private readonly IDisposable _storeLifetime;
 
     public AppShell(
         ShellSettingsStore settingsStore,
         ShellSettings settings,
         UsagePollLoop pollLoop,
         DetailPushCoordinator detailCoordinator,
-        DiagnosticsBundleWriter diagnosticsWriter)
+        DiagnosticsBundleWriter diagnosticsWriter,
+        IShellToSkin skin,
+        IDisposable storeLifetime)
     {
         ArgumentNullException.ThrowIfNull(settingsStore);
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(pollLoop);
         ArgumentNullException.ThrowIfNull(detailCoordinator);
         ArgumentNullException.ThrowIfNull(diagnosticsWriter);
+        ArgumentNullException.ThrowIfNull(skin);
+        ArgumentNullException.ThrowIfNull(storeLifetime);
 
         _settingsStore = settingsStore;
         Settings = settings;
         _pollLoop = pollLoop;
         _detailCoordinator = detailCoordinator;
         _diagnosticsWriter = diagnosticsWriter;
+        _skin = skin;
+        _storeLifetime = storeLifetime;
     }
 
     /// <summary>
@@ -79,11 +87,18 @@ public sealed class AppShell : ISkinToShell
     public void WriteDiagnosticsBundle() => _diagnosticsWriter.Write(Settings, _pollLoop.CurrentSnapshot);
 
     /// <summary>
-    /// Not implemented in this slice. Process-lifetime shutdown ordering (skin
-    /// <c>Shutdown()</c>, then poll loop, then stores) is ADR-0009 slicing table row 4 — a
-    /// separate, board-merge slice, because a wrong order here is a corrupted ledger reachable
-    /// from one menu click.
+    /// The shell's process-lifetime shutdown order (ADR-0009 D7, slicing table row 4,
+    /// OVI-469): the skin tears down its OS integration first (<see cref="IShellToSkin.Shutdown"/>),
+    /// then the poll loop stops and — <see cref="UsagePollLoop.Dispose"/>'s own guarantee —
+    /// blocks until any poll already in flight finishes, then the stores release ownership.
+    /// Only after this method returns does the skin let its platform loop exit; that mechanism
+    /// is the skin's own (WPF's <c>Application.Shutdown</c>, Avalonia's classic-desktop
+    /// equivalent) and is not called from here.
     /// </summary>
-    public void Quit() => throw new NotImplementedException(
-        "Quit's shutdown ordering is ADR-0009 slicing table row 4, not this slice (OVI-447).");
+    public void Quit()
+    {
+        _skin.Shutdown();
+        _pollLoop.Dispose();
+        _storeLifetime.Dispose();
+    }
 }
