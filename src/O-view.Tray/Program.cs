@@ -50,6 +50,9 @@ namespace OView.Tray;
 /// <see cref="OView.Tray.Platform.RegistryStartupRegistration"/>: <c>TrayStatusIcon</c>'s new
 /// <c>TrayMenu</c> reads it live every time the menu opens and applies a toggle through it
 /// directly (D3), never through <see cref="ISkinToShell"/>.
+/// ADR-0009 slice 7 (OVI-489) gives <see cref="OView.Tray.Platform.RegistryThemeSource"/> its
+/// first production construction, shared by the detail window and the menu so both repaint from
+/// the same live reading.
 /// </summary>
 internal static class Program
 {
@@ -59,6 +62,8 @@ internal static class Program
         var directory = StoreDirectoryResolver.ResolveDefault();
         var settingsStore = new ShellSettingsStore(directory);
         var settings = settingsStore.Load();
+
+        using var themeSource = new RegistryThemeSource();
 
         var (pollLoop, skin) = TraySkinHost.Compose(
             BuildUsageProvider(),
@@ -99,11 +104,11 @@ internal static class Program
                 DetailWindow.DefaultHeight),
             (x, y) => preferenceStore.Save(x, y));
 
-        var detailWindow = new DetailWindow(skinToShell, positionController);
+        var detailWindow = new DetailWindow(skinToShell, positionController, themeSource);
         skin.DetailShown += detailWindow.ShowDetail;
         skin.VisibilityChanged += detailWindow.SetVisible;
 
-        using var statusIcon = new TrayStatusIcon(skinToShell, () => skinToShell.Settings, new RegistryStartupRegistration());
+        using var statusIcon = new TrayStatusIcon(skinToShell, () => skinToShell.Settings, new RegistryStartupRegistration(), themeSource);
         statusIcon.OnSnapshotUpdated(pollLoop.CurrentSnapshot);
         pollLoop.SnapshotUpdated += (_, snapshot) => statusIcon.OnSnapshotUpdated(snapshot);
 
