@@ -30,6 +30,11 @@ namespace OView.Linux.Presentation;
 /// forwards to <see cref="StatusIconController"/> — both run inside the same UI-thread
 /// dispatch, so the icon and its tooltip never disagree about which snapshot they rendered.
 /// </para>
+///
+/// <para>ADR-0009 slice 9 (OVI-484) adds the right-click menu: the
+/// <see cref="LinuxStatusIcon(ISkinToShell, Func{ShellSettings}, IStartupRegistration, Action{string, string})"/>
+/// overload builds a <see cref="LinuxTrayMenu"/> over a <see cref="LinuxMenuController"/> and
+/// assigns it to this icon's <c>TrayIcon.Menu</c>.</para>
 /// </summary>
 internal sealed class LinuxStatusIcon : IDisposable
 {
@@ -44,6 +49,23 @@ internal sealed class LinuxStatusIcon : IDisposable
         _trayIcon = new TrayIcon { IsVisible = false };
         _tooltip = new TooltipTextController(text => _trayIcon.ToolTipText = text);
         _trayIcon.Clicked += (_, _) => _controller.OnActivated();
+    }
+
+    /// <summary>
+    /// ADR-0009 slice 9 (OVI-484): attaches the right-click menu to this icon's
+    /// <see cref="TrayIcon"/>. A second constructor rather than a required parameter on the
+    /// one above, because that constructor is still this type's own tests' entry point (via
+    /// <see cref="StatusIconController"/>'s fakes) and those tests need no menu.
+    /// </summary>
+    public LinuxStatusIcon(
+        ISkinToShell skinToShell,
+        Func<ShellSettings> currentSettings,
+        IStartupRegistration startupRegistration,
+        Action<string, string> showFailureNotification)
+        : this(skinToShell)
+    {
+        var menuController = new LinuxMenuController(skinToShell, currentSettings, startupRegistration);
+        _trayIcon.Menu = new LinuxTrayMenu(menuController, showFailureNotification).Menu;
     }
 
     /// <summary>Forwards the shell's latest snapshot onto the UI thread.</summary>

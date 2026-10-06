@@ -1,5 +1,7 @@
+using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
 using OView.App;
 using OView.Core.Models;
 using OView.Core.Providers;
@@ -98,7 +100,13 @@ internal static class Program
 
         var preferenceStore = new DetailWindowPreferenceStore(DetailWindowPreferenceStore.DefaultDirectory);
 
-        var statusIcon = new LinuxStatusIcon(skinToShell);
+        var notificationSender = new DBusNotificationSender();
+
+        var statusIcon = new LinuxStatusIcon(
+            skinToShell,
+            () => skinToShell.Settings,
+            new XdgAutostartRegistration(),
+            (summary, body) => { _ = notificationSender.SendAsync(summary, body); });
         statusIcon.OnSnapshotUpdated(pollLoop.CurrentSnapshot);
         pollLoop.SnapshotUpdated += (_, snapshot) => statusIcon.OnSnapshotUpdated(snapshot);
 
@@ -115,10 +123,30 @@ internal static class Program
         };
         _ = monitor.StartAsync(CancellationToken.None);
 
-        var notificationSender = new DBusNotificationSender();
         var notificationController = new AlertNotificationController(
             (summary, body) => notificationSender.SendAsync(summary, body));
         skin.EventRaised += notificationController.OnEventRaised;
+
+        // ADR-0009 D7 (OVI-484): the Linux half of the loop-exit call. SIGTERM is this
+        // platform's session/service-manager termination signal — the nearest equivalent of
+        // the Windows skin's WM_QUERYENDSESSION-driven Application.SessionEnding (slice 4,
+        // OVI-469), since Avalonia's classic-desktop lifetime raises no "session ending" event
+        // of its own on Linux. Cancelling the default handling and running the shell's own
+        // ordering first (Quit(), then the platform loop's own exit call) keeps this on the
+        // same ordering every other quit path uses, including the menu's (slice 9's own Quit
+        // item, wired through LinuxTrayMenu above). Not exercised by this process's own tests —
+        // no signal-sending harness runs against this process here — but it calls nothing that
+        // is not already tested: AppShell.Quit() (slice 4) and IClassicDesktopStyleApplicationLifetime.Shutdown()
+        // (an Avalonia framework member, not this repository's code).
+        using var sigterm = PosixSignalRegistration.Create(PosixSignal.SIGTERM, context =>
+        {
+            context.Cancel = true;
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                skinToShell.Quit();
+                (Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.Shutdown();
+            });
+        });
 
         using (pollLoop)
         using (statusIcon)
