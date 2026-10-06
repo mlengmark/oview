@@ -24,6 +24,11 @@ namespace OView.Tray.Presentation;
 /// same icon (Windows has no toast API independent of a notification-area icon), so it lives
 /// here rather than a new standalone adapter; <see cref="AlertToastController"/> owns the
 /// "which event, what text" decision and is the only caller.
+/// ADR-0009 slice 6 (OVI-480) adds the right-click menu: <see cref="TrayMenu"/> owns the real
+/// <c>ContextMenuStrip</c>, assigned to this icon's <c>NotifyIcon.ContextMenuStrip</c>, and
+/// reuses <see cref="ShowToast"/> as the surface for its run-at-startup failed-toggle
+/// statement (D3 point 3) — the same balloon tip <see cref="AlertToastController"/> already
+/// uses, not a new one.
 /// </summary>
 internal sealed class TrayStatusIcon : IDisposable
 {
@@ -33,12 +38,13 @@ internal sealed class TrayStatusIcon : IDisposable
     private readonly StatusIconController _controller;
     private readonly TooltipTextController _tooltip;
     private readonly NotifyIcon _notifyIcon;
+    private readonly TrayMenu _menu;
     private readonly MessageSink _messageSink;
     private readonly int _taskbarCreatedMessage;
     private Icon? _currentIcon;
     private bool _disposed;
 
-    public TrayStatusIcon(ISkinToShell skinToShell)
+    public TrayStatusIcon(ISkinToShell skinToShell, Func<ShellSettings> currentSettings, IStartupRegistration startupRegistration)
     {
         _controller = new StatusIconController(skinToShell, Render, Reregister);
         _taskbarCreatedMessage = RegisterWindowMessage("TaskbarCreated");
@@ -46,6 +52,10 @@ internal sealed class TrayStatusIcon : IDisposable
         _notifyIcon = new NotifyIcon { Visible = false };
         _notifyIcon.MouseClick += (_, _) => _controller.OnActivated();
         _tooltip = new TooltipTextController(text => _notifyIcon.Text = text);
+
+        var menuController = new TrayMenuController(skinToShell, currentSettings, startupRegistration);
+        _menu = new TrayMenu(menuController, ShowToast);
+        _notifyIcon.ContextMenuStrip = _menu.Strip;
 
         _messageSink = new MessageSink(this);
 
@@ -98,6 +108,8 @@ internal sealed class TrayStatusIcon : IDisposable
 
         _messageSink.Dispose();
         _notifyIcon.Visible = false;
+        _notifyIcon.ContextMenuStrip = null;
+        _menu.Dispose();
         _notifyIcon.Dispose();
         _currentIcon?.Dispose();
         _disposed = true;

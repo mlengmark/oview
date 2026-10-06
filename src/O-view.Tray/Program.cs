@@ -5,6 +5,7 @@ using OView.Core.Models;
 using OView.Core.Providers;
 using OView.Core.Providers.Jsonl;
 using OView.Core.Statistics;
+using OView.Tray.Platform;
 using OView.Tray.Presentation;
 
 namespace OView.Tray;
@@ -45,6 +46,10 @@ namespace OView.Tray;
 /// process until that composition-root slice lands. The same is true of
 /// <see cref="UsageEventKind.UpdateAvailable"/>: its fetch is ADR-0007 D3's own slice (OVI-433),
 /// so <see cref="UsageEventDecider.DecideUpdateAvailable"/> has no caller here either.
+/// ADR-0009 slice 6 (OVI-480) adds the menu's own first production caller of
+/// <see cref="OView.Tray.Platform.RegistryStartupRegistration"/>: <c>TrayStatusIcon</c>'s new
+/// <c>TrayMenu</c> reads it live every time the menu opens and applies a toggle through it
+/// directly (D3), never through <see cref="ISkinToShell"/>.
 /// </summary>
 internal static class Program
 {
@@ -98,7 +103,7 @@ internal static class Program
         skin.DetailShown += detailWindow.ShowDetail;
         skin.VisibilityChanged += detailWindow.SetVisible;
 
-        using var statusIcon = new TrayStatusIcon(skinToShell);
+        using var statusIcon = new TrayStatusIcon(skinToShell, () => skinToShell.Settings, new RegistryStartupRegistration());
         statusIcon.OnSnapshotUpdated(pollLoop.CurrentSnapshot);
         pollLoop.SnapshotUpdated += (_, snapshot) => statusIcon.OnSnapshotUpdated(snapshot);
 
