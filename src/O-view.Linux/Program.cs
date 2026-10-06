@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using OView.App;
+using OView.Core.Models;
 using OView.Core.Providers;
 using OView.Core.Providers.Jsonl;
 using OView.Core.Statistics;
@@ -44,6 +45,18 @@ namespace OView.Linux;
 /// cadence. <see cref="AppShell.Quit"/> still throws — that ordering is a separate, board-merge
 /// slice (ADR-0009 slicing table row 4) — so this process still exits only by being killed from
 /// outside.</para>
+///
+/// <para>ADR-0009 slice 3 (OVI-457) gives <see cref="LinuxShellToSkin.RaiseEvent"/> — wired
+/// since slice 11 but never called in production until now — its first real caller: a
+/// <see cref="UsageEventDecider"/> over the same <see cref="LedgerUsageStatisticsSource"/> the
+/// detail coordinator already reads, consulted on every poll alongside it.
+/// <see cref="BuildUsageProvider"/> still returns a plain
+/// <see cref="OView.Core.Providers.Jsonl.JsonlUsageProvider"/>, not a <c>CompositeUsageProvider</c>,
+/// so there is no real <see cref="OView.Core.Models.ProviderHealth"/> list to pass yet —
+/// <see cref="UsageEventKind.InputDegraded"/> stays decided and tested but unreachable in this
+/// process until that composition-root slice lands. The same is true of
+/// <see cref="UsageEventKind.UpdateAvailable"/>: its fetch is ADR-0007 D3's own slice (OVI-433),
+/// so <see cref="UsageEventDecider.DecideUpdateAvailable"/> has no caller here either.</para>
 /// </summary>
 internal static class Program
 {
@@ -68,6 +81,20 @@ internal static class Program
 
         var diagnosticsWriter = new DiagnosticsBundleWriter(directory, new SystemClock());
         var skinToShell = new AppShell(settingsStore, settings, pollLoop, detailCoordinator, diagnosticsWriter);
+
+        // ADR-0009 slice 3 (OVI-457): no CompositeUsageProvider is composed in this process yet
+        // (see BuildUsageProvider below), so there is no real ProviderHealth list — an empty one
+        // is the honest answer, not a fabricated "all healthy", and InputDegraded simply never
+        // fires here until that composition-root slice lands.
+        var eventDecider = new UsageEventDecider(statisticsSource, new SystemClock(), TimeZoneInfo.Local);
+        pollLoop.SnapshotUpdated += (_, snapshot) =>
+        {
+            foreach (var usageEvent in eventDecider.OnPollSucceeded(snapshot, Array.Empty<ProviderHealth>(), skinToShell.Settings))
+            {
+                skin.RaiseEvent(usageEvent);
+            }
+        };
+
         var preferenceStore = new DetailWindowPreferenceStore(DetailWindowPreferenceStore.DefaultDirectory);
 
         var statusIcon = new LinuxStatusIcon(skinToShell);
