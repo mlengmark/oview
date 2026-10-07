@@ -110,6 +110,36 @@ internal sealed class DetailWindow : Window
         _log($"O-view detail window: granted position {Position}");
     }
 
+    /// <summary>
+    /// The untested half of ADR-0009 slice 10's repaint: converts
+    /// <see cref="LinuxWindowThemeColors"/> — plain RGB, decided by
+    /// <see cref="LinuxThemeRepaintController"/> against a fake — into the Avalonia
+    /// <see cref="SolidColorBrush"/>es this window actually paints with. No decision is made
+    /// here; see the controller for that (the same "decision tested, adapter not" split every
+    /// other control in this skin already uses). <see cref="Foreground"/> is set on the window
+    /// itself rather than on each <see cref="TextBlock"/> individually, since it is an inherited
+    /// styled property every child text element already reads from its nearest ancestor.
+    /// </summary>
+    public void ApplyTheme(LinuxWindowThemeColors colors)
+    {
+        Background = ToBrush(colors.Background);
+        Foreground = ToBrush(colors.Foreground);
+        var border = ToBrush(colors.Border);
+
+        if (Content is ScrollViewer { Content: StackPanel outer })
+        {
+            foreach (var separator in outer.Children)
+            {
+                if (separator is Separator separatorControl)
+                {
+                    separatorControl.Background = border;
+                }
+            }
+        }
+    }
+
+    private static SolidColorBrush ToBrush(LinuxRgbColor color) => new(Color.FromRgb(color.R, color.G, color.B));
+
     /// <summary>Renders the exact pushed detail and nothing else — see the type remarks.</summary>
     public void ShowDetail(UsageDetail detail)
     {
