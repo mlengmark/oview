@@ -1,9 +1,9 @@
 # ADR-0010: Acting on an update, and shipping the thing that acts — install kind decides, verification fails closed
 
-- **Status:** **Proposed** — awaiting board sign-off at gate G2. No slice in the
-  table below may start before this record is merged. Living document: amend in
-  place, as [ADR-0001](0001-core-to-skin-data-contract.md) and
-  [ADR-0008](0008-presentation-skin-contract.md) do.
+- **Status:** **Accepted** — board sign-off at gate G2 via the PR #77 merge card
+  (interaction `f2a1b66b-1257-4f53-af81-8a0a32b3e3d4`, accepted by local-board).
+  Living document: amend in place, as [ADR-0001](0001-core-to-skin-data-contract.md)
+  and [ADR-0008](0008-presentation-skin-contract.md) do.
 - **Date:** 2026-10-05
 - **Deciders:** Adrian II the Architect, pending board sign-off
 - **Scope:** Phase 4B — **acting** on the update check that Phase 2 already
