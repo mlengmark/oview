@@ -110,6 +110,9 @@ internal static class Program
         statusIcon.OnSnapshotUpdated(pollLoop.CurrentSnapshot);
         pollLoop.SnapshotUpdated += (_, snapshot) => statusIcon.OnSnapshotUpdated(snapshot);
 
+        var themeSource = new LinuxThemeSource(new DBusDesktopThemePortal());
+        _ = themeSource.StartAsync(CancellationToken.None);
+
         var monitor = new NotificationHostMonitor(new DBusSessionBusNameWatcher(NotificationHostWellKnownName));
         monitor.ProbeCompleted += observed =>
         {
@@ -151,7 +154,7 @@ internal static class Program
         using (pollLoop)
         using (statusIcon)
         {
-            BuildAvaloniaApp(statusIcon, skin, skinToShell, preferenceStore)
+            BuildAvaloniaApp(statusIcon, skin, skinToShell, preferenceStore, themeSource)
                 .StartWithClassicDesktopLifetime(args, ShutdownMode.OnExplicitShutdown);
         }
     }
@@ -166,8 +169,9 @@ internal static class Program
     /// and <paramref name="preferenceStore"/> carry no Avalonia dependency and are safe to build here.
     /// </summary>
     private static AppBuilder BuildAvaloniaApp(
-        LinuxStatusIcon statusIcon, LinuxShellToSkin skin, ISkinToShell skinToShell, DetailWindowPreferenceStore preferenceStore) =>
-        AppBuilder.Configure(() => new App(statusIcon, skin, skinToShell, preferenceStore))
+        LinuxStatusIcon statusIcon, LinuxShellToSkin skin, ISkinToShell skinToShell, DetailWindowPreferenceStore preferenceStore,
+        IThemeSource themeSource) =>
+        AppBuilder.Configure(() => new App(statusIcon, skin, skinToShell, preferenceStore, themeSource))
             .UsePlatformDetect()
             .LogToTrace();
 

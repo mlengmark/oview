@@ -24,6 +24,8 @@ internal sealed class App : Application
     private readonly LinuxShellToSkin? _skin;
     private readonly ISkinToShell? _skinToShell;
     private readonly DetailWindowPreferenceStore? _preferenceStore;
+    private readonly IThemeSource? _themeSource;
+    private LinuxThemeRepaintController? _themeRepaint;
 
     public App()
     {
@@ -33,12 +35,14 @@ internal sealed class App : Application
         LinuxStatusIcon statusIcon,
         LinuxShellToSkin skin,
         ISkinToShell skinToShell,
-        DetailWindowPreferenceStore preferenceStore)
+        DetailWindowPreferenceStore preferenceStore,
+        IThemeSource? themeSource = null)
     {
         _statusIcon = statusIcon;
         _skin = skin;
         _skinToShell = skinToShell;
         _preferenceStore = preferenceStore;
+        _themeSource = themeSource;
     }
 
     public override void OnFrameworkInitializationCompleted()
@@ -68,6 +72,11 @@ internal sealed class App : Application
 
         _skin.DetailShown += detailWindow.ShowDetail;
         _skin.VisibilityChanged += detailWindow.SetVisible;
+
+        if (_themeSource is not null)
+        {
+            _themeRepaint = new LinuxThemeRepaintController(_themeSource, detailWindow.ApplyTheme);
+        }
     }
 
     /// <summary>The primary screen's work area, or an empty rectangle before the window (and
