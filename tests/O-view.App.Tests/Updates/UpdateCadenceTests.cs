@@ -1,4 +1,5 @@
 using System.Net.Http;
+using System.Runtime.InteropServices;
 using OView.App.Updates;
 using OView.Core.Updates;
 
@@ -155,6 +156,70 @@ public class UpdateCadenceTests
         Assert.Equal(UpdateOutcome.Unknown, result.Outcome);
     }
 
+    /// <summary>
+    /// ADR-0010 slice 6 (D4): both Linux install kinds still notify on the same background
+    /// cadence Windows uses — <see cref="UpdatePolicy.MayDownloadAndRun"/> only gates download
+    /// and launch, never the notice itself, so "notify-only" must not regress into "no notice
+    /// at all" the way the source's own apt bug once silenced detection entirely.
+    /// </summary>
+    [Theory]
+    [InlineData(InstallKind.LinuxPackage)]
+    [InlineData(InstallKind.LinuxTarball)]
+    public void Background_tick_still_notifies_for_a_Linux_install_kind_that_may_never_download(InstallKind kind)
+    {
+        Assert.False(UpdatePolicy.MayDownloadAndRun(kind));
+
+        var transport = new FakeTransport(UpdateAvailableJsonFor(kind, "v2.0.0"));
+        var cadence = CreateCadence(transport, out var timer, out var settings, out var raised, installKind: kind);
+        settings.AutoUpdateEnabled = true;
+
+        timer.RaiseElapsed();
+        WaitForPendingWork();
+
+        Assert.Single(raised);
+        Assert.Equal(UsageEventKind.UpdateAvailable, raised[0].Kind);
+        Assert.Equal("v2.0.0", settings.Settings.LastAnnouncedUpdateTag);
+    }
+
+    /// <summary>The manual "Check for updates now" path is reachable for a Linux kind too —
+    /// D4's notify-only guarantee is about download and launch, not about hiding the check.</summary>
+    [Theory]
+    [InlineData(InstallKind.LinuxPackage)]
+    [InlineData(InstallKind.LinuxTarball)]
+    public async Task CheckNowAsync_also_reports_UpdateAvailable_for_a_Linux_install_kind(InstallKind kind)
+    {
+        var transport = new FakeTransport(UpdateAvailableJsonFor(kind, "v2.0.0"));
+        var cadence = CreateCadence(transport, out _, out _, out var raised, installKind: kind);
+
+        var result = await cadence.CheckNowAsync();
+
+        Assert.Equal(UpdateOutcome.UpdateAvailable, result.Outcome);
+        Assert.Empty(raised);
+    }
+
+    /// <summary>
+    /// ADR-0010 D4's own words: "a later edit that makes this head 'helpfully' install
+    /// something trips a test rather than shipping". <see cref="LayeringStructuralTests"/>
+    /// already proves <c>O-view.App</c> cannot reference the project that defines
+    /// <c>IInstallerDownloader</c>/<c>IInstallerLauncher</c> (<c>O-view.Tray</c>); this test
+    /// proves the narrower, type-level fact directly on <see cref="UpdateCadence"/> itself —
+    /// its constructor takes no parameter shaped like either seam — so neither the background
+    /// cadence nor the manual check can reach a download or a launch for any install kind,
+    /// Linux included.
+    /// </summary>
+    [Fact]
+    public void UpdateCadence_has_no_constructor_dependency_able_to_download_or_launch_an_installer()
+    {
+        var parameterTypeNames = typeof(UpdateCadence)
+            .GetConstructors()
+            .SelectMany(constructor => constructor.GetParameters())
+            .Select(parameter => parameter.ParameterType.Name);
+
+        Assert.DoesNotContain(parameterTypeNames, name =>
+            name.Contains("Downloader", StringComparison.Ordinal) ||
+            name.Contains("Launcher", StringComparison.Ordinal));
+    }
+
     [Fact]
     public void ConstructorRejectsNullDependencies()
     {
@@ -184,7 +249,8 @@ public class UpdateCadenceTests
         out FakeAppTimer timer,
         out FakeSettingsHolder settings,
         out List<UsageEvent> raised,
-        string currentVersion = "1.0.0")
+        string currentVersion = "1.0.0",
+        InstallKind installKind = InstallKind.WindowsInstaller)
     {
         var releaseFeed = new ReleaseFeed(transport, new FakeClock(DateTimeOffset.UnixEpoch));
         timer = new FakeAppTimer();
@@ -195,13 +261,40 @@ public class UpdateCadenceTests
 
         return new UpdateCadence(
             releaseFeed,
-            new FakeInstallKindSource(),
+            new FakeInstallKindSource { Current = installKind },
             currentVersion,
             () => settingsHolder.Settings,
             settingsHolder.Record,
             raisedEvents.Add,
             timer,
-            TimeSpan.FromHours(24));
+            TimeSpan.FromHours(24),
+            architecture: Architecture.X64);
+    }
+
+    /// <summary>
+    /// A release JSON whose asset matches whatever <paramref name="kind"/> actually detects
+    /// on (pinned to <see cref="Architecture.X64"/> in <see cref="CreateCadence"/>) — Windows
+    /// detects on the installer, the two Linux kinds on their own package names
+    /// (<see cref="UpdatePolicy.DetectionAsset"/>), so a Windows-shaped asset would never match
+    /// a Linux selector and the test would prove nothing.
+    /// </summary>
+    private static string UpdateAvailableJsonFor(InstallKind kind, string tag)
+    {
+        var assetName = kind switch
+        {
+            InstallKind.LinuxPackage => $"o-view_{tag.TrimStart('v')}_amd64.deb",
+            InstallKind.LinuxTarball => $"o-view-{tag.TrimStart('v')}-linux-x64.tar.gz",
+            _ => "O-view-Setup.exe",
+        };
+
+        return $$"""
+        {
+          "tag_name": "{{tag}}",
+          "draft": false,
+          "prerelease": false,
+          "assets": [ { "name": "{{assetName}}", "browser_download_url": "https://github.com/mlengmark/O-view/releases/download/{{tag}}/{{assetName}}" } ]
+        }
+        """;
     }
 
     /// <summary>The timer's handler runs <c>async void</c> fire-and-forget (the real
