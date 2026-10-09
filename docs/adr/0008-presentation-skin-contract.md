@@ -447,6 +447,34 @@ established shape — skin→shell members are commands, and the skin learns the
 result from the next shell→skin push — and it keeps window lifecycle in the
 shell where ADR-0007 D2 put it.
 
+**Amended 2026-10-09 (OVI-601, G7 parity slice P4) — a left-click on the icon
+toggles rather than always opening, per the original `ui-spec.md` section 4
+("Clicking the icon toggles").** `RequestWidget(true)` still means
+"show, unconditionally" — the control-surface menu's "show usage details"
+item keeps that meaning (P21 reuses this slice's rule for the menu later).
+The icon's own left-click gesture needed a different meaning, so the
+skin→shell seam gains a second command instead of overloading the first:
+
+```
+void ToggleWidget();   // "the user clicked the tray icon" — open if closed, close if open
+```
+
+`DetailPushCoordinator.OnIconActivated()` implements the decision, from the
+`_visible` state it already tracks for rule 3 above: if visible, this closes
+it (equivalent to `OnRequestWidget(false)`); if hidden, this opens it
+(equivalent to `OnRequestWidget(true)`) — **unless** the hide happened less
+than 400 ms ago, in which case the click is absorbed and the widget stays
+closed. That grace window exists because the click that dismisses the widget
+by taking its focus is the *same* click the icon then receives — without it,
+a click could only ever reopen the widget it had just closed. Both skins'
+`DetailWindow` now also close on Esc, calling `RequestWidget(false)` exactly
+as their existing `Deactivated` handler does. On Windows, `SetVisible` now
+takes the foreground explicitly (`O-view.Tray/Platform/ForegroundWindowTaker.cs`,
+Win32-only, not referenced from `App`/`Core`) with an `AttachThreadInput`
+fallback for when `SetForegroundWindow` is refused — a widget shown but never
+actually foregrounded never raises `Deactivated`, so it would stay stuck on
+screen with no way to dismiss it (Esc is now the backstop even then).
+
 **This is not the skin polling the shell** (rejected by ADR-0007 D6) and not a
 Core event stream (rejected above). `RequestWidget` fires on a user gesture, and
 every subsequent refresh rides the shell's one existing poll cadence. There is

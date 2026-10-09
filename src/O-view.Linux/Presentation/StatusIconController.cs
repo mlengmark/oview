@@ -87,8 +87,9 @@ internal sealed class StatusIconController
     /// render the icon now, without requiring a restart (D6 point 4).</summary>
     public void OnHostAppeared() => OnHostObserved(true);
 
-    /// <summary>The user activated the icon. Calls <see cref="ISkinToShell.RequestWidget"/> and
-    /// nothing else, the same shell contract Windows slice 4 uses — this skin never calls
-    /// <c>SetVisible</c> on itself.</summary>
-    public void OnActivated() => _skinToShell.RequestWidget(true);
+    /// <summary>The user left-clicked the icon. Calls <see cref="ISkinToShell.ToggleWidget"/>
+    /// and nothing else, the same shell contract the Windows skin uses (ADR-0008 D9b, amended
+    /// OVI-601) — this skin never calls <c>SetVisible</c> on itself, and never decides
+    /// open-vs-closed itself either; the shell does, from the state it already tracks.</summary>
+    public void OnActivated() => _skinToShell.ToggleWidget();
 }

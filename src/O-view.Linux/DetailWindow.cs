@@ -81,6 +81,7 @@ internal sealed class DetailWindow : Window
         PointerMoved += OnPointerMoved;
         PointerReleased += OnPointerReleased;
         Deactivated += (_, _) => _skinToShell.RequestWidget(false);
+        KeyDown += (_, e) => { if (e.Key == Key.Escape) _skinToShell.RequestWidget(false); };
     }
 
     /// <summary>
