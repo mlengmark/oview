@@ -65,8 +65,9 @@ internal sealed class StatusIconController
     /// changed.</summary>
     public void OnHostRestarted() => _reregisterHost();
 
-    /// <summary>The user activated the icon. Calls <see cref="ISkinToShell.RequestWidget"/> and
-    /// nothing else (ADR-0008 D9b, amended OVI-326) — this skin never calls
-    /// <c>SetVisible</c> on itself.</summary>
-    public void OnActivated() => _skinToShell.RequestWidget(true);
+    /// <summary>The user left-clicked the icon. Calls <see cref="ISkinToShell.ToggleWidget"/>
+    /// and nothing else (ADR-0008 D9b, amended OVI-601) — this skin never calls
+    /// <c>SetVisible</c> on itself, and never decides open-vs-closed itself either; the shell
+    /// does, from the state it already tracks.</summary>
+    public void OnActivated() => _skinToShell.ToggleWidget();
 }

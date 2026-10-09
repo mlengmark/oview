@@ -126,6 +126,65 @@ public sealed class DetailPushCoordinatorTests
         Assert.Equal(UsageDetail.Unavailable, skin.LastDetail);
     }
 
+    [Fact]
+    public void OnIconActivated_opens_a_closed_widget()
+    {
+        var skin = new FakeSkin();
+        var source = new FakeStatisticsSource(RealStatistics(), RealBreakdown());
+        var coordinator = new DetailPushCoordinator(source, skin, new FakeClock(DateTimeOffset.UnixEpoch), Zone);
+
+        coordinator.OnIconActivated();
+
+        Assert.True(skin.LastVisible);
+    }
+
+    [Fact]
+    public void OnIconActivated_closes_an_open_widget()
+    {
+        var skin = new FakeSkin();
+        var source = new FakeStatisticsSource(RealStatistics(), RealBreakdown());
+        var clock = new FakeClock(DateTimeOffset.UnixEpoch);
+        var coordinator = new DetailPushCoordinator(source, skin, clock, Zone);
+        coordinator.OnIconActivated();
+
+        coordinator.OnIconActivated();
+
+        Assert.False(skin.LastVisible);
+    }
+
+    [Fact]
+    public void A_click_399ms_after_a_focus_loss_close_is_absorbed_and_the_widget_stays_closed()
+    {
+        var skin = new FakeSkin();
+        var source = new FakeStatisticsSource(RealStatistics(), RealBreakdown());
+        var clock = new FakeClock(DateTimeOffset.UnixEpoch);
+        var coordinator = new DetailPushCoordinator(source, skin, clock, Zone);
+        coordinator.OnRequestWidget(true);
+        coordinator.OnRequestWidget(false); // the window's own Deactivated handler
+        clock.UtcNow = clock.UtcNow.AddMilliseconds(399);
+        var callsBeforeClick = skin.SetVisibleCallCount;
+
+        coordinator.OnIconActivated();
+
+        Assert.Equal(callsBeforeClick, skin.SetVisibleCallCount); // no SetVisible call at all — the click was absorbed
+    }
+
+    [Fact]
+    public void A_click_401ms_after_a_focus_loss_close_reopens_the_widget()
+    {
+        var skin = new FakeSkin();
+        var source = new FakeStatisticsSource(RealStatistics(), RealBreakdown());
+        var clock = new FakeClock(DateTimeOffset.UnixEpoch);
+        var coordinator = new DetailPushCoordinator(source, skin, clock, Zone);
+        coordinator.OnRequestWidget(true);
+        coordinator.OnRequestWidget(false); // the window's own Deactivated handler
+        clock.UtcNow = clock.UtcNow.AddMilliseconds(401);
+
+        coordinator.OnIconActivated();
+
+        Assert.True(skin.LastVisible);
+    }
+
     private sealed class FakeStatisticsSource : IUsageStatisticsSource
     {
         private readonly UsageStatistics _statistics;
@@ -165,6 +224,8 @@ public sealed class DetailPushCoordinatorTests
 
         public bool? LastVisible { get; private set; }
 
+        public int SetVisibleCallCount { get; private set; }
+
         public void ShowSnapshot(UsageSnapshot snapshot)
         {
         }
@@ -175,7 +236,11 @@ public sealed class DetailPushCoordinatorTests
 
         public void ShowDetail(UsageDetail detail) => LastDetail = detail;
 
-        public void SetVisible(bool visible) => LastVisible = visible;
+        public void SetVisible(bool visible)
+        {
+            LastVisible = visible;
+            SetVisibleCallCount++;
+        }
 
         public void Shutdown()
         {

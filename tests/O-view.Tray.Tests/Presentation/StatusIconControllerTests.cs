@@ -46,14 +46,15 @@ public class StatusIconControllerTests
     }
 
     [Fact]
-    public void OnActivatedCallsRequestWidgetTrueAndNothingElse()
+    public void OnActivatedCallsToggleWidgetAndNothingElse()
     {
         var skin = new FakeSkinToShell();
         var controller = new StatusIconController(skin, (_, _) => { }, () => { });
 
         controller.OnActivated();
 
-        Assert.Equal(new List<bool> { true }, skin.RequestWidgetCalls);
+        Assert.Equal(1, skin.ToggleWidgetCalls);
+        Assert.Empty(skin.RequestWidgetCalls);
         Assert.Empty(skin.OtherCalls);
     }
 
@@ -69,9 +70,13 @@ public class StatusIconControllerTests
     {
         public List<bool> RequestWidgetCalls { get; } = new();
 
+        public int ToggleWidgetCalls { get; private set; }
+
         public List<string> OtherCalls { get; } = new();
 
         public void RequestWidget(bool visible) => RequestWidgetCalls.Add(visible);
+
+        public void ToggleWidget() => ToggleWidgetCalls++;
 
         public void RefreshNow() => OtherCalls.Add(nameof(RefreshNow));
 

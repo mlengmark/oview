@@ -19,6 +19,13 @@ public interface ISkinToShell
     /// itself.</summary>
     void RequestWidget(bool visible);
 
+    /// <summary>The user clicked the tray icon (ADR-0008 D9b, amended OVI-601 — ui-spec.md
+    /// section 4, "Clicking the icon toggles"): open the widget if it is closed, close it if
+    /// it is open. Distinct from <see cref="RequestWidget"/>, which a menu's "show usage
+    /// details" item still uses to mean "show" unconditionally — this is the icon's own
+    /// toggle gesture, left-click only.</summary>
+    void ToggleWidget();
+
     /// <summary>The user changed the alert threshold percent (D4: a shell-owned behaviour
     /// setting).</summary>
     void SetThresholdPercent(int percent);

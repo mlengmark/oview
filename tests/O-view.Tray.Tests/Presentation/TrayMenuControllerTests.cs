@@ -152,6 +152,8 @@ public class TrayMenuControllerTests
 
         public void RequestWidget(bool visible) => RequestWidgetCalls.Add(visible);
 
+        public void ToggleWidget() { }
+
         public void SetThresholdPercent(int percent) => ThresholdCalls.Add(percent);
 
         public void SetAutoUpdate(bool enabled) => AutoUpdateCalls.Add(enabled);

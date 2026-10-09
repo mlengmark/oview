@@ -86,6 +86,24 @@ public class AppShellTests : IDisposable
         Assert.Equal(true, skin.LastVisible);
     }
 
+    [Fact]
+    public void ToggleWidget_delegates_to_the_detail_coordinator()
+    {
+        var skin = new FakeSkin();
+        var settingsStore = new ShellSettingsStore(_directory);
+        var timer = new FakeAppTimer();
+        using var pollLoop = new UsagePollLoop(
+            new FakeUsageProvider(_ => UsageSnapshot.Unavailable), new FakeClock(DateTimeOffset.UnixEpoch), timer, TimeSpan.FromMinutes(1));
+        var detailCoordinator = new DetailPushCoordinator(
+            new FakeStatisticsSource(), skin, new FakeClock(DateTimeOffset.UnixEpoch), TimeZoneInfo.Utc);
+        var diagnosticsWriter = new DiagnosticsBundleWriter(_directory, new FakeClock(DateTimeOffset.UnixEpoch));
+        var shell = new AppShell(settingsStore, ShellSettings.Default, pollLoop, detailCoordinator, diagnosticsWriter, skin, new StoreLifetime(_directory));
+
+        shell.ToggleWidget();
+
+        Assert.Equal(true, skin.LastVisible);
+    }
+
     [Theory]
     [InlineData(50, 50)]
     [InlineData(-10, 0)]

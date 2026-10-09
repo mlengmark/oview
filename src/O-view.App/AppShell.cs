@@ -64,6 +64,9 @@ public sealed class AppShell : ISkinToShell
     /// <inheritdoc />
     public void RequestWidget(bool visible) => _detailCoordinator.OnRequestWidget(visible);
 
+    /// <inheritdoc />
+    public void ToggleWidget() => _detailCoordinator.OnIconActivated();
+
     /// <summary>
     /// Clamps <paramref name="percent"/> to <see cref="ShellSettings"/>'s documented 0–100
     /// range (ADR-0009 D4's validation rule — the shell validates, not cosmetic), then persists

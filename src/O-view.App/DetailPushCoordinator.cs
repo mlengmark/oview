@@ -20,6 +20,15 @@ namespace OView.App;
 /// </summary>
 public sealed class DetailPushCoordinator
 {
+    /// <summary>How long after the widget auto-closes from losing focus a tray-icon click
+    /// still counts as the second half of that toggle, rather than a fresh open request
+    /// (ui-spec.md section 4, "Clicking the icon toggles", ADR-0008 D9b amended OVI-601). The
+    /// click itself takes focus from the widget, so by the time <see cref="OnIconActivated"/>
+    /// runs the widget may already have reported itself hidden — without this window every
+    /// click could only ever open it. Wide enough to cover that deactivate-then-click
+    /// ordering, short enough that a deliberate click a moment later still opens.</summary>
+    public static readonly TimeSpan IconClickAwayGrace = TimeSpan.FromMilliseconds(400);
+
     private readonly IUsageStatisticsSource _statistics;
     private readonly IShellToSkin _skin;
     private readonly IClock _clock;
@@ -27,6 +36,7 @@ public sealed class DetailPushCoordinator
 
     private bool _visible;
     private UsageSnapshot _lastSnapshot = UsageSnapshot.Unavailable;
+    private DateTimeOffset _lastHiddenAt = DateTimeOffset.MinValue;
 
     public DetailPushCoordinator(IUsageStatisticsSource statistics, IShellToSkin skin, IClock clock, TimeZoneInfo zone)
     {
@@ -55,6 +65,34 @@ public sealed class DetailPushCoordinator
         {
             PushDetail(_lastSnapshot);
         }
+        else
+        {
+            _lastHiddenAt = _clock.UtcNow;
+        }
+    }
+
+    /// <summary>
+    /// The user clicked the tray icon (ADR-0008 D9b amended OVI-601, ui-spec.md section 4):
+    /// toggles the widget rather than always opening it. A click arriving within
+    /// <see cref="IconClickAwayGrace"/> of the widget's own focus-loss close is absorbed as
+    /// the second half of that same close, not treated as a fresh open. Distinct from
+    /// <see cref="OnRequestWidget"/>, which a menu's "show usage details" item still uses to
+    /// mean "show" unconditionally.
+    /// </summary>
+    public void OnIconActivated()
+    {
+        if (_visible)
+        {
+            OnRequestWidget(false);
+            return;
+        }
+
+        if (_clock.UtcNow - _lastHiddenAt < IconClickAwayGrace)
+        {
+            return;
+        }
+
+        OnRequestWidget(true);
     }
 
     /// <summary>

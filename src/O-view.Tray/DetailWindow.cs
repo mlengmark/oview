@@ -1,9 +1,11 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using OView.App;
 using OView.Core.Models;
+using OView.Tray.Platform;
 using OView.Tray.Presentation;
 
 namespace OView.Tray;
@@ -43,6 +45,7 @@ internal sealed class DetailWindow : Window
     private readonly ISkinToShell _skinToShell;
     private readonly DetailWindowPositionController _position;
     private readonly ThemeRepaintController _theme;
+    private readonly ForegroundWindowTaker _foreground = new();
     private readonly TextBlock _freshness = NewLine();
     private readonly TextBlock _session = NewLine();
     private readonly TextBlock _weekly = NewLine();
@@ -79,6 +82,7 @@ internal sealed class DetailWindow : Window
         MouseLeftButtonUp += OnMouseLeftButtonUp;
         MouseMove += OnMouseMove;
         Deactivated += (_, _) => _skinToShell.RequestWidget(false);
+        PreviewKeyDown += (_, e) => { if (e.Key == Key.Escape) _skinToShell.RequestWidget(false); };
 
         _theme = new ThemeRepaintController(themeSource, ApplyTheme);
     }
@@ -103,6 +107,13 @@ internal sealed class DetailWindow : Window
     /// resolves (the first-run corner, or the last dragged spot). Called from
     /// <see cref="TrayShellToSkin.VisibilityChanged"/> when the shell answers
     /// <see langword="true"/> — never called by this window on itself (ADR-0008 D9b).
+    ///
+    /// <para>Takes the foreground explicitly (<see cref="ForegroundWindowTaker"/>, ADR-0008
+    /// D9b amended OVI-601) rather than relying on <see cref="Activate"/> alone: a tray-resident
+    /// app owns no already-activated window, so <c>Activate()</c>'s underlying
+    /// <c>SetForegroundWindow</c> call is not guaranteed to succeed, and a window shown but
+    /// never actually foregrounded never raises <see cref="Window.Deactivated"/> — it would
+    /// stay on screen with no way to dismiss it.</para>
     /// </summary>
     public void SetVisible(bool visible)
     {
@@ -117,6 +128,7 @@ internal sealed class DetailWindow : Window
         Top = y;
         Show();
         Activate();
+        _foreground.Take(new WindowInteropHelper(this).Handle);
     }
 
     /// <summary>Renders the exact pushed detail and nothing else — see the type remarks.</summary>
