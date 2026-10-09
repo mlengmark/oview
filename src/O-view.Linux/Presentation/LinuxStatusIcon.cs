@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Threading;
 using OView.App;
+using OView.App.Updates;
 using OView.Core.Models;
 
 namespace OView.Linux.Presentation;
@@ -32,9 +33,11 @@ namespace OView.Linux.Presentation;
 /// </para>
 ///
 /// <para>ADR-0009 slice 9 (OVI-484) adds the right-click menu: the
-/// <see cref="LinuxStatusIcon(ISkinToShell, Func{ShellSettings}, IStartupRegistration, Action{string, string})"/>
+/// <see cref="LinuxStatusIcon(ISkinToShell, Func{ShellSettings}, IStartupRegistration, Action{string, string}, UpdateCadence)"/>
 /// overload builds a <see cref="LinuxTrayMenu"/> over a <see cref="LinuxMenuController"/> and
-/// assigns it to this icon's <c>TrayIcon.Menu</c>.</para>
+/// assigns it to this icon's <c>TrayIcon.Menu</c>. ADR-0010 slicing table row 5 (OVI-557) adds
+/// that overload's <see cref="OView.App.Updates.UpdateCadence"/> parameter, threaded through to
+/// the menu's own "Check for updates now" item.</para>
 /// </summary>
 internal sealed class LinuxStatusIcon : IDisposable
 {
@@ -61,10 +64,11 @@ internal sealed class LinuxStatusIcon : IDisposable
         ISkinToShell skinToShell,
         Func<ShellSettings> currentSettings,
         IStartupRegistration startupRegistration,
-        Action<string, string> showFailureNotification)
+        Action<string, string> showFailureNotification,
+        UpdateCadence updateCadence)
         : this(skinToShell)
     {
-        var menuController = new LinuxMenuController(skinToShell, currentSettings, startupRegistration);
+        var menuController = new LinuxMenuController(skinToShell, currentSettings, startupRegistration, updateCadence);
         _trayIcon.Menu = new LinuxTrayMenu(menuController, showFailureNotification).Menu;
     }
 

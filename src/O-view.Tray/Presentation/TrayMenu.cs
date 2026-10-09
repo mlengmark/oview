@@ -1,6 +1,7 @@
 using System.Drawing;
 using System.Windows.Forms;
 using OView.App;
+using OView.Core.Updates;
 
 namespace OView.Tray.Presentation;
 
@@ -22,19 +23,19 @@ namespace OView.Tray.Presentation;
 internal sealed class TrayMenu : IDisposable
 {
     private readonly TrayMenuController _controller;
-    private readonly Action<string, string> _showFailureToast;
+    private readonly Action<string, string> _showToast;
     private readonly ContextMenuStrip _strip = new();
     private readonly ToolStripMenuItem _runAtStartupItem;
     private readonly ToolStripMenuItem _autoUpdateItem;
     private readonly (int Percent, ToolStripMenuItem Item)[] _thresholdItems;
 
-    public TrayMenu(TrayMenuController controller, Action<string, string> showFailureToast)
+    public TrayMenu(TrayMenuController controller, Action<string, string> showToast)
     {
         ArgumentNullException.ThrowIfNull(controller);
-        ArgumentNullException.ThrowIfNull(showFailureToast);
+        ArgumentNullException.ThrowIfNull(showToast);
 
         _controller = controller;
-        _showFailureToast = showFailureToast;
+        _showToast = showToast;
 
         var refreshNow = new ToolStripMenuItem("Refresh now");
         refreshNow.Click += (_, _) => _controller.OnRefreshNow();
@@ -59,6 +60,9 @@ internal sealed class TrayMenu : IDisposable
         _autoUpdateItem = new ToolStripMenuItem("Check for updates automatically") { CheckOnClick = false };
         _autoUpdateItem.Click += (_, _) => OnAutoUpdateClicked();
 
+        var checkForUpdatesNow = new ToolStripMenuItem("Check for updates now");
+        checkForUpdatesNow.Click += (_, _) => OnCheckForUpdatesNowClicked();
+
         var copyDiagnostics = new ToolStripMenuItem("Copy diagnostics");
         copyDiagnostics.Click += (_, _) => _controller.OnCopyDiagnostics();
 
@@ -70,6 +74,7 @@ internal sealed class TrayMenu : IDisposable
         _strip.Items.Add(thresholdMenu);
         _strip.Items.Add(_runAtStartupItem);
         _strip.Items.Add(_autoUpdateItem);
+        _strip.Items.Add(checkForUpdatesNow);
         _strip.Items.Add(new ToolStripSeparator());
         _strip.Items.Add(copyDiagnostics);
         _strip.Items.Add(quit);
@@ -137,7 +142,7 @@ internal sealed class TrayMenu : IDisposable
 
         if (result.Failed)
         {
-            _showFailureToast(
+            _showToast(
                 "Run at startup",
                 result.Enabled
                     ? "O-view could not turn run at startup off. It is still set to run at startup."
@@ -150,6 +155,16 @@ internal sealed class TrayMenu : IDisposable
         var enabled = !_autoUpdateItem.Checked;
         _controller.OnSetAutoUpdate(enabled);
         _autoUpdateItem.Checked = enabled;
+    }
+
+    /// <summary>Runs the interactive check and reports whatever it finds via the same toast
+    /// surface the run-at-startup failure statement already uses (D7: a menu item the user
+    /// clicked on purpose must never answer with silence).</summary>
+    private async void OnCheckForUpdatesNowClicked()
+    {
+        var result = await _controller.OnCheckForUpdatesNow().ConfigureAwait(true);
+        var content = AlertToastFormatter.FormatManualCheck(result);
+        _showToast(content.Title, content.Body);
     }
 
     public void Dispose() => _strip.Dispose();

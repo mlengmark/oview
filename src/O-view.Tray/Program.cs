@@ -1,6 +1,8 @@
 using System.IO;
+using System.Reflection;
 using System.Windows;
 using OView.App;
+using OView.App.Updates;
 using OView.Core.Models;
 using OView.Core.Providers;
 using OView.Core.Providers.Jsonl;
@@ -92,6 +94,28 @@ internal static class Program
             }
         };
 
+        // ADR-0010 slicing table row 5 (OVI-557): ReleaseFeed's first production composition
+        // in this process — HttpReleaseFeedTransport is platform-neutral (ADR-0007 D3), and
+        // WindowsInstallKindSource (slice 2, OVI-511) had no consumer until this slice. Neither
+        // this background cadence nor the manual menu item ever downloads or installs anything
+        // (D7); only WindowsUpdateExecutor (slice 4, not called here) does that, and only from
+        // an explicit, confirmed user action a later slice wires up.
+        using var releaseFeedTransport = new HttpReleaseFeedTransport();
+        var releaseFeed = new ReleaseFeed(releaseFeedTransport, new SystemClock());
+        var currentVersion = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "0.0.0";
+        using var updateCadence = new UpdateCadence(
+            releaseFeed,
+            new WindowsInstallKindSource(),
+            currentVersion,
+            () => skinToShell.Settings,
+            skinToShell.RecordAnnouncedUpdateTag,
+            skin.RaiseEvent,
+            new AppTimer(),
+            // INFERRED: no ADR names an exact background cadence for this check (D4 only says
+            // "on a cadence"); once a day matches an update check's own low urgency without
+            // hammering GitHub's rate limit every poll tick.
+            TimeSpan.FromHours(24));
+
         var preferenceStore = new DetailWindowPreferenceStore(ResolvePreferenceDirectory());
         var positionController = new DetailWindowPositionController(
             preferenceStore.Load,
@@ -108,7 +132,8 @@ internal static class Program
         skin.DetailShown += detailWindow.ShowDetail;
         skin.VisibilityChanged += detailWindow.SetVisible;
 
-        using var statusIcon = new TrayStatusIcon(skinToShell, () => skinToShell.Settings, new RegistryStartupRegistration(), themeSource);
+        using var statusIcon = new TrayStatusIcon(
+            skinToShell, () => skinToShell.Settings, new RegistryStartupRegistration(), themeSource, updateCadence);
         statusIcon.OnSnapshotUpdated(pollLoop.CurrentSnapshot);
         pollLoop.SnapshotUpdated += (_, snapshot) => statusIcon.OnSnapshotUpdated(snapshot);
 

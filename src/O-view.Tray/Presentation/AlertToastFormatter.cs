@@ -1,5 +1,6 @@
 using System.Globalization;
 using OView.App;
+using OView.Core.Updates;
 
 namespace OView.Tray.Presentation;
 
@@ -69,6 +70,34 @@ public static class AlertToastFormatter
 
         return string.Create(CultureInfo.InvariantCulture, $"{health.ProviderName} is not returning usage data.");
     }
+
+    /// <summary>
+    /// The "Check for updates now" menu item's own report (ADR-0010 D4/D7, slicing table row
+    /// 5): unlike <see cref="Format"/>'s <see cref="UsageEventKind.UpdateAvailable"/> case,
+    /// this always has something to say, including the two outcomes that case never carries —
+    /// up to date, and <see cref="UpdateOutcome.Unknown"/> ("could not tell") — because a menu
+    /// item the user clicked on purpose must never answer with silence.
+    /// </summary>
+    public static AlertToastContent FormatManualCheck(UpdateCheckResult result) => result.Outcome switch
+    {
+        UpdateOutcome.UpToDate => new AlertToastContent(
+            "O-view is up to date",
+            "No newer version is available."),
+
+        UpdateOutcome.UpdateAvailable => new AlertToastContent(
+            "O-view update available",
+            result.Available is { } available
+                ? string.Create(CultureInfo.InvariantCulture, $"Version {available.Tag} is available.")
+                : "A newer version of O-view is available."),
+
+        UpdateOutcome.RateLimited => new AlertToastContent(
+            "O-view could not check for updates",
+            "GitHub rate-limited the update check. Try again later."),
+
+        _ => new AlertToastContent(
+            "O-view could not check for updates",
+            "Could not tell whether a newer version is available."),
+    };
 }
 
 /// <summary>The title and body of one toast, already split so a skin adapter can pass both

@@ -1,5 +1,6 @@
 using System.Globalization;
 using OView.App;
+using OView.Core.Updates;
 
 namespace OView.Linux.Presentation;
 
@@ -71,6 +72,35 @@ public static class AlertNotificationFormatter
 
         return string.Create(CultureInfo.InvariantCulture, $"{health.ProviderName} stopped returning usage data.");
     }
+
+    /// <summary>
+    /// The "Check for updates now" menu item's own report (ADR-0010 D4/D7, slicing table row
+    /// 5): unlike <see cref="Format"/>'s <see cref="UsageEventKind.UpdateAvailable"/> case,
+    /// this always has something to say, including the two outcomes that case never carries —
+    /// up to date, and <see cref="UpdateOutcome.Unknown"/> ("could not tell") — because a menu
+    /// item the user clicked on purpose must never answer with silence. Independently worded
+    /// from <c>O-view.Tray</c>'s own <c>AlertToastFormatter.FormatManualCheck</c> (ADR-0003).
+    /// </summary>
+    public static AlertNotificationContent FormatManualCheck(UpdateCheckResult result) => result.Outcome switch
+    {
+        UpdateOutcome.UpToDate => new AlertNotificationContent(
+            "O-view is up to date",
+            "No newer version is available."),
+
+        UpdateOutcome.UpdateAvailable => new AlertNotificationContent(
+            "O-view update available",
+            result.Available is { } available
+                ? string.Create(CultureInfo.InvariantCulture, $"Version {available.Tag} can be installed.")
+                : "A new version of O-view can be installed."),
+
+        UpdateOutcome.RateLimited => new AlertNotificationContent(
+            "O-view could not check for updates",
+            "GitHub rate-limited the update check. Try again later."),
+
+        _ => new AlertNotificationContent(
+            "O-view could not check for updates",
+            "Could not tell whether a newer version is available."),
+    };
 }
 
 /// <summary>The summary and body of one freedesktop notification, already split so the real

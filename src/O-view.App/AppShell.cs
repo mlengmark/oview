@@ -83,6 +83,21 @@ public sealed class AppShell : ISkinToShell
         _settingsStore.Save(Settings);
     }
 
+    /// <summary>
+    /// Persists the tag of a release the update check just told the user about (ADR-0010 D4,
+    /// slicing table row 5), so a later check — background or manual — does not re-announce
+    /// the same version. Not an <see cref="ISkinToShell"/> member: the caller is
+    /// <c>OView.App.Updates.UpdateCadence</c>, composed alongside this shell, never a skin —
+    /// the seam this record names stays unchanged by this slice.
+    /// </summary>
+    public void RecordAnnouncedUpdateTag(string tag)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(tag);
+
+        Settings = Settings with { LastAnnouncedUpdateTag = tag };
+        _settingsStore.Save(Settings);
+    }
+
     /// <inheritdoc />
     public void WriteDiagnosticsBundle() => _diagnosticsWriter.Write(Settings, _pollLoop.CurrentSnapshot);
 

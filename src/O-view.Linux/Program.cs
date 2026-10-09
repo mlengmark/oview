@@ -1,8 +1,10 @@
+using System.Reflection;
 using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using OView.App;
+using OView.App.Updates;
 using OView.Core.Models;
 using OView.Core.Providers;
 using OView.Core.Providers.Jsonl;
@@ -102,11 +104,32 @@ internal static class Program
 
         var notificationSender = new DBusNotificationSender();
 
+        // ADR-0010 slicing table row 5 (OVI-557): ReleaseFeed's first production composition
+        // in this process, mirroring O-view.Tray's own. Neither this background cadence nor
+        // the manual menu item ever downloads or installs anything (D7) — Linux never gets a
+        // download/execute path at all (D4; slice 6's own never-download assertion covers it).
+        using var releaseFeedTransport = new HttpReleaseFeedTransport();
+        var releaseFeed = new ReleaseFeed(releaseFeedTransport, new SystemClock());
+        var currentVersion = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "0.0.0";
+        using var updateCadence = new UpdateCadence(
+            releaseFeed,
+            new LinuxInstallKindSource(),
+            currentVersion,
+            () => skinToShell.Settings,
+            skinToShell.RecordAnnouncedUpdateTag,
+            skin.RaiseEvent,
+            new AppTimer(),
+            // INFERRED: no ADR names an exact background cadence for this check (D4 only says
+            // "on a cadence"); matches O-view.Tray's own choice so both skins check the same
+            // GitHub endpoint at the same rate.
+            TimeSpan.FromHours(24));
+
         var statusIcon = new LinuxStatusIcon(
             skinToShell,
             () => skinToShell.Settings,
             new XdgAutostartRegistration(),
-            (summary, body) => { _ = notificationSender.SendAsync(summary, body); });
+            (summary, body) => { _ = notificationSender.SendAsync(summary, body); },
+            updateCadence);
         statusIcon.OnSnapshotUpdated(pollLoop.CurrentSnapshot);
         pollLoop.SnapshotUpdated += (_, snapshot) => statusIcon.OnSnapshotUpdated(snapshot);
 
