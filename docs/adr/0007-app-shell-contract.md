@@ -151,6 +151,7 @@ change and a new decision, not a porting detail.
 |---|---|---|---|
 | Unrecomputable vendor-derived facts | usage ledger, weekly-reset anchor | Core | [ADR-0006](0006-local-storage-contract.md) D1 |
 | Behaviour settings | alert threshold percent, poll cadence, auto-update opt-in | **Shell** | One settings file in the shell's own directory |
+| Shell-side "already done that" marks | which release the user has already been told about (`LastAnnouncedUpdateTag`) | **Shell** | The same settings file. Added 2026-10-09 (OVI-570, D6) — see that amendment below |
 | OS-owned truth | run-at-startup | **The OS** | The registry value / autostart file *is* the state. No copy anywhere else ([ADR-0002](0002-cross-platform-capability-matrix.md)) |
 | Perceptual preferences | widget position, per-skin display choices | **Skin** | Each skin's own preference file, never Core's store and never the shell's settings |
 
@@ -508,8 +509,11 @@ to ship unverified and labelled as such.
 - **2026-10-01 update — slice 5 landed (Kit the Builder, OVI-280, PR #54).**
   `src/O-view.App/ShellSettings.cs` adds a `sealed record` carrying exactly
   D4's three behaviour settings — `AlertThresholdPercent` (int),
-  `PollCadence` (`TimeSpan`), `AutoUpdateEnabled` (bool) — and nothing else:
-  not the usage ledger or weekly-reset anchor (Core's stores, ADR-0006 D1),
+  `PollCadence` (`TimeSpan`), `AutoUpdateEnabled` (bool) — **and, as of this
+  slice, nothing else** (a fourth field, `LastAnnouncedUpdateTag`, landed later
+  in PR #93 — see the 2026-10-09 amendment below; the exclusions in the rest of
+  this sentence are unaffected and still hold): not the usage ledger or
+  weekly-reset anchor (Core's stores, ADR-0006 D1),
   not run-at-startup (the OS stays the sole owner, D4's explicit rejection,
   never mirrored here), not a per-skin perceptual preference such as widget
   position (D4's other explicit rejection, each skin's own file).
@@ -657,3 +661,48 @@ to ship unverified and labelled as such.
   `HttpReleaseFeedTransport` itself carries no test beyond compiling, same
   as the source repo's own `ReleaseFeed` had no integration test against
   live GitHub.
+
+- **2026-10-09 amendment — D4 gains a fifth category: shell-side "already
+  done that" marks (OVI-570, D6; drift found by OVI-566).** PR #93 (OVI-557)
+  added a fourth field to `ShellSettings`, `LastAnnouncedUpdateTag`
+  (`string?`, persisted as `lastAnnouncedUpdateTag`): the release tag the
+  shell last raised `UsageEventKind.UpdateAvailable` for, so a restart does
+  not re-announce a version the user has already been told about (ADR-0010
+  D4's "once per version"). **It fits none of D4's original four
+  categories.** It is not a behaviour setting — no user ever sets it, it
+  appears in no settings UI, and it has no meaningful default beyond "nothing
+  has been announced yet". It is not an unrecomputable vendor-derived fact:
+  it is not vendor-derived at all and names nothing about usage, so it does
+  not belong in Core's store. It is not OS-owned truth, and it is not a
+  perceptual preference — if it were per-skin, each skin would re-announce
+  the same release separately.
+
+  **Decision.** D4's table gains the row above. The category is *shell-side
+  record of an action the shell has already taken*: written only by the shell,
+  read only by the shell, carried across restarts because the behaviour it
+  guards ("once per version") is only correct if it survives one. The settings
+  file is where it lives, because it is the shell's own file and there is no
+  second shell-owned store to invent. D4's two explicit rejections — no shadow
+  copy of run-at-startup, no skin preference in a shared file — are untouched,
+  and this field deliberately satisfies both: it is not a mirror of anything
+  (nothing else records which tag was announced), and it is not per-skin.
+
+  Both update paths write it — the background cadence and the manual "Check
+  for updates now" — which is the behaviour the field exists for, not a
+  second writer: a user who just checked by hand must not then be told the
+  same version again by the next background tick.
+
+  Slice 5's landing note above said the record carried D4's three behaviour
+  settings "and nothing else"; that sentence is now scoped to the slice it
+  describes rather than left reading as a standing rule.
+
+  **Rejected: call it a behaviour setting and change nothing.** That makes
+  D4's "behaviour settings" row mean "whatever the shell happens to persist",
+  which is how a one-owner table stops constraining anything. The categories
+  are load-bearing: they are what make "no shadow copies" checkable.
+
+  **Rejected: a separate shell-owned file for announcement marks.** A second
+  file and a second atomic-write path for one nullable string, when the shell
+  already owns a file written the same way. If such marks multiply past this
+  one, that is the point to reconsider — and this amendment is the record of
+  the first.

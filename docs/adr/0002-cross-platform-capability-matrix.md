@@ -4,7 +4,8 @@
   hardware verification happens. Do not compress a label upward without a
   new, dated verification event.
 - **Date:** 2026-09-08 · **Amended** 2026-09-10 (OVI-30), 2026-09-25 (OVI-135),
-  2026-09-26 (OVI-140), 2026-10-02 (OVI-342 — seam cross-references only)
+  2026-09-26 (OVI-140), 2026-10-02 (OVI-342 — seam cross-references only),
+  2026-10-09 (OVI-570 — seam cross-references and one new row; no label moved)
 - **Deciders:** Adrian II the Architect, per board sign-off at gate G1
   (2026-09-08T19:53:12Z)
 - **Formalizes:** the approved PDR (rev. 2, `oview-pdr-reissued`), §4
@@ -49,10 +50,11 @@ not re-tested" or "never observed" into "supported."
 | Detail window launch & positioning | Draggable widget, launched from the tray/menu-bar icon; skin remembers last position (a skin preference, not Core data) | Can additionally use `Shell_NotifyIconGetRect` for icon-anchored placement — this target design deliberately does not rely on this (see "Alternatives considered") | **Cannot report icon position at all** — protocol limitation, StatusNotifierItem has no equivalent. Current fallback is a fixed work-area corner (source repo ADR-0013). **Never observed rendering on real hardware in any form** — blocked historically by a deadlock (#124), then a segfault (#143) |
 | Notifications | Fire on a user-set threshold crossing, and nothing else. Expressed by the shell↔skin seam ([ADR-0007](0007-app-shell-contract.md) D6, shipped OVI-273): the shell pushes `IShellToSkin.RaiseEvent(UsageEvent)` with `UsageEventKind.ThresholdCrossed`; the skin sets the threshold back via `ISkinToShell.SetThresholdPercent`. The skin decides nothing about *when* — see [ADR-0008](0008-presentation-skin-contract.md) D2, "present `RaiseEvent` and nothing else" | **CONFIRMED** — balloon/toast, shipped | Freedesktop notification implemented; **never observed firing on real hardware** |
 | Startup registration | Register/unregister at login via the OS's own canonical mechanism; the OS is the sole source of truth (no shadow copy in Core settings — [ADR-0007](0007-app-shell-contract.md) D4). Expressed by `IStartupRegistration` ([ADR-0007](0007-app-shell-contract.md) D5, shipped OVI-283): the shell declares the capability, the skin implements it — `RegistryStartupRegistration` on Windows, `XdgAutostartRegistration` on Linux | **CONFIRMED** — `HKCU\...\Run` key (source repo ADR-0009) | XDG autostart file implemented; **hardware-unverified** that login actually triggers launch (INFERRED from code) |
-| Theme-following | Match OS light/dark preference automatically. To be expressed by `IThemeSource` ([ADR-0009](0009-control-surface-contract.md) D6, Phase 4A — **designed, not yet built**): the shell declares the capability and carries one of three values (light / dark / **unknown**), each skin implements the read and owns every colour. An absent registry value or absent portal is reported as `Unknown`, never guessed | **CONFIRMED** — reads `AppsUseLightTheme` | Desktop theme portal implemented; **never observed on real hardware** |
+| Theme-following | Match OS light/dark preference automatically. Expressed by `IThemeSource` ([ADR-0009](0009-control-surface-contract.md) D6, **shipped** — `RegistryThemeSource` PR #83, `ThemeRepaintController` PR #86, `LinuxThemeSource` PR #87, `LinuxThemeRepaintController` PR #88): the shell declares the capability and carries one of three values (light / dark / **unknown**), each skin implements the read and owns every colour — the two repaint controllers map the same three readings to deliberately different palettes. An absent registry value or absent portal is reported as `Unknown`, never guessed, and each skin resolves `Unknown` to a named fallback rather than a crash | **CONFIRMED** — reads `AppsUseLightTheme` | Desktop theme portal implemented; **never observed on real hardware** |
 | Single-instance enforcement | Guarantee exactly one running copy per user session. Expressed by `ISingleInstanceGuard.TryAcquire()` ([ADR-0007](0007-app-shell-contract.md) D5, shipped OVI-283) — `MutexSingleInstanceGuard` on Windows, `FileLockSingleInstanceGuard` on Linux. One capability, two unrelated primitives; the seam is the only thing they share | **CONFIRMED** — named mutex | No equivalent primitive exists; needs its own mechanism (file lock or socket) — genuinely a different implementation, not a shared API |
-| Install & distribution | Get itself onto the machine via the OS's native packaging convention; register uninstall | **CONFIRMED** — Inno Setup installer, per-user, Start Menu shortcut, uninstall registry entry | Headless CI (Ubuntu/Debian/Fedora containers) **confirms install-and-start only** — proves nothing about UI, since containers have no compositor. Hardware reports used a tarball, not the `.deb`; `.deb`-on-real-hardware is untested |
-| Self-update | Act on the shared update check's result: self-replace only if the OS's package model allows it, else notify-only. The check itself (fetch, rate-limit detection, `retryAfterUtc`) is **not** per-skin — see the 2026-09-25 (OVI-135) note below | **CONFIRMED** — installer self-replaces via Restart Manager, checksum-verified first | **Must never self-replace** under a package-manager install (the package manager owns those files) — getting this wrong already shipped a real bug once (source repo ADR-0009 amendment) |
+| Install & distribution | Get itself onto the machine via the OS's native packaging convention; register uninstall. **How it was installed is itself a capability**, because the self-update row below turns on it: expressed by `IInstallKindSource.Current` ([ADR-0010](0010-update-execution-and-packaging-contract.md), seam shipped PR #89, both implementations — `WindowsInstallKindSource`, `LinuxInstallKindSource` — PR #90), which each skin implements by inspecting its own platform's evidence. Never a runtime OS check in shared code ([ADR-0007](0007-app-shell-contract.md) D5) | **CONFIRMED** — Inno Setup installer, per-user, Start Menu shortcut, uninstall registry entry | Headless CI (Ubuntu/Debian/Fedora containers) **confirms install-and-start only** — proves nothing about UI, since containers have no compositor. Hardware reports used a tarball, not the `.deb`; `.deb`-on-real-hardware is untested |
+| Self-update | Act on the shared update check's result: self-replace only if the OS's package model allows it, else notify-only. The check itself (fetch, rate-limit detection, `retryAfterUtc`) is **not** per-skin — see the 2026-09-25 (OVI-135) note below. **The "if" is one shared predicate, not two skin opinions:** `UpdatePolicy.MayDownloadAndRun(InstallKind)` ([ADR-0010](0010-update-execution-and-packaging-contract.md), shipped PR #89) is the only thing that decides, over the `InstallKind` the Install row's seam reports; the per-OS variance is which execution path that answer selects — `WindowsUpdateExecutor` (PR #92) or Linux notify-only (PR #94) | **CONFIRMED** — installer self-replaces via Restart Manager, checksum-verified first | **Must never self-replace** under a package-manager install (the package manager owns those files) — getting this wrong already shipped a real bug once (source repo ADR-0009 amendment) |
+| Menu / control surface | Offer the same control items from the tray/menu-bar icon ([ADR-0009](0009-control-surface-contract.md) D1/D2), each skin deciding every item's rendered state by re-reading the live source on open — never a cached copy — and wording its own labels. Adds no shell↔skin seam member; the menu is a skin surface over seams that already exist. **Who paints the menu is a per-OS fact, not a shared one** — see the two cells beside this one; a skin must not assume it owns its menu's colours | Skin-painted: a `ContextMenuStrip` on the existing `NotifyIcon`, so the skin owns its colours and must repaint it itself on an `IThemeSource` change. **INFERRED from code** — `TrayMenuController`/`TrayMenu` (PR #84), repaint via `ThemeRepaintController` (PR #86); the adapter layer is untested, and the source app's own tray context menu is the CONFIRMED precedent for the mechanism, not for this implementation | Host-drawn: a `NativeMenu` assigned to the existing `TrayIcon.Menu`, rendered by the host desktop's own menu widget — it already follows the desktop theme and **has no themeable part a skin can set**, so the Windows cell's repaint obligation has no Linux counterpart. **Never observed on real hardware** — shipped labelled unverified, no interactive Linux display reachable (`LinuxMenuController`/`LinuxTrayMenu`, PR #85; PR #88's note) |
 | Menu-dismiss-on-outside-click | Dismiss the widget/menu on an outside click | **CONFIRMED** — Win32 `AttachThreadInput`-based fix | No direct equivalent; compositor-dependent. One hardware-found bug here (#129, panel self-dismissing on an unfocused compositor) fixed but not re-tested |
 
 ### 2026-09-10 update — `O-view.Linux` project scaffolded (OVI-30)
@@ -136,6 +138,42 @@ seam makes the *obligation* checkable in code; it does not make the *behaviour* 
 
 This matrix stays the register of **per-OS variance and evidence**; those four own the
 contracts. Where they disagree with a row here, the row here is the one to fix.
+
+### 2026-10-09 amendment — three rows now name their seam, and the menu surface gets a row (OVI-570, D4/D5)
+
+Found by OVI-566's drift check. **Correction and one addition only.**
+
+- **Theme-following** (D4) no longer says `IThemeSource` is "designed, not yet
+  built" — it shipped across four slices: `RegistryThemeSource` (PR #83),
+  `ThemeRepaintController` (PR #86), `LinuxThemeSource` (PR #87),
+  `LinuxThemeRepaintController` (PR #88). The 2026-10-05 addition above
+  anticipated exactly this and is left standing as written, including its
+  prediction that the Linux cell would still read "never observed on real
+  hardware" afterwards. **It does, and that is the correct reading** — four
+  shipped slices are four pieces of code, and code existing has never been
+  hardware evidence in this table.
+- **Self-update and Install & distribution** (D5) now name the pair that
+  expresses them: `IInstallKindSource.Current` reports how this copy was
+  installed (seam PR #89, both implementations PR #90), and
+  `UpdatePolicy.MayDownloadAndRun(InstallKind)` (PR #89) is the single shared
+  predicate deciding whether self-replacement is allowed at all. Naming it
+  here is the point: the "notify-only on a package-managed install" rule that
+  the source repository got wrong once is **one function**, not a judgement
+  each skin makes for itself.
+- **Menu / control surface** (D5) is a **new row**. Its per-OS variance —
+  Windows paints its own `ContextMenuStrip` and must therefore repaint it on a
+  theme change; Linux's `NativeMenu` is drawn by the host desktop and has no
+  themeable part at all — existed only in an ADR-0009 slicing-table cell
+  (row 10, PR #88). That is per-OS variance, which is this table's job to
+  hold, and a slicing table is a build plan that stops being read once its
+  slices land.
+
+**No existing Windows or Linux guarantee cell changed, and no evidence label
+moved.** Nothing was verified on hardware for this entry. The new row's two
+cells are new, not relocated, and carry the labels their evidence supports and
+no more: the Windows cell **INFERRED from code** (the adapter is untested; the
+source app's menu is precedent for the mechanism, not for this implementation),
+the Linux cell **never observed on real hardware**.
 
 ### Reading the Linux column honestly
 

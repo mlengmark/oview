@@ -92,6 +92,8 @@ render this as an explicit gap, never as zero or blank).
 | `RateCardSource` | enum {`Bundled`, `UserFile`} | — | real | where the rate table came from — an enum, never a display label: `"bundled"`/`"user file"` are skin wording. `UserFile` is carried forward though unimplemented, because the moment it exists the panel must name it (source repo issue [#255](https://github.com/mlengmark/O-view/issues/255)); added 2026-09-23 (OVI-100) |
 | `UpdateCheckOutcome` | enum {`UpToDate`, `UpdateAvailable`, `Unknown`, `RateLimited`} | — | real | what the shared update check concluded. `Unknown` ("could not tell") is never collapsed into `UpToDate`, and `RateLimited` is never collapsed into `Unknown` (source repo issue #176). Produced by the shared, platform-neutral layer, not by a skin; added 2026-09-25 (OVI-135, D4) — see that amendment below |
 | `UpdateRetryAfterUtc` | timestamp, UTC, ISO-8601, nullable | instant | real / unavailable | when GitHub's rate limit lifts, for `RateLimited` only. `unavailable` = GitHub sent no usable header; a skin must then say it does not know, never invent a time. The value `RateLimitedNotice` already takes as its raw `retryAfterUtc` argument; added 2026-09-25 (OVI-135, D4) |
+| `AvailableUpdate` | `AvailableUpdate?` (nullable; see row below) | — | real / unavailable | the newer release the update check found, for `UpdateCheckOutcome.UpdateAvailable` only. **Null is the only correct value under the other three outcomes** — a skin renders no version at all then. Under `UpdateAvailable` Core guarantees it is non-null (`real`): a newer tag with no installable asset is reported `Unknown`, never a dangling offer. The type still permits null because one record carries all four outcomes, so **a skin must keep a version-free fallback sentence for the `UpdateAvailable` + null pair and must never invent, infer or re-derive a version number** — that fallback is this field's `unavailable` wording, not an error path. Added 2026-10-09 (OVI-570, D3) — see that amendment below |
+| `AvailableUpdate` (nested type) | `{version: ReleaseVersion, tag: string, installerUrl: string, checksumsUrl: string?}` | — (identifiers, not quantities — no unit) | fields inherit the parent `AvailableUpdate` field's real/unavailable status | `tag` is the vendor's release tag **relayed verbatim** — never reformatted, re-prefixed, `v`-stripped, truncated or re-cased by Core or by a skin; a skin may wrap it in a sentence but never rewrite it. `version` is the parsed form and is the **only** thing either side may order or compare; a skin must never compare `tag` as a string. `checksumsUrl` null is a real fact ("this release publishes no manifest"), not an absent one — ADR-0010 decides what a null there blocks, and that is not a skin decision. `installerUrl`/`checksumsUrl` are consumed by the shell's update path, not rendered. Added 2026-10-09 (OVI-570, D3) |
 | `Divergence` | `DivergenceReading?` (nullable; see row below) | — | real / unavailable | what the plan meter and local activity say about each other, for the current 5-hour window. Lives on `UsageStatistics`. `null` + `unavailable` = Core could not run the comparison; added 2026-09-27 (OVI-168) — see that amendment below |
 | `DivergenceReading` (nested type) | `{state: DivergenceState, outputTokensInWindow: TokenCount, planRisePoints: int32?}` | tokens, percentage points | fields inherit the parent `Divergence` field's real/unavailable status | `planRisePoints` is **nullable and is `null` whenever no rise was measurable** — the source app reports `0` there, which is a fabricated zero a skin cannot tell from a meter that genuinely held still. `IsOffPlan` (`state` is `Diverging` or `PlanLimitReached`) is a Core-derived property of this type, not a skin test — same rule as `UsageLevel`'s banding; added 2026-09-27 (OVI-168) |
 | `DivergenceState` | enum {`InsufficientActivity`, `Consistent`, `Diverging`, `PlanLimitReached`, `MeterNotReporting`, `RiseNotMeasurable`} | — | real | six states, carried across unmerged: the last three are three different ways of saying "cannot tell" and the source app needed all three separately (its issue #268). No member is a display label |
@@ -1402,3 +1404,39 @@ the source of truth for what the contract *means*.
   outlive the vendor's ~30-day transcript retention and cannot be read from
   vendor files at all. This is a producer decision, not a contract-shape
   decision — every row of both types is unchanged.
+
+- **2026-10-09 amendment — the available release version becomes contract
+  data (OVI-570, D3; drift found by OVI-566).** Since PR #93 (OVI-557) both
+  skins render `UpdateCheckResult.Available.Tag` —
+  `AlertToastFormatter.FormatManualCheck` ("Version {tag} is available.") and
+  `AlertNotificationFormatter.FormatManualCheck` ("Version {tag} can be
+  installed.") — and this table named no such field. Neither skin had a type,
+  a unit, a status flag or a nullability rule to read, so **each one invented
+  its own answer** to "what do I render when `Outcome` is `UpdateAvailable`
+  but `Available` is null": the Windows skin falls back to "A newer version of
+  O-view is available.", the Linux skin to "A new version of O-view can be
+  installed." (CONFIRMED by read of both files at this commit.)
+
+  **Decision.** `AvailableUpdate` and its nested shape get rows above. The two
+  skins' invented fallbacks are **ratified, not reconciled**: they already
+  agree on the only thing the contract cares about — drop the version number,
+  keep the "an update exists" claim, fabricate nothing — and their wording
+  differs because [ADR-0003](0003-paneltext-anti-drift-mechanism.md) requires
+  each skin to word its own sentences. Independent wording of the same
+  contract fact is the design, so there was no unreconcilable contract
+  decision here to escalate; what was missing was the written rule, which is
+  now written. No skin code changes under this amendment.
+
+  **Rejected: make `Available` non-nullable under `UpdateAvailable` and delete
+  both fallbacks.** The pair is unrepresentable *as Core produces it* today,
+  but it is representable *in the type*, and a record shared by four outcomes
+  that is only sometimes populated is exactly where a later producer — a
+  second release feed, a replayed cached result — reintroduces the null. A
+  fallback a skin never reaches costs one sentence; a null-dereference in a
+  notification path costs a crash at the moment the user is being told
+  something.
+
+  **Rejected: let Core supply the fallback sentence.** That is a display
+  string, which this contract forbids Core to emit, and it would collapse the
+  two skins' independent wording into one shared phrase — the drift
+  [ADR-0003](0003-paneltext-anti-drift-mechanism.md) exists to prevent.
