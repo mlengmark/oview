@@ -135,6 +135,8 @@ its own PR and its own review. The answers:
   or named.
 
 **2026-10-02 — Phase 2 is fully landed and Phase 3 is designed, not started.**
+*(Superseded on the state of the build by the 2026-10-09 entry below; its gate
+and D9 statements still hold.)*
 Every slice in ADR-0005, 0006 and 0007's slicing tables is merged (last: PR
 #56). **Gate G4 is answered: Option A, keep two native windows** — WPF on
 Windows, Avalonia on Linux, no shared UI layer (board card
@@ -151,6 +153,25 @@ from the shell's side: nothing presentational may enter `O-view.App`, and adding
 it is now a reversal of an accepted gate rather than an open design call.
 **Gates G3 (macOS) and G5 (second AI source) remain open and Phase 3 does not
 need either.**
+
+**2026-10-09 — Phase 3 is complete, Phase 4A is complete, Phase 4B is six of
+ten slices in.** All eleven ADR-0008 slices are built (last: PR #75,
+2026-10-04), so the status icon, tooltip, detail window and alerts exist in
+both skins. **ADR-0009 (Phase 4A) is Accepted** — the board merged PR #76 on
+2026-10-05 (card `6c233a56`, merge `3172e63`) — **and all ten of its slices are
+built**: the menu as the fifth surface on both skins, a real `ISkinToShell`
+that loads `ShellSettings`, the ADR-0007 D2 point 6 event decision, ordered
+quit, and `IThemeSource` with both OS implementations and both repaint paths.
+**ADR-0010 (Phase 4B) is Accepted** — board-merged PR #77, 2026-10-05, card
+`f2a1b66b` — with slices 1–6 built (install-kind policy and its two detectors,
+manifest/URL verification, Windows download-verify-launch, the check cadence
+with notify-once, the Linux notify-only guarantee) and slices 7–10 open
+(Windows installer in PR #95, Linux packages, the release workflow, optional
+attestation). Treat both records' slicing tables as live: read the row before
+building it. **Nothing in this repository has been run on real hardware** —
+ADR-0002's never-observed cells are unchanged, and a merged slice is evidence
+of tests passing, never of a working desktop. Gates **G3** (macOS) and **G5**
+(second AI source) remain open and nothing in Phase 4 needs either.
 
 **Do not assume this repository contains working code.** If you are looking
 for the current, running implementation, that is
