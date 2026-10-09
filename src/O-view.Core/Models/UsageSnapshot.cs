@@ -26,6 +26,15 @@ public sealed record UsageSnapshot(
     /// <see cref="ExtraUsageState.Disabled"/> (ADR-0001, OVI-168).</summary>
     public ExtraUsageReading? ExtraUsage { get; init; }
 
+    /// <summary>The session-window boost notice relayed from Claude Code's own promo-flag
+    /// cache (ADR-0008 D9e, closing ADR-0001's 2026-09-21 reservation). Defaults to
+    /// <c>null</c> — the cache did not say — never a fabricated notice.</summary>
+    public BoostNotice? SessionBoostNotice { get; init; }
+
+    /// <summary>The weekly-window boost notice. See <see cref="SessionBoostNotice"/>'s
+    /// remarks — the same reservation, for the other meter.</summary>
+    public BoostNotice? WeeklyBoostNotice { get; init; }
+
     /// <summary>
     /// The canonical "no data" snapshot — every value unavailable, not zero.
     /// <see cref="LastIngestAt"/> is <see cref="DateTimeOffset.MinValue"/> here as an

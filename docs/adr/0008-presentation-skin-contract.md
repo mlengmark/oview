@@ -518,6 +518,161 @@ observed activity ([ADR-0006](0006-local-storage-contract.md)); every value
 keeps its `UsageValueStatus`; the reads are read-only, on the local machine,
 and touch no credential. No escalation required.
 
+> **2026-10-09 amendment (OVI-585/591, gate G7).** D9d said "no history series,
+> and no per-model split for today", and said plainly that both were "a real
+> future widening of `UsageDetail` … a later amendment with their own slice".
+> Gate G7 is that amendment. D9a–D9c are unchanged; D9d's four closures are
+> **narrowed, not lifted** — see D9h below.
+>
+> **D9e — `UsageDetail` widens once, by four optional members, and
+> `UsageSnapshot` by two.** Every new member defaults to its own `Unavailable`
+> sentinel, so a shell that has not assembled it yet pushes an honest gap
+> rather than a zero:
+>
+> ```
+> UsageDetail(                           // D9a's three positional members, unchanged
+>     UsageSnapshot        Snapshot,
+>     UsageStatistics      Statistics,
+>     ModelUsageBreakdown  Models)
+> {
+>     AccountIdentity       Account         { get; init; } = AccountIdentity.Unavailable;
+>     DailyUsageSeries      History         { get; init; } = DailyUsageSeries.Unavailable;
+>     WeeklyResetBoundaries ResetBoundaries { get; init; } = WeeklyResetBoundaries.Unavailable;
+>     TokenKindTotals       TokensToday     { get; init; } = TokenKindTotals.Unavailable;
+>     TokenKindTotals       Tokens31d       { get; init; } = TokenKindTotals.Unavailable;
+> }
+> ```
+>
+> ```
+> AccountIdentity(
+>     string?           DisplayName,        // verbatim from the vendor file, never reworded
+>     string?           EmailAddress,
+>     string?           OrganizationType,   // the vendor's own token, relayed verbatim
+>     UsageValueStatus  Status)
+>   static AccountIdentity Unavailable { get; }
+> ```
+>
+> The tier is `oauthAccount.organizationType` and nothing else. Core relays
+> the token; mapping a token to a badge word is wording, so it is the skin's,
+> and an unrecognised token renders verbatim — the same rule
+> `ModelUsageRow.ModelId` already carries. *Rejected: a `Tier` enum in Core.*
+> An enum must decide what an unknown value becomes, and every answer to that
+> is either a fabricated tier or a display string in Core.
+>
+> ```
+> DailyUsageSeries(
+>     DateOnly                        FromLocalDate,
+>     DateOnly                        ToLocalDate,
+>     IReadOnlyList<DailyUsagePoint>  Days,       // all 31, in date order, never sparse
+>     HistoryCoverage                 Coverage,
+>     UsageValueStatus                Status)
+>   static DailyUsageSeries Unavailable { get; }
+>
+> DailyUsagePoint(
+>     DateOnly    LocalDate,
+>     TokenCount  OutputTokens)       // Status.Unavailable = not recorded -> blank column
+> ```
+>
+> Three properties are load-bearing: every day in the window is present, and
+> absence is a status, not an omission (`OutputTokens.Status == Unavailable`
+> is "this day is not in recorded history" and renders as a blank column with
+> its date label still drawn; `Status == Real` with value `0` is "a recorded,
+> idle day" — a sparse list would make the skin reconstruct the missing dates,
+> which is date arithmetic in a skin); the measure is output tokens, matching
+> the tiles; and there is no per-model and no per-kind split per day — the
+> tiles' per-model split comes from `Models`, and the kind split from
+> `TokensToday`/`Tokens31d`.
+>
+> ```
+> TokenKindTotals(
+>     DateOnly             FromLocalDate,
+>     DateOnly             ToLocalDate,
+>     TokenKindAmount      Input,
+>     TokenKindAmount      Output,
+>     TokenKindAmount      CacheCreation,
+>     TokenKindAmount      CacheRead,
+>     TokenCount           Total,          // carried, so no skin ever sums the four
+>     RateCardStamp        Rates,
+>     UsageValueStatus     Status)
+>   static TokenKindTotals Unavailable { get; }
+>
+> TokenKindAmount(TokenCount Tokens, EstimatedUsd EstimatedValue)
+> ```
+>
+> `Total` is carried rather than derived because a skin's share text needs a
+> denominator that both skins agree on. Pricing per kind is Core's; the
+> *share* is the skin's.
+>
+> ```
+> WeeklyResetBoundaries(
+>     DateOnly                              FromLocalDate,
+>     DateOnly                              ToLocalDate,
+>     IReadOnlyList<WeeklyResetBoundary>    Boundaries,   // ascending
+>     UsageValueStatus                      Status)
+>   static WeeklyResetBoundaries Unavailable { get; }
+>
+> WeeklyResetBoundary(
+>     DateTimeOffset            Instant,   // carried in the offset in force at that instant,
+>     WeeklyResetBoundaryKind   Kind)      //   in the same zone the day buckets were computed in
+>
+> enum WeeklyResetBoundaryKind { Observed, DerivedFromObserved, MondayFallback }
+> ```
+>
+> **Three kinds, not two.** Past boundaries are *derived* by stepping the
+> cadence back from the predicted next reset, and a derivation is not an
+> observation. Collapsing `DerivedFromObserved` into `Observed` would present
+> a computed boundary as a recorded one, which the "never fabricate" rule
+> forbids. The boundary carries its own `DateTimeOffset` so a skin can place
+> it against the day columns without resolving a timezone —
+> [ADR-0006](0006-local-storage-contract.md) D2's rule that the zone is always
+> caller-supplied, never read inside, holds for skins too; per-boundary
+> offsets are what make a DST transition inside the window representable.
+>
+> **`UsageSnapshot` gains exactly two members**, closing
+> [ADR-0001](0001-core-to-skin-data-contract.md)'s 2026-09-21 reservation:
+>
+> ```
+> public BoostNotice? SessionBoostNotice { get; init; }   // null = the cache did not say
+> public BoostNotice? WeeklyBoostNotice  { get; init; }
+> ```
+>
+> `BoostNotice` already carries Claude's own sentence, the percent and the end
+> date, and the hover card's provenance is `DataSourceKind` + `LastIngestAt`,
+> already on the snapshot. Boost notices qualify as `UsageSnapshot` members —
+> and not `UsageDetail` members — because they are plan-meter facts read from
+> the same vendor cache block the percentages come from, on the tooltip's
+> poll path, not a 31-day ledger aggregate.
+>
+> **D9f — the weekly-reset "not known" state needs no new field.**
+> `UsageSnapshot.WeeklyResetAt` is a `UsageInstant` with its own status, and
+> the "no plan data at all" case is `DataSourceKind.Unavailable` — both
+> already state what a three-valued enum would be a second way to state.
+>
+> **D9g — the new members ride the same push and the same cadence.** No new
+> seam member, no second schedule. `ShowDetail(UsageDetail)` is unchanged in
+> signature; D9b's three rules (on becoming visible, on every poll while
+> visible, never while hidden) apply to the whole object.
+>
+> **D9h — what stays closed.** D9d's four closures, narrowed:
+>
+> - **`IUsageProvider` still does not change.** `UsageSnapshot` gains two
+>   boost members and nothing else; no series, no kind totals, no account
+>   identity.
+> - **`DailyModelUsage` still does not cross the seam.** `DailyUsageSeries` is
+>   a Core model type with status flags, built *from* it.
+> - **The alert path still does not change.**
+> - **No per-model split for *today* beyond `Models`' stated window.**
+>
+> **This slice (OVI-602, gate G7 parity P5) adds only the contract members
+> above and their `Unavailable`-sentinel defaults.** No ledger query backs
+> `History`/`ResetBoundaries`/`TokensToday`/`Tokens31d` yet (a later slice,
+> [ADR-0005](0005-data-provider-contract.md)'s D6c amendment), no account
+> reader backs `Account` yet (also a later slice), and no skin reads any of
+> the six new members yet. Every new member therefore reads as `Unavailable`
+> (or `null`, for the two boost members) on every existing `UsageDetail`/
+> `UsageSnapshot` construction in this repository — a pure, additive contract
+> widening with no behaviour change.
+
 ## Alternatives considered
 
 **Build the Linux skin first, since it is the one nobody has ever seen work.**
