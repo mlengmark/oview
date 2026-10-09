@@ -91,6 +91,57 @@ public class UsageSnapshotTests
         Assert.Equal(values.Distinct().Count(), values.Length);
     }
 
+    /// <summary>
+    /// ADR-0008 D9e closes ADR-0001's 2026-09-21 reservation: both boost members default to
+    /// <c>null</c> — the cache did not say — never a fabricated notice, for a snapshot no
+    /// provider has populated.
+    /// </summary>
+    [Fact]
+    public void BoostNoticesDefaultToNullWhenNoProviderPopulatesThem()
+    {
+        var snapshot = new UsageSnapshot(
+            DataSourceKind.Live,
+            new DateTimeOffset(2026, 9, 8, 20, 45, 0, TimeSpan.Zero),
+            new UsagePercent(57, UsageValueStatus.Real),
+            new UsageInstant(DateTimeOffset.UtcNow, UsageValueStatus.Real),
+            new UsagePercent(14, UsageValueStatus.Real),
+            new UsageInstant(DateTimeOffset.UtcNow, UsageValueStatus.Real),
+            UsageLevel.Amber);
+
+        Assert.Null(snapshot.SessionBoostNotice);
+        Assert.Null(snapshot.WeeklyBoostNotice);
+    }
+
+    [Fact]
+    public void UnavailableSnapshotAlsoDefaultsBothBoostNoticesToNull()
+    {
+        Assert.Null(UsageSnapshot.Unavailable.SessionBoostNotice);
+        Assert.Null(UsageSnapshot.Unavailable.WeeklyBoostNotice);
+    }
+
+    [Fact]
+    public void BoostNoticesCanBeSetExplicitlyWithoutDisturbingTheOtherMembers()
+    {
+        var sessionBoost = new BoostNotice("Extra usage for a limited time", 20, new DateOnly(2026, 10, 31));
+        var ingestAt = new DateTimeOffset(2026, 9, 8, 20, 45, 0, TimeSpan.Zero);
+
+        var snapshot = new UsageSnapshot(
+            DataSourceKind.Live,
+            ingestAt,
+            new UsagePercent(57, UsageValueStatus.Real),
+            new UsageInstant(DateTimeOffset.UtcNow, UsageValueStatus.Real),
+            new UsagePercent(14, UsageValueStatus.Real),
+            new UsageInstant(DateTimeOffset.UtcNow, UsageValueStatus.Real),
+            UsageLevel.Amber)
+        {
+            SessionBoostNotice = sessionBoost,
+        };
+
+        Assert.Equal(sessionBoost, snapshot.SessionBoostNotice);
+        Assert.Null(snapshot.WeeklyBoostNotice);
+        Assert.Equal(ingestAt, snapshot.LastIngestAt);
+    }
+
     [Fact]
     public void ThisAssemblyDefinesNoNotifyIconLengthCap()
     {
