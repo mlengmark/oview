@@ -1,0 +1,58 @@
+using OView.App;
+using OView.CrossSkin.Tests.Fixtures;
+
+namespace OView.CrossSkin.Tests;
+
+/// <summary>
+/// Proves ADR-0008 D11a's render-proof hook (OVI-598, slice P0) actually produces a file for
+/// every state <see cref="DetailWindowFixtures.All"/> currently pins, in both
+/// <see cref="ThemePreference.Light"/> and <see cref="ThemePreference.Dark"/>, for both skins.
+/// This is the mechanism every later parity slice (P1-P25) reuses to prove the state it adds
+/// rendered correctly in review — this slice only proves the mechanism itself works, not any
+/// particular pixel (that is each later slice's own obligation, against the renders it attaches
+/// to its own PR).
+/// </summary>
+public sealed class DetailWindowRenderProofTests : IDisposable
+{
+    private static readonly DateTimeOffset UtcNow = new(2026, 9, 8, 21, 0, 0, TimeSpan.Zero);
+
+    private readonly string _directory = Directory.CreateDirectory(
+        Path.Combine(Path.GetTempPath(), "oview-render-proof-tests-" + Guid.NewGuid().ToString("N"))).FullName;
+
+    public static IEnumerable<object[]> FixturesByTheme()
+    {
+        foreach (var fixture in DetailWindowFixtures.All)
+        {
+            yield return new object[] { fixture, ThemePreference.Light };
+            yield return new object[] { fixture, ThemePreference.Dark };
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(FixturesByTheme))]
+    public void TrayRenderProofWritesAFileForEveryStateInBothThemes(DetailWindowFixture fixture, ThemePreference theme)
+    {
+        var path = Path.Combine(_directory, $"tray-{fixture.Name}-{theme}.png");
+
+        OView.Tray.Presentation.DetailWindowRenderProof.RenderToFile(
+            fixture.Detail, theme, path, UtcNow, fixture.DisplayZone);
+
+        Assert.True(File.Exists(path), $"[{fixture.Name}/{theme}] wrote no file.");
+        Assert.True(new FileInfo(path).Length > 0, $"[{fixture.Name}/{theme}] wrote an empty file.");
+    }
+
+    [Theory]
+    [MemberData(nameof(FixturesByTheme))]
+    public void LinuxRenderProofWritesAFileForEveryStateInBothThemes(DetailWindowFixture fixture, ThemePreference theme)
+    {
+        var path = Path.Combine(_directory, $"linux-{fixture.Name}-{theme}.png");
+
+        OView.Linux.Presentation.DetailWindowRenderProof.RenderToFile(
+            fixture.Detail, theme, path, UtcNow, fixture.DisplayZone);
+
+        Assert.True(File.Exists(path), $"[{fixture.Name}/{theme}] wrote no file.");
+        Assert.True(new FileInfo(path).Length > 0, $"[{fixture.Name}/{theme}] wrote an empty file.");
+    }
+
+    public void Dispose() => Directory.Delete(_directory, recursive: true);
+}
