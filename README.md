@@ -6,28 +6,32 @@ usage allowance you've used, and when it resets. This repository is the
 taken into a new codebase with a stronger data/presentation boundary and a
 documentation trail from the first commit.
 
-> **Status (2026-10-02).** **Phase 1 — text extraction — is complete**:
-> every confirmed display-string leak has moved out of the shared data layer
-> into each skin's own formatter. **Phase 2 is fully landed**: every slice in
-> ADR-0005's, ADR-0006's and ADR-0007's slicing tables is merged, so Core now
-> reads Claude's data off this machine, persists what it cannot recompute, and
-> is driven by an application shell (`O-view.App`). **Phase 3 — the status
-> icon, tooltip, detail window and alerts — is designed and has started**:
-> [ADR-0008](docs/adr/0008-presentation-skin-contract.md) is **Accepted**
-> (board-merged, 2026-10-02) and the first slice, cross-skin test fixtures
-> for the detail window and the four alert kinds, is merged. No window and no
-> alert UI exists yet.
+> **Status (2026-10-09).** **Phases 1, 2 and 3 are complete**, and Phase 4 is
+> most of the way there. The display strings are out of the shared data layer
+> and into each skin's own formatter (Phase 1); Core reads Claude's data off
+> this machine, persists what it cannot recompute, and is driven by an
+> application shell (Phase 2); and the five presentation surfaces — status
+> icon, tooltip, detail window, alerts and the right-click menu — are built on
+> both Windows and Linux (Phase 3, all eleven
+> [ADR-0008](docs/adr/0008-presentation-skin-contract.md) slices built
+> 2026-10-04). **Phase 4** adds the controls and the shipping: its control
+> surface ([ADR-0009](docs/adr/0009-control-surface-contract.md), all ten
+> slices built) is finished, and its update execution and packaging
+> ([ADR-0010](docs/adr/0010-update-execution-and-packaging-contract.md), six of
+> ten slices built) is in progress. **No skin has yet been run on real
+> hardware**, so nothing here is verified against a live desktop.
 >
 > Board gates: **G0** (this repository), **G1** (target-architecture
 > sign-off) and **G4** (UI unification — **option A**: keep two native
 > windows, WPF on Windows and Avalonia on Linux, no shared UI layer) are all
 > decided. **G3** (macOS) and **G5** (a second AI source) remain open, and
-> Phase 3 needs neither. See
+> neither Phase 3 nor Phase 4 needs either. See
 > [`docs/adr/`](docs/adr/) for the
 > Core-to-skin data contract, the cross-platform capability matrix, and the
 > mechanism that replaced `PanelText.cs`'s centralization when its display
 > strings moved out of the shared layer, the Phase 2 provider/storage/shell
-> contracts and the Phase 3 presentation contract — and the approved PDR
+> contracts, the Phase 3 presentation contract and the Phase 4 control,
+> update and packaging contracts — and the approved PDR
 > (linked from the ADRs) for the full target architecture.
 
 ## What O-view does
@@ -135,7 +139,8 @@ the full standard this repository follows from commit one. In short:
 | [`docs/adr/0006-local-storage-contract.md`](docs/adr/0006-local-storage-contract.md) | Phase 2. What Core persists on this machine, where, and who owns each file — and why SQLite is the first third-party runtime dependency. |
 | [`docs/adr/0007-app-shell-contract.md`](docs/adr/0007-app-shell-contract.md) | Phase 2. `O-view.App` — a third layer between Core and the skins, its admission rule, and what it may never contain. |
 | [`docs/adr/0008-presentation-skin-contract.md`](docs/adr/0008-presentation-skin-contract.md) | Phase 3. Four surfaces (status icon, tooltip, detail window, alerts), two native skins, no shared UI layer — gate **G4 = A**. Read **D9** before touching the detail window. Its D2 is now **five** surfaces — see that section's 2026-10-05 amendment and 0009. |
-| [`docs/adr/0009-control-surface-contract.md`](docs/adr/0009-control-surface-contract.md) | Phase 4A, **Proposed — board sign-off pending.** The right-click menu as the fifth surface, the three shell settings it exposes, run-at-startup read live from the OS, and `IThemeSource`. No settings window, and the conditions that would re-open that. |
+| [`docs/adr/0009-control-surface-contract.md`](docs/adr/0009-control-surface-contract.md) | Phase 4A, **Accepted** (board merged PR #76, 2026-10-05); all ten slices built. The right-click menu as the fifth surface, the three shell settings it exposes, run-at-startup read live from the OS, and `IThemeSource`. No settings window, and the conditions that would re-open that. |
+| [`docs/adr/0010-update-execution-and-packaging-contract.md`](docs/adr/0010-update-execution-and-packaging-contract.md) | Phase 4B, **Accepted** (board merged PR #77, 2026-10-05); six of ten slices built. How the build arrived (`InstallKind`) is the only thing permitting an update download or launch; checksum verification fails closed and ships with the download. Declines update channels, a proxy setting and an apt repository. |
 | [`CLAUDE.md`](CLAUDE.md) | Contributor guidance — what may be assumed, what must be re-verified, and the evidence-labelling discipline this repository runs on. |
 
 ## Relationship to `mlengmark/O-view`
@@ -172,14 +177,34 @@ cross-skin anti-drift harness `O-view.CrossSkin.Tests`. Build and test with
   single reading with a health signal, three local stores, and the
   `O-view.App` shell with its poll loop, settings file, single-instance
   guard, update check and redacted diagnostics bundle.
-- **Phase 3 — the four presentation surfaces: designed, started.**
+- **Phase 3 — the presentation surfaces: complete.**
   [ADR-0008](docs/adr/0008-presentation-skin-contract.md) is **Accepted**
   (2026-10-02, board-merged PR #58; amended the same day by **D9**, which
-  adds the detail window's `ShowDetail(UsageDetail)` data path). Its first
-  slice — cross-skin fixtures for the detail window and the four alert
-  kinds, as pure data with no presenter — is merged. **No status-icon,
-  tooltip, detail-window or alert UI exists in this repository yet**, and no
-  skin has been run on real hardware.
+  adds the detail window's `ShowDetail(UsageDetail)` data path), and all
+  eleven slices of its table are built (last: PR #75, 2026-10-04). The
+  status icon, tooltip, detail window and alerts exist in both skins — WPF
+  on Windows, Avalonia on Linux — each with its own wording.
+- **Phase 4 — the controls and the shipping: one half complete, one half in
+  progress.** Phase 4A,
+  [ADR-0009](docs/adr/0009-control-surface-contract.md) (**Accepted**,
+  board-merged PR #76, 2026-10-05), is **built in full**: the right-click
+  menu as a fifth surface on both skins, a shell that actually loads and
+  honours its settings file, the alert-event decision, ordered quit, and
+  light/dark/unknown theme following from the OS. Phase 4B,
+  [ADR-0010](docs/adr/0010-update-execution-and-packaging-contract.md)
+  (**Accepted**, board-merged PR #77, 2026-10-05), is **six of ten slices
+  built**: the install-kind policy table and its two OS detectors, manifest
+  and download-URL verification, Windows download-verify-launch, the
+  background check cadence with notify-once-per-version, and the Linux
+  notify-only path. Still to build: the Windows installer script (PR #95,
+  open), the Linux `.deb` and tarball build, the release workflow, and —
+  only if the board asks for it — provenance attestation.
+
+**No skin has been run on real hardware.** Everything above is proved by
+tests on this machine and on CI; no tray icon, menu, window or notification
+in this repository has been seen working on a live Windows or Linux desktop,
+and [ADR-0002](docs/adr/0002-cross-platform-capability-matrix.md)'s
+never-observed cells stay never-observed.
 
 ### Changelog
 
