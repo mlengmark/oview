@@ -79,7 +79,8 @@ public sealed class ShellSettingsStore
             return new ShellSettings(
                 file.AlertThresholdPercent,
                 TimeSpan.FromSeconds(file.PollCadenceSeconds),
-                file.AutoUpdateEnabled);
+                file.AutoUpdateEnabled,
+                file.LastAnnouncedUpdateTag);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {
@@ -128,6 +129,7 @@ public sealed class ShellSettingsStore
             AlertThresholdPercent = settings.AlertThresholdPercent,
             PollCadenceSeconds = (int)settings.PollCadence.TotalSeconds,
             AutoUpdateEnabled = settings.AutoUpdateEnabled,
+            LastAnnouncedUpdateTag = settings.LastAnnouncedUpdateTag,
         };
 
         try
@@ -157,5 +159,6 @@ public sealed class ShellSettingsStore
         [JsonPropertyName("alertThresholdPercent")] public int AlertThresholdPercent { get; set; }
         [JsonPropertyName("pollCadenceSeconds")] public int PollCadenceSeconds { get; set; }
         [JsonPropertyName("autoUpdateEnabled")] public bool AutoUpdateEnabled { get; set; }
+        [JsonPropertyName("lastAnnouncedUpdateTag")] public string? LastAnnouncedUpdateTag { get; set; }
     }
 }

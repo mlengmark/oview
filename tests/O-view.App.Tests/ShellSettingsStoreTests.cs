@@ -50,6 +50,33 @@ public class ShellSettingsStoreTests : IDisposable
     }
 
     [Fact]
+    public void Save_then_Load_round_trips_a_non_null_last_announced_update_tag()
+    {
+        var store = new ShellSettingsStore(_directory);
+        var settings = new ShellSettings(80, TimeSpan.FromSeconds(60), true, "v1.2.3");
+
+        store.Save(settings);
+        var loaded = store.Load();
+
+        Assert.Equal("v1.2.3", loaded.LastAnnouncedUpdateTag);
+    }
+
+    [Fact]
+    public void Load_defaults_the_last_announced_update_tag_to_null_for_a_file_written_before_this_field_existed()
+    {
+        Directory.CreateDirectory(_directory);
+        File.WriteAllText(
+            Path.Combine(_directory, "settings.json"),
+            """{ "version": 1, "alertThresholdPercent": 80, "pollCadenceSeconds": 60, "autoUpdateEnabled": true }""");
+        var store = new ShellSettingsStore(_directory);
+
+        var settings = store.Load();
+
+        Assert.Null(settings.LastAnnouncedUpdateTag);
+        Assert.True(settings.AutoUpdateEnabled);
+    }
+
+    [Fact]
     public void Save_creates_the_directory_when_it_does_not_exist()
     {
         Assert.False(Directory.Exists(_directory));

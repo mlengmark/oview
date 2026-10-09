@@ -1,4 +1,6 @@
 using OView.App;
+using OView.App.Updates;
+using OView.Core.Updates;
 
 namespace OView.Tray.Presentation;
 
@@ -19,6 +21,7 @@ internal sealed class TrayMenuController
     private readonly ISkinToShell _skinToShell;
     private readonly Func<ShellSettings> _currentSettings;
     private readonly IStartupRegistration _startupRegistration;
+    private readonly UpdateCadence _updateCadence;
 
     /// <param name="skinToShell">Where every action item's call goes (D2's table) and where
     /// the persisted threshold/auto-update settings ultimately come from.</param>
@@ -28,15 +31,25 @@ internal sealed class TrayMenuController
     /// <param name="startupRegistration">The skin's own run-at-startup mechanism (D3), called
     /// directly rather than through <paramref name="skinToShell"/> per D3's rejected
     /// alternative.</param>
-    public TrayMenuController(ISkinToShell skinToShell, Func<ShellSettings> currentSettings, IStartupRegistration startupRegistration)
+    /// <param name="updateCadence">ADR-0010 slicing table row 5's "Check for updates now" item
+    /// calls this directly, the same "shell declares, skin calls directly" shape
+    /// <paramref name="startupRegistration"/> already uses — not an <see cref="ISkinToShell"/>
+    /// member, per that slice's "adds no member to either seam".</param>
+    public TrayMenuController(
+        ISkinToShell skinToShell,
+        Func<ShellSettings> currentSettings,
+        IStartupRegistration startupRegistration,
+        UpdateCadence updateCadence)
     {
         ArgumentNullException.ThrowIfNull(skinToShell);
         ArgumentNullException.ThrowIfNull(currentSettings);
         ArgumentNullException.ThrowIfNull(startupRegistration);
+        ArgumentNullException.ThrowIfNull(updateCadence);
 
         _skinToShell = skinToShell;
         _currentSettings = currentSettings;
         _startupRegistration = startupRegistration;
+        _updateCadence = updateCadence;
     }
 
     /// <summary>
@@ -58,6 +71,14 @@ internal sealed class TrayMenuController
     public void OnSetThresholdPercent(int percent) => _skinToShell.SetThresholdPercent(percent);
 
     public void OnSetAutoUpdate(bool enabled) => _skinToShell.SetAutoUpdate(enabled);
+
+    /// <summary>
+    /// Runs the same check the background cadence runs, interactively, and always returns a
+    /// real outcome (ADR-0010 D7) for <c>TrayMenu</c> to word via
+    /// <c>AlertToastFormatter.FormatManualCheck</c> — never silence, because the user clicked
+    /// this item on purpose.
+    /// </summary>
+    public Task<UpdateCheckResult> OnCheckForUpdatesNow() => _updateCadence.CheckNowAsync();
 
     public void OnCopyDiagnostics() => _skinToShell.WriteDiagnosticsBundle();
 

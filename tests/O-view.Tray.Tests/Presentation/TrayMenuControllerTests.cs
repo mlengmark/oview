@@ -1,4 +1,6 @@
 using OView.App;
+using OView.App.Updates;
+using OView.Core.Updates;
 using OView.Tray.Presentation;
 
 namespace OView.Tray.Tests.Presentation;
@@ -11,7 +13,7 @@ public class TrayMenuControllerTests
     public void BuildSnapshotReadsStartupLiveFromTheOsEveryCall()
     {
         var startup = new FakeStartupRegistration(enabled: false);
-        var controller = new TrayMenuController(new FakeSkinToShell(), () => ShellSettings.Default, startup);
+        var controller = new TrayMenuController(new FakeSkinToShell(), () => ShellSettings.Default, startup, CreateUpdateCadence());
 
         Assert.False(controller.BuildSnapshot().StartupEnabled);
 
@@ -26,7 +28,8 @@ public class TrayMenuControllerTests
     public void BuildSnapshotReadsThresholdAndAutoUpdateFromTheShellsPersistedSettings()
     {
         var settings = ShellSettings.Default with { AlertThresholdPercent = 70, AutoUpdateEnabled = true };
-        var controller = new TrayMenuController(new FakeSkinToShell(), () => settings, new FakeStartupRegistration(enabled: false));
+        var controller = new TrayMenuController(
+            new FakeSkinToShell(), () => settings, new FakeStartupRegistration(enabled: false), CreateUpdateCadence());
 
         var snapshot = controller.BuildSnapshot();
 
@@ -38,7 +41,8 @@ public class TrayMenuControllerTests
     public void OnSetThresholdPercentCallsTheShellWithTheRequestedPercent()
     {
         var skin = new FakeSkinToShell();
-        var controller = new TrayMenuController(skin, () => ShellSettings.Default, new FakeStartupRegistration(enabled: false));
+        var controller = new TrayMenuController(
+            skin, () => ShellSettings.Default, new FakeStartupRegistration(enabled: false), CreateUpdateCadence());
 
         controller.OnSetThresholdPercent(90);
 
@@ -49,7 +53,8 @@ public class TrayMenuControllerTests
     public void OnSetAutoUpdateCallsTheShellWithTheRequestedValue()
     {
         var skin = new FakeSkinToShell();
-        var controller = new TrayMenuController(skin, () => ShellSettings.Default, new FakeStartupRegistration(enabled: false));
+        var controller = new TrayMenuController(
+            skin, () => ShellSettings.Default, new FakeStartupRegistration(enabled: false), CreateUpdateCadence());
 
         controller.OnSetAutoUpdate(true);
 
@@ -60,7 +65,8 @@ public class TrayMenuControllerTests
     public void OnRefreshNowOnShowUsageDetailsOnCopyDiagnosticsAndOnQuitCallTheirSingleShellMember()
     {
         var skin = new FakeSkinToShell();
-        var controller = new TrayMenuController(skin, () => ShellSettings.Default, new FakeStartupRegistration(enabled: false));
+        var controller = new TrayMenuController(
+            skin, () => ShellSettings.Default, new FakeStartupRegistration(enabled: false), CreateUpdateCadence());
 
         controller.OnRefreshNow();
         controller.OnShowUsageDetails();
@@ -77,7 +83,7 @@ public class TrayMenuControllerTests
     public void OnToggleRunAtStartupRendersTheOsReturnedStateNotTheRequest()
     {
         var startup = new FakeStartupRegistration(enabled: false) { ApplyResult = true };
-        var controller = new TrayMenuController(new FakeSkinToShell(), () => ShellSettings.Default, startup);
+        var controller = new TrayMenuController(new FakeSkinToShell(), () => ShellSettings.Default, startup, CreateUpdateCadence());
 
         var result = controller.OnToggleRunAtStartup(requested: true);
 
@@ -92,7 +98,7 @@ public class TrayMenuControllerTests
         // The user asked to turn it on; the registry write failed and it is still off (D3's
         // own example scenario, mirrored from MenuFixtures.RunAtStartupEnableRequestedButFailed).
         var startup = new FakeStartupRegistration(enabled: false) { ApplyResult = false };
-        var controller = new TrayMenuController(new FakeSkinToShell(), () => ShellSettings.Default, startup);
+        var controller = new TrayMenuController(new FakeSkinToShell(), () => ShellSettings.Default, startup, CreateUpdateCadence());
 
         var result = controller.OnToggleRunAtStartup(requested: true);
 
@@ -101,12 +107,37 @@ public class TrayMenuControllerTests
     }
 
     [Fact]
+    public async Task OnCheckForUpdatesNowDelegatesToTheUpdateCadenceAndReturnsItsOutcome()
+    {
+        var controller = new TrayMenuController(
+            new FakeSkinToShell(), () => ShellSettings.Default, new FakeStartupRegistration(enabled: false), CreateUpdateCadence());
+
+        var result = await controller.OnCheckForUpdatesNow();
+
+        Assert.Equal(UpdateOutcome.UpToDate, result.Outcome);
+    }
+
+    [Fact]
     public void ConstructorRejectsNullDependencies()
     {
-        Assert.Throws<ArgumentNullException>(() => new TrayMenuController(null!, () => ShellSettings.Default, new FakeStartupRegistration(enabled: false)));
-        Assert.Throws<ArgumentNullException>(() => new TrayMenuController(new FakeSkinToShell(), null!, new FakeStartupRegistration(enabled: false)));
-        Assert.Throws<ArgumentNullException>(() => new TrayMenuController(new FakeSkinToShell(), () => ShellSettings.Default, null!));
+        Assert.Throws<ArgumentNullException>(() => new TrayMenuController(null!, () => ShellSettings.Default, new FakeStartupRegistration(enabled: false), CreateUpdateCadence()));
+        Assert.Throws<ArgumentNullException>(() => new TrayMenuController(new FakeSkinToShell(), null!, new FakeStartupRegistration(enabled: false), CreateUpdateCadence()));
+        Assert.Throws<ArgumentNullException>(() => new TrayMenuController(new FakeSkinToShell(), () => ShellSettings.Default, null!, CreateUpdateCadence()));
+        Assert.Throws<ArgumentNullException>(() => new TrayMenuController(new FakeSkinToShell(), () => ShellSettings.Default, new FakeStartupRegistration(enabled: false), null!));
     }
+
+    /// <summary>A real <see cref="UpdateCadence"/> over fakes only — no real HTTP, no real
+    /// timer tick — just enough for <see cref="TrayMenuController"/>'s own constructor and
+    /// <see cref="TrayMenuController.OnCheckForUpdatesNow"/> to have something to call.</summary>
+    private static UpdateCadence CreateUpdateCadence() => new(
+        new ReleaseFeed(new FakeReleaseFeedTransport(), new FakeClock(DateTimeOffset.UnixEpoch)),
+        new FakeInstallKindSource(),
+        "1.0.0",
+        () => ShellSettings.Default,
+        _ => { },
+        _ => { },
+        new FakeAppTimer(),
+        TimeSpan.FromHours(24));
 
     private sealed class FakeSkinToShell : ISkinToShell
     {
@@ -165,5 +196,48 @@ public class TrayMenuControllerTests
         }
 
         public void SetEnabledForTest(bool enabled) => _enabled = enabled;
+    }
+
+    private sealed class FakeInstallKindSource : IInstallKindSource
+    {
+        public InstallKind Current => InstallKind.WindowsInstaller;
+    }
+
+    private sealed class FakeClock : IClock
+    {
+        public FakeClock(DateTimeOffset utcNow) => UtcNow = utcNow;
+
+        public DateTimeOffset UtcNow { get; set; }
+    }
+
+    private sealed class FakeAppTimer : IAppTimer
+    {
+        public event EventHandler? Elapsed
+        {
+            add { }
+            remove { }
+        }
+
+        public TimeSpan Interval { get; set; }
+
+        public void Start()
+        {
+        }
+
+        public void Stop()
+        {
+        }
+
+        public void Dispose()
+        {
+        }
+    }
+
+    private sealed class FakeReleaseFeedTransport : IReleaseFeedTransport
+    {
+        public Task<ReleaseFeedResponse> FetchLatestReleaseAsync(CancellationToken cancellation) =>
+            Task.FromResult(new ReleaseFeedResponse(
+                200, null, null, null,
+                """{ "tag_name": "v1.0.0", "draft": false, "prerelease": false, "assets": [] }"""));
     }
 }

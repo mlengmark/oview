@@ -2,6 +2,7 @@ using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using OView.App;
+using OView.App.Updates;
 using OView.Core.Models;
 
 namespace OView.Tray.Presentation;
@@ -48,7 +49,12 @@ internal sealed class TrayStatusIcon : IDisposable
     private Icon? _currentIcon;
     private bool _disposed;
 
-    public TrayStatusIcon(ISkinToShell skinToShell, Func<ShellSettings> currentSettings, IStartupRegistration startupRegistration, IThemeSource themeSource)
+    public TrayStatusIcon(
+        ISkinToShell skinToShell,
+        Func<ShellSettings> currentSettings,
+        IStartupRegistration startupRegistration,
+        IThemeSource themeSource,
+        UpdateCadence updateCadence)
     {
         _controller = new StatusIconController(skinToShell, Render, Reregister);
         _taskbarCreatedMessage = RegisterWindowMessage("TaskbarCreated");
@@ -57,7 +63,7 @@ internal sealed class TrayStatusIcon : IDisposable
         _notifyIcon.MouseClick += (_, _) => _controller.OnActivated();
         _tooltip = new TooltipTextController(text => _notifyIcon.Text = text);
 
-        var menuController = new TrayMenuController(skinToShell, currentSettings, startupRegistration);
+        var menuController = new TrayMenuController(skinToShell, currentSettings, startupRegistration, updateCadence);
         _menu = new TrayMenu(menuController, ShowToast);
         _notifyIcon.ContextMenuStrip = _menu.Strip;
         _menuTheme = new ThemeRepaintController(themeSource, _menu.ApplyTheme);

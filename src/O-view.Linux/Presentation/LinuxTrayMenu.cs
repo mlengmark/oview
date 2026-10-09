@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using OView.Core.Updates;
 
 namespace OView.Linux.Presentation;
 
@@ -18,19 +19,19 @@ namespace OView.Linux.Presentation;
 internal sealed class LinuxTrayMenu
 {
     private readonly LinuxMenuController _controller;
-    private readonly Action<string, string> _showFailureNotification;
+    private readonly Action<string, string> _showNotification;
     private readonly NativeMenu _menu = new();
     private readonly NativeMenuItem _runAtStartupItem;
     private readonly NativeMenuItem _autoUpdateItem;
     private readonly (int Percent, NativeMenuItem Item)[] _thresholdItems;
 
-    public LinuxTrayMenu(LinuxMenuController controller, Action<string, string> showFailureNotification)
+    public LinuxTrayMenu(LinuxMenuController controller, Action<string, string> showNotification)
     {
         ArgumentNullException.ThrowIfNull(controller);
-        ArgumentNullException.ThrowIfNull(showFailureNotification);
+        ArgumentNullException.ThrowIfNull(showNotification);
 
         _controller = controller;
-        _showFailureNotification = showFailureNotification;
+        _showNotification = showNotification;
 
         var refreshNow = new NativeMenuItem("Refresh now");
         refreshNow.Click += (_, _) => _controller.RefreshNow();
@@ -56,6 +57,9 @@ internal sealed class LinuxTrayMenu
         _autoUpdateItem = new NativeMenuItem("Check for updates automatically") { ToggleType = MenuItemToggleType.CheckBox };
         _autoUpdateItem.Click += (_, _) => OnAutoUpdateClicked();
 
+        var checkForUpdatesNow = new NativeMenuItem("Check for updates now");
+        checkForUpdatesNow.Click += (_, _) => OnCheckForUpdatesNowClicked();
+
         var copyDiagnostics = new NativeMenuItem("Copy diagnostics");
         copyDiagnostics.Click += (_, _) => _controller.CopyDiagnostics();
 
@@ -67,6 +71,7 @@ internal sealed class LinuxTrayMenu
         _menu.Add(thresholdItem);
         _menu.Add(_runAtStartupItem);
         _menu.Add(_autoUpdateItem);
+        _menu.Add(checkForUpdatesNow);
         _menu.Add(new NativeMenuItemSeparator());
         _menu.Add(copyDiagnostics);
         _menu.Add(quit);
@@ -104,7 +109,7 @@ internal sealed class LinuxTrayMenu
 
         if (result.Failed)
         {
-            _showFailureNotification(
+            _showNotification(
                 "Run at startup",
                 result.Enabled
                     ? "O-view could not turn run at startup off. It is still set to run at startup."
@@ -117,5 +122,15 @@ internal sealed class LinuxTrayMenu
         var enabled = !_autoUpdateItem.IsChecked;
         _controller.SetAutoUpdate(enabled);
         _autoUpdateItem.IsChecked = enabled;
+    }
+
+    /// <summary>Runs the interactive check and reports whatever it finds via the same
+    /// notification surface the run-at-startup failure statement already uses (D7: a menu item
+    /// the user clicked on purpose must never answer with silence).</summary>
+    private async void OnCheckForUpdatesNowClicked()
+    {
+        var result = await _controller.CheckForUpdatesNow().ConfigureAwait(true);
+        var content = AlertNotificationFormatter.FormatManualCheck(result);
+        _showNotification(content.Summary, content.Body);
     }
 }

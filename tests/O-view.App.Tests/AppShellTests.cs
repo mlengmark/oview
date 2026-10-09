@@ -128,6 +128,19 @@ public class AppShellTests : IDisposable
     }
 
     [Fact]
+    public void RecordAnnouncedUpdateTag_updates_and_persists_the_tag()
+    {
+        var shell = CreateShell(out var pollLoop, out _);
+        using var pollLoopScope = pollLoop;
+
+        shell.RecordAnnouncedUpdateTag("v1.2.3");
+
+        Assert.Equal("v1.2.3", shell.Settings.LastAnnouncedUpdateTag);
+        var reloaded = new ShellSettingsStore(_directory).Load();
+        Assert.Equal("v1.2.3", reloaded.LastAnnouncedUpdateTag);
+    }
+
+    [Fact]
     public void WriteDiagnosticsBundle_writes_a_bundle_file()
     {
         var shell = CreateShell(out var pollLoop, out _);

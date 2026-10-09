@@ -1,4 +1,6 @@
 using OView.App;
+using OView.App.Updates;
+using OView.Core.Updates;
 
 namespace OView.Linux.Presentation;
 
@@ -26,6 +28,7 @@ internal sealed class LinuxMenuController
     private readonly ISkinToShell _shell;
     private readonly Func<ShellSettings> _loadCurrentSettings;
     private readonly IStartupRegistration _startup;
+    private readonly UpdateCadence _updateCadence;
 
     /// <param name="shell">Where every item's action goes, and the source of
     /// <see cref="ShellSettings"/> indirectly via <paramref name="loadCurrentSettings"/>.</param>
@@ -34,15 +37,22 @@ internal sealed class LinuxMenuController
     /// testable without <c>AppShell</c>.</param>
     /// <param name="startup">This skin's own run-at-startup mechanism (D3). Called directly,
     /// never through <paramref name="shell"/>, per D3's rejected alternative.</param>
-    public LinuxMenuController(ISkinToShell shell, Func<ShellSettings> loadCurrentSettings, IStartupRegistration startup)
+    /// <param name="updateCadence">ADR-0010 slicing table row 5's "Check for updates now" item
+    /// calls this directly, the same "shell declares, skin calls directly" shape
+    /// <paramref name="startup"/> already uses — not an <see cref="ISkinToShell"/> member, per
+    /// that slice's "adds no member to either seam".</param>
+    public LinuxMenuController(
+        ISkinToShell shell, Func<ShellSettings> loadCurrentSettings, IStartupRegistration startup, UpdateCadence updateCadence)
     {
         ArgumentNullException.ThrowIfNull(shell);
         ArgumentNullException.ThrowIfNull(loadCurrentSettings);
         ArgumentNullException.ThrowIfNull(startup);
+        ArgumentNullException.ThrowIfNull(updateCadence);
 
         _shell = shell;
         _loadCurrentSettings = loadCurrentSettings;
         _startup = startup;
+        _updateCadence = updateCadence;
     }
 
     /// <summary>
@@ -64,6 +74,14 @@ internal sealed class LinuxMenuController
     public void SetThresholdPercent(int percent) => _shell.SetThresholdPercent(percent);
 
     public void SetAutoUpdate(bool enabled) => _shell.SetAutoUpdate(enabled);
+
+    /// <summary>
+    /// Runs the same check the background cadence runs, interactively, and always returns a
+    /// real outcome (ADR-0010 D7) for <c>LinuxTrayMenu</c> to word via
+    /// <c>AlertNotificationFormatter.FormatManualCheck</c> — never silence, because the user
+    /// clicked this item on purpose.
+    /// </summary>
+    public Task<UpdateCheckResult> CheckForUpdatesNow() => _updateCadence.CheckNowAsync();
 
     public void CopyDiagnostics() => _shell.WriteDiagnosticsBundle();
 
