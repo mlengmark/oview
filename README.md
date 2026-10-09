@@ -6,26 +6,32 @@ usage allowance you've used, and when it resets. This repository is the
 taken into a new codebase with a stronger data/presentation boundary and a
 documentation trail from the first commit.
 
-> **Status (2026-10-09).** **Phases 1, 2 and 3 are complete**, and Phase 4 is
-> most of the way there. The display strings are out of the shared data layer
-> and into each skin's own formatter (Phase 1); Core reads Claude's data off
-> this machine, persists what it cannot recompute, and is driven by an
-> application shell (Phase 2); and the five presentation surfaces — status
-> icon, tooltip, detail window, alerts and the right-click menu — are built on
-> both Windows and Linux (Phase 3, all eleven
-> [ADR-0008](docs/adr/0008-presentation-skin-contract.md) slices built
-> 2026-10-04). **Phase 4** adds the controls and the shipping: its control
-> surface ([ADR-0009](docs/adr/0009-control-surface-contract.md), all ten
-> slices built) is finished, and its update execution and packaging
+> **Status (2026-10-09).** **Phases 1 and 2 are complete, and Phase 3 is
+> complete against [ADR-0008](docs/adr/0008-presentation-skin-contract.md) as
+> written**; Phase 4 is most of the way there. The display strings are out of
+> the shared data layer and into each skin's own formatter (Phase 1); Core
+> reads Claude's data off this machine, persists what it cannot recompute, and
+> is driven by an application shell (Phase 2); and the five presentation
+> surfaces — status icon, tooltip, detail window, alerts and the right-click
+> menu — are built on both Windows and Linux (Phase 3, all eleven ADR-0008
+> slices built 2026-10-04). **Phase 4** adds the controls and the shipping: its
+> control surface ([ADR-0009](docs/adr/0009-control-surface-contract.md), all
+> ten slices built) is finished, and its update execution and packaging
 > ([ADR-0010](docs/adr/0010-update-execution-and-packaging-contract.md), six of
 > ten slices built) is in progress. **No skin has yet been run on real
 > hardware**, so nothing here is verified against a live desktop.
 >
+> **Gate G7 is open (2026-10-09): design parity of the detail window and the
+> adjacent surfaces with [`mlengmark/O-view`](https://github.com/mlengmark/O-view).**
+> Phase 3 being complete against ADR-0008 is not the same as the rebuild being
+> finished: until G7 is answered, this repository is **not** to be described as
+> a complete rebuild and **not** to be used in place of the original.
+>
 > Board gates: **G0** (this repository), **G1** (target-architecture
 > sign-off) and **G4** (UI unification — **option A**: keep two native
 > windows, WPF on Windows and Avalonia on Linux, no shared UI layer) are all
-> decided. **G3** (macOS) and **G5** (a second AI source) remain open, and
-> neither Phase 3 nor Phase 4 needs either. See
+> decided. **G3** (macOS), **G5** (a second AI source) and **G7** (detail-window
+> design parity) remain open; neither Phase 3 nor Phase 4 needs G3 or G5. See
 > [`docs/adr/`](docs/adr/) for the
 > Core-to-skin data contract, the cross-platform capability matrix, and the
 > mechanism that replaced `PanelText.cs`'s centralization when its display
@@ -45,8 +51,11 @@ answers three questions at a glance:
 3. **Is my work drawing from the plan, or billing as extra usage?**
 
 It shows a colour-coded tray icon, a one-line tooltip on hover, a detail
-window with account info, usage bars, a per-model breakdown and a 31-day
-usage graph, a settings menu, and threshold-based desktop notifications.
+window with account info, usage figures and a per-model breakdown, a settings
+menu, and threshold-based desktop notifications. The 31-day window appears as
+a figure, not a graph: **a 31-day usage graph is planned, not shipped** —
+whether and how it is built is part of open gate **G7** (CONFIRMED
+2026-10-09: no chart or graph rendering exists in either skin).
 
 Two things are standing product policy, not incidental behaviour, and this
 rebuild does not renegotiate them:
@@ -177,13 +186,19 @@ cross-skin anti-drift harness `O-view.CrossSkin.Tests`. Build and test with
   single reading with a health signal, three local stores, and the
   `O-view.App` shell with its poll loop, settings file, single-instance
   guard, update check and redacted diagnostics bundle.
-- **Phase 3 — the presentation surfaces: complete.**
-  [ADR-0008](docs/adr/0008-presentation-skin-contract.md) is **Accepted**
-  (2026-10-02, board-merged PR #58; amended the same day by **D9**, which
-  adds the detail window's `ShowDetail(UsageDetail)` data path), and all
-  eleven slices of its table are built (last: PR #75, 2026-10-04). The
+- **Phase 3 — the presentation surfaces: complete against ADR-0008 as
+  written.** [ADR-0008](docs/adr/0008-presentation-skin-contract.md) is
+  **Accepted** (2026-10-02, board-merged PR #58; amended the same day by
+  **D9**, which adds the detail window's `ShowDetail(UsageDetail)` data path),
+  and all eleven slices of its table are built (last: PR #75, 2026-10-04). The
   status icon, tooltip, detail window and alerts exist in both skins — WPF
-  on Windows, Avalonia on Linux — each with its own wording.
+  on Windows, Avalonia on Linux — each with its own wording. **Open gate G7
+  (2026-10-09) holds that this is not yet design parity with the original**:
+  the detail window and its adjacent surfaces do not match
+  [`mlengmark/O-view`](https://github.com/mlengmark/O-view)'s, and until the
+  board answers G7, Phase 3's completeness against ADR-0008 does not make the
+  rebuild complete or ready to replace the original in use. The ADR-0008
+  amendment recording what G7 changes is tracked separately (OVI-585).
 - **Phase 4 — the controls and the shipping: one half complete, one half in
   progress.** Phase 4A,
   [ADR-0009](docs/adr/0009-control-surface-contract.md) (**Accepted**,
