@@ -456,6 +456,26 @@ public static class PanelTextFormatter
     public static string OffPlanNote(bool offPlan) => offPlan ? "incl. off-plan usage" : "";
 
     /// <summary>
+    /// The header account block's display name (ADR-0008 D9e, gate G7 parity slice P8): the
+    /// vendor's own string, relayed verbatim. <see cref="UsageFormatter.Usd"/>'s existing
+    /// "unknown" fallback when Core could read nothing at all — never a guessed name.
+    /// </summary>
+    public static string AccountDisplayName(AccountIdentity account) => account.DisplayName ?? "unknown";
+
+    /// <summary>The header account block's email address. See <see cref="AccountDisplayName"/>'s
+    /// remarks — same relay, same fallback.</summary>
+    public static string AccountEmail(AccountIdentity account) => account.EmailAddress ?? "unknown";
+
+    /// <summary>
+    /// The header's tier badge: Core's own <see cref="AccountIdentity.OrganizationType"/> token,
+    /// relayed verbatim — the same unrecognised-token-renders-as-is rule
+    /// <see cref="ModelUsageRow.ModelId"/> already carries (see <see cref="AccountIdentity"/>'s
+    /// remarks for why this skin maps no token to a friendlier word). Empty when Core read no
+    /// identity at all, so the caller can hide the badge pill rather than draw an empty one.
+    /// </summary>
+    public static string AccountTierBadge(AccountIdentity account) => account.OrganizationType ?? "";
+
+    /// <summary>
     /// The "Est. value/spend today" tile heading, which flips when usage goes off-plan —
     /// because then it genuinely is spend, not a modelled value within a plan that already
     /// costs nothing marginal.

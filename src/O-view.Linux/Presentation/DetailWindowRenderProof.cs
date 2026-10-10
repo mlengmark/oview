@@ -1,6 +1,7 @@
 using System.IO;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using OView.App;
@@ -135,7 +136,8 @@ public static class DetailWindowRenderProof
     private static Border BuildVisual(DetailWindowContent content, LinuxWindowThemeColors colors)
     {
         var stack = new StackPanel { Margin = new Thickness(12) };
-        stack.Children.Add(Line(content.Freshness, colors));
+        stack.Children.Add(BuildHeader(content, colors));
+        stack.Children.Add(new Separator { Margin = new Thickness(0, 8, 0, 8), Background = ToBrush(colors.Border) });
         stack.Children.Add(Line(content.SessionLine, colors));
         stack.Children.Add(BuildBar(content.SessionBarFraction, content.SessionBarBand, colors));
         if (content.WeeklyState != WeeklyBarState.Hidden)
@@ -203,6 +205,51 @@ public static class DetailWindowRenderProof
             Background = ToBrush(LinuxWindowThemePalette.BandColor(band)),
         },
     };
+
+    /// <summary>
+    /// The header (ADR-0008 D2 §B, gate G7 parity slice P8), mirroring
+    /// <see cref="DetailWindow.BuildHeader"/> — hand-duplicated, not shared, per this class's
+    /// own remarks: the title and freshness line at the left, the account block (display name,
+    /// email, tier badge) at the right.
+    /// </summary>
+    private static Grid BuildHeader(DetailWindowContent content, LinuxWindowThemeColors colors)
+    {
+        var left = new StackPanel();
+        left.Children.Add(new TextBlock { Text = "O-view", FontWeight = FontWeight.Bold, FontSize = 14, Foreground = ToBrush(colors.Foreground) });
+        left.Children.Add(Line(content.Freshness, colors));
+
+        var right = new StackPanel { HorizontalAlignment = HorizontalAlignment.Right };
+        right.Children.Add(Line(content.AccountDisplayName, colors));
+        right.Children.Add(Line(content.AccountEmail, colors));
+
+        if (!string.IsNullOrEmpty(content.AccountTierBadge))
+        {
+            right.Children.Add(new Border
+            {
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(6, 1, 6, 1),
+                Margin = new Thickness(0, 2, 0, 0),
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Background = ToBrush(colors.Accent),
+                Child = new TextBlock
+                {
+                    Text = content.AccountTierBadge,
+                    FontSize = 10,
+                    FontWeight = FontWeight.SemiBold,
+                    Foreground = Brushes.White,
+                },
+            });
+        }
+
+        var header = new Grid();
+        header.ColumnDefinitions.Add(new ColumnDefinition());
+        header.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+        Grid.SetColumn(right, 1);
+        header.Children.Add(left);
+        header.Children.Add(right);
+
+        return header;
+    }
 
     private static TextBlock Line(string text, LinuxWindowThemeColors colors) => new()
     {

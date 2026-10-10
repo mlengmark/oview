@@ -426,4 +426,25 @@ public static class PanelTextFormatter
             : $"No usage billed to credits ({models}) in the last 31 days. Off-plan usage while "
               + "O-view was not running is not captured.";
     }
+
+    /// <summary>
+    /// The header account block's display name (ADR-0008 D9e, gate G7 parity slice P8): the
+    /// vendor's own string, relayed verbatim. Falls back to this skin's own "n/a" convention
+    /// (see <see cref="UsageFormatter.Usd"/>) when Core could read no identity at all — never a
+    /// guessed name.
+    /// </summary>
+    public static string AccountDisplayName(AccountIdentity account) => account.DisplayName ?? "n/a";
+
+    /// <summary>The header account block's email address. See <see cref="AccountDisplayName"/>'s
+    /// remarks — same relay, same fallback.</summary>
+    public static string AccountEmail(AccountIdentity account) => account.EmailAddress ?? "n/a";
+
+    /// <summary>
+    /// The header's tier badge: Core's own <see cref="AccountIdentity.OrganizationType"/> token,
+    /// relayed verbatim, worded independently from <c>O-view.Tray</c> (ADR-0003) — this skin
+    /// maps no token to a friendlier word either, for the same reason
+    /// <see cref="AccountIdentity"/>'s remarks give. Empty when Core read no identity at all, so
+    /// the caller can hide the badge pill rather than draw an empty one.
+    /// </summary>
+    public static string AccountTierBadge(AccountIdentity account) => account.OrganizationType ?? "";
 }

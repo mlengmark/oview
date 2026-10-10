@@ -24,6 +24,38 @@ public sealed class DetailWindowContentBuilderTests
         Assert.Equal("No data", content.Freshness);
     }
 
+    /// <summary>
+    /// Gate G7 parity slice P8 (OVI-645): the header's account block never guesses a name,
+    /// email or tier when <see cref="UsageDetail.Account"/> is
+    /// <see cref="AccountIdentity.Unavailable"/> — the sentinel this skin's own
+    /// <see cref="PanelTextFormatter.AccountDisplayName"/>/<see cref="PanelTextFormatter.AccountEmail"/>
+    /// already fall back to.
+    /// </summary>
+    [Fact]
+    public void Unavailable_account_identity_shows_the_unavailable_sentinel_never_a_guess()
+    {
+        var content = DetailWindowContentBuilder.Build(UsageDetail.Unavailable, UtcNow, TimeZoneInfo.Utc);
+
+        Assert.Equal("unknown", content.AccountDisplayName);
+        Assert.Equal("unknown", content.AccountEmail);
+        Assert.Equal("", content.AccountTierBadge);
+    }
+
+    [Fact]
+    public void A_known_account_identity_is_relayed_onto_the_header_fields()
+    {
+        var detail = UsageDetail.Unavailable with
+        {
+            Account = new AccountIdentity("Jane Doe", "jane@example.com", "claude_max", UsageValueStatus.Real),
+        };
+
+        var content = DetailWindowContentBuilder.Build(detail, UtcNow, TimeZoneInfo.Utc);
+
+        Assert.Equal("Jane Doe", content.AccountDisplayName);
+        Assert.Equal("jane@example.com", content.AccountEmail);
+        Assert.Equal("claude_max", content.AccountTierBadge);
+    }
+
     [Fact]
     public void Unavailable_model_breakdown_admits_it_could_not_be_read_not_a_fabricated_empty_window()
     {

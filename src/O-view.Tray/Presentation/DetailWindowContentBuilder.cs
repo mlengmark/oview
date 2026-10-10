@@ -52,6 +52,9 @@ public enum WeeklyBarState
 /// </summary>
 public sealed record DetailWindowContent(
     string Freshness,
+    string AccountDisplayName,
+    string AccountEmail,
+    string AccountTierBadge,
     string SessionLine,
     double SessionBarFraction,
     UsageBarBand SessionBarBand,
@@ -88,6 +91,9 @@ public static class DetailWindowContentBuilder
 
         return new DetailWindowContent(
             Freshness: PanelTextFormatter.Freshness(snapshot, utcNow, displayZone),
+            AccountDisplayName: PanelTextFormatter.AccountDisplayName(detail.Account),
+            AccountEmail: PanelTextFormatter.AccountEmail(detail.Account),
+            AccountTierBadge: PanelTextFormatter.AccountTierBadge(detail.Account),
             SessionLine: PercentLine("5h", snapshot.SessionUtilizationPercent)
                 + " · " + PanelTextFormatter.SessionReset(snapshot.SessionResetAt, utcNow, displayZone),
             SessionBarFraction: BarFraction(snapshot.SessionUtilizationPercent),

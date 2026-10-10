@@ -1,4 +1,5 @@
 using OView.Core.Models;
+using OView.Core.Providers;
 using OView.Core.Statistics;
 
 namespace OView.App;
@@ -30,6 +31,7 @@ public sealed class DetailPushCoordinator
     public static readonly TimeSpan IconClickAwayGrace = TimeSpan.FromMilliseconds(400);
 
     private readonly IUsageStatisticsSource _statistics;
+    private readonly IAccountIdentitySource _identity;
     private readonly IShellToSkin _skin;
     private readonly IClock _clock;
     private readonly TimeZoneInfo _zone;
@@ -38,14 +40,17 @@ public sealed class DetailPushCoordinator
     private UsageSnapshot _lastSnapshot = UsageSnapshot.Unavailable;
     private DateTimeOffset _lastHiddenAt = DateTimeOffset.MinValue;
 
-    public DetailPushCoordinator(IUsageStatisticsSource statistics, IShellToSkin skin, IClock clock, TimeZoneInfo zone)
+    public DetailPushCoordinator(
+        IUsageStatisticsSource statistics, IAccountIdentitySource identity, IShellToSkin skin, IClock clock, TimeZoneInfo zone)
     {
         ArgumentNullException.ThrowIfNull(statistics);
+        ArgumentNullException.ThrowIfNull(identity);
         ArgumentNullException.ThrowIfNull(skin);
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(zone);
 
         _statistics = statistics;
+        _identity = identity;
         _skin = skin;
         _clock = clock;
         _zone = zone;
@@ -117,17 +122,16 @@ public sealed class DetailPushCoordinator
         var utcNow = _clock.UtcNow;
         var statistics = _statistics.GetStatistics(utcNow, _zone);
         var models = _statistics.GetModelBreakdown(utcNow, _zone);
+        var identity = _identity.GetIdentity();
 
         if (statistics == UsageStatistics.Unavailable || models == ModelUsageBreakdown.Unavailable)
         {
-            _skin.ShowDetail(UsageDetail.Unavailable);
+            _skin.ShowDetail(UsageDetail.Unavailable with { Account = identity });
             return;
         }
 
-        // ADR-0008 D9e/D9g (gate G7 parity P6, OVI-635): the four members below ride the same
-        // push as Statistics/Models above — no new seam member, no second schedule. Account
-        // (D9e's fifth new member) is a separate slice (P7) and stays at its Unavailable
-        // default here.
+        // ADR-0008 D9e/D9g (gate G7 parity P6/P8, OVI-635/OVI-645): these members ride the same
+        // push as Statistics/Models above — no new seam member, no second schedule.
         var history = _statistics.GetDailySeries(utcNow, _zone);
         var resetBoundaries = _statistics.GetResetBoundaries(utcNow, _zone);
         var tokensToday = _statistics.GetTokenKindTotals(utcNow, _zone, StatisticsWindow.Today);
@@ -135,6 +139,7 @@ public sealed class DetailPushCoordinator
 
         var detail = new UsageDetail(snapshot, statistics, models)
         {
+            Account = identity,
             History = history,
             ResetBoundaries = resetBoundaries,
             TokensToday = tokensToday,

@@ -280,4 +280,29 @@ public class PanelTextFormatterTests
         Assert.Contains("next check", result);
         Assert.Contains("Nothing is wrong with your connection", result);
     }
+
+    [Fact]
+    public void AccountDisplayNameAndEmailRelayTheVendorsOwnStringsVerbatim()
+    {
+        var account = new AccountIdentity("Jane Doe", "jane@example.com", "claude_max", UsageValueStatus.Real);
+
+        Assert.Equal("Jane Doe", PanelTextFormatter.AccountDisplayName(account));
+        Assert.Equal("jane@example.com", PanelTextFormatter.AccountEmail(account));
+    }
+
+    [Fact]
+    public void AccountTierBadgeRelaysAnUnrecognisedOrganizationTypeTokenVerbatim()
+    {
+        var account = new AccountIdentity("Jane Doe", "jane@example.com", "some_future_tier", UsageValueStatus.Real);
+
+        Assert.Equal("some_future_tier", PanelTextFormatter.AccountTierBadge(account));
+    }
+
+    [Fact]
+    public void AnUnavailableIdentityNeverGuessesANameEmailOrTier()
+    {
+        Assert.Equal("unknown", PanelTextFormatter.AccountDisplayName(AccountIdentity.Unavailable));
+        Assert.Equal("unknown", PanelTextFormatter.AccountEmail(AccountIdentity.Unavailable));
+        Assert.Equal("", PanelTextFormatter.AccountTierBadge(AccountIdentity.Unavailable));
+    }
 }

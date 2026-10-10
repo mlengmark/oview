@@ -1,4 +1,5 @@
 using OView.Core.Models;
+using OView.Core.Providers;
 using OView.Core.Statistics;
 
 namespace OView.App.Tests;
@@ -12,6 +13,7 @@ namespace OView.App.Tests;
 public sealed class DetailPushCoordinatorTests
 {
     private static readonly TimeZoneInfo Zone = TimeZoneInfo.Utc;
+    private static readonly IAccountIdentitySource Identity = new FakeAccountIdentitySource(AccountIdentity.Unavailable);
 
     private static UsageSnapshot Snapshot(DateTimeOffset lastIngestAt) => new(
         DataSourceKind.Live,
@@ -42,7 +44,7 @@ public sealed class DetailPushCoordinatorTests
     {
         var skin = new FakeSkin();
         var source = new FakeStatisticsSource(RealStatistics(), RealBreakdown());
-        var coordinator = new DetailPushCoordinator(source, skin, new FakeClock(DateTimeOffset.UnixEpoch), Zone);
+        var coordinator = new DetailPushCoordinator(source, Identity, skin, new FakeClock(DateTimeOffset.UnixEpoch), Zone);
         var snapshot = Snapshot(DateTimeOffset.UnixEpoch);
         coordinator.OnPollSucceeded(snapshot);
         skin.LastDetail = null;
@@ -59,7 +61,7 @@ public sealed class DetailPushCoordinatorTests
     {
         var skin = new FakeSkin();
         var source = new FakeStatisticsSource(RealStatistics(), RealBreakdown());
-        var coordinator = new DetailPushCoordinator(source, skin, new FakeClock(DateTimeOffset.UnixEpoch), Zone);
+        var coordinator = new DetailPushCoordinator(source, Identity, skin, new FakeClock(DateTimeOffset.UnixEpoch), Zone);
 
         coordinator.OnRequestWidget(false);
 
@@ -73,7 +75,7 @@ public sealed class DetailPushCoordinatorTests
     {
         var skin = new FakeSkin();
         var source = new FakeStatisticsSource(RealStatistics(), RealBreakdown());
-        var coordinator = new DetailPushCoordinator(source, skin, new FakeClock(DateTimeOffset.UnixEpoch), Zone);
+        var coordinator = new DetailPushCoordinator(source, Identity, skin, new FakeClock(DateTimeOffset.UnixEpoch), Zone);
         coordinator.OnRequestWidget(true);
         source.CallCount = 0;
 
@@ -89,7 +91,7 @@ public sealed class DetailPushCoordinatorTests
     {
         var skin = new FakeSkin();
         var source = new FakeStatisticsSource(RealStatistics(), RealBreakdown());
-        var coordinator = new DetailPushCoordinator(source, skin, new FakeClock(DateTimeOffset.UnixEpoch), Zone);
+        var coordinator = new DetailPushCoordinator(source, Identity, skin, new FakeClock(DateTimeOffset.UnixEpoch), Zone);
 
         coordinator.OnPollSucceeded(Snapshot(DateTimeOffset.UnixEpoch));
 
@@ -102,7 +104,7 @@ public sealed class DetailPushCoordinatorTests
     {
         var skin = new FakeSkin();
         var source = new FakeStatisticsSource(RealStatistics(), RealBreakdown());
-        var coordinator = new DetailPushCoordinator(source, skin, new FakeClock(DateTimeOffset.UnixEpoch), Zone);
+        var coordinator = new DetailPushCoordinator(source, Identity, skin, new FakeClock(DateTimeOffset.UnixEpoch), Zone);
         coordinator.OnRequestWidget(true);
         coordinator.OnRequestWidget(false);
         skin.LastDetail = null;
@@ -119,11 +121,49 @@ public sealed class DetailPushCoordinatorTests
     {
         var skin = new FakeSkin();
         var source = new FakeStatisticsSource(UsageStatistics.Unavailable, ModelUsageBreakdown.Unavailable);
-        var coordinator = new DetailPushCoordinator(source, skin, new FakeClock(DateTimeOffset.UnixEpoch), Zone);
+        var coordinator = new DetailPushCoordinator(source, Identity, skin, new FakeClock(DateTimeOffset.UnixEpoch), Zone);
 
         coordinator.OnRequestWidget(true);
 
         Assert.Equal(UsageDetail.Unavailable, skin.LastDetail);
+    }
+
+    /// <summary>
+    /// Wires the detail window's account block (ADR-0008 D9e, gate G7 parity slice P8): the
+    /// pushed <see cref="UsageDetail.Account"/> carries whatever <see cref="IAccountIdentitySource"/>
+    /// returned, not a fabricated value and not always <see cref="AccountIdentity.Unavailable"/>.
+    /// </summary>
+    [Fact]
+    public void A_known_identity_is_carried_onto_the_pushed_detail()
+    {
+        var skin = new FakeSkin();
+        var source = new FakeStatisticsSource(RealStatistics(), RealBreakdown());
+        var identity = new FakeAccountIdentitySource(
+            new AccountIdentity("Jane Doe", "jane@example.com", "claude_max", UsageValueStatus.Real));
+        var coordinator = new DetailPushCoordinator(source, identity, skin, new FakeClock(DateTimeOffset.UnixEpoch), Zone);
+
+        coordinator.OnRequestWidget(true);
+
+        Assert.Equal("Jane Doe", skin.LastDetail?.Account.DisplayName);
+    }
+
+    /// <summary>
+    /// The identity read is attempted even when the ledger read failed — the two sources are
+    /// independent, so a missing statistics file must not also blank out an identity Core could
+    /// read.
+    /// </summary>
+    [Fact]
+    public void A_known_identity_is_carried_even_when_statistics_are_unavailable()
+    {
+        var skin = new FakeSkin();
+        var source = new FakeStatisticsSource(UsageStatistics.Unavailable, ModelUsageBreakdown.Unavailable);
+        var identity = new FakeAccountIdentitySource(
+            new AccountIdentity("Jane Doe", "jane@example.com", "claude_max", UsageValueStatus.Real));
+        var coordinator = new DetailPushCoordinator(source, identity, skin, new FakeClock(DateTimeOffset.UnixEpoch), Zone);
+
+        coordinator.OnRequestWidget(true);
+
+        Assert.Equal("Jane Doe", skin.LastDetail?.Account.DisplayName);
     }
 
     [Fact]
@@ -131,7 +171,7 @@ public sealed class DetailPushCoordinatorTests
     {
         var skin = new FakeSkin();
         var source = new FakeStatisticsSource(RealStatistics(), RealBreakdown());
-        var coordinator = new DetailPushCoordinator(source, skin, new FakeClock(DateTimeOffset.UnixEpoch), Zone);
+        var coordinator = new DetailPushCoordinator(source, Identity, skin, new FakeClock(DateTimeOffset.UnixEpoch), Zone);
 
         coordinator.OnIconActivated();
 
@@ -144,7 +184,7 @@ public sealed class DetailPushCoordinatorTests
         var skin = new FakeSkin();
         var source = new FakeStatisticsSource(RealStatistics(), RealBreakdown());
         var clock = new FakeClock(DateTimeOffset.UnixEpoch);
-        var coordinator = new DetailPushCoordinator(source, skin, clock, Zone);
+        var coordinator = new DetailPushCoordinator(source, Identity, skin, clock, Zone);
         coordinator.OnIconActivated();
 
         coordinator.OnIconActivated();
@@ -158,7 +198,7 @@ public sealed class DetailPushCoordinatorTests
         var skin = new FakeSkin();
         var source = new FakeStatisticsSource(RealStatistics(), RealBreakdown());
         var clock = new FakeClock(DateTimeOffset.UnixEpoch);
-        var coordinator = new DetailPushCoordinator(source, skin, clock, Zone);
+        var coordinator = new DetailPushCoordinator(source, Identity, skin, clock, Zone);
         coordinator.OnRequestWidget(true);
         coordinator.OnRequestWidget(false); // the window's own Deactivated handler
         clock.UtcNow = clock.UtcNow.AddMilliseconds(399);
@@ -175,7 +215,7 @@ public sealed class DetailPushCoordinatorTests
         var skin = new FakeSkin();
         var source = new FakeStatisticsSource(RealStatistics(), RealBreakdown());
         var clock = new FakeClock(DateTimeOffset.UnixEpoch);
-        var coordinator = new DetailPushCoordinator(source, skin, clock, Zone);
+        var coordinator = new DetailPushCoordinator(source, Identity, skin, clock, Zone);
         coordinator.OnRequestWidget(true);
         coordinator.OnRequestWidget(false); // the window's own Deactivated handler
         clock.UtcNow = clock.UtcNow.AddMilliseconds(401);
@@ -234,6 +274,15 @@ public sealed class DetailPushCoordinatorTests
         public FakeClock(DateTimeOffset utcNow) => UtcNow = utcNow;
 
         public DateTimeOffset UtcNow { get; set; }
+    }
+
+    private sealed class FakeAccountIdentitySource : IAccountIdentitySource
+    {
+        private readonly AccountIdentity _identity;
+
+        public FakeAccountIdentitySource(AccountIdentity identity) => _identity = identity;
+
+        public AccountIdentity GetIdentity() => _identity;
     }
 
     private sealed class FakeSkin : IShellToSkin
