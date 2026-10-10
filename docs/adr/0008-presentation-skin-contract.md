@@ -253,6 +253,30 @@ plainly-centred does not.
 > identifier, which Linux does not reliably give (INFERRED) — a Windows-first
 > mechanism, which is the shape D4 exists to refuse.
 
+**2026-10-10 built (OVI-620, G7 parity slice P1).** `DetailWindowPositionController`
+in both skins now takes `Func<ScreenRect, bool> isOnScreen` plus the window's
+fixed width/height; `ResolveShowPosition()` builds a `ScreenRect` from the saved
+point and those dimensions, calls the predicate, and only returns the saved
+position when it accepts — otherwise it falls through to the exact same
+`computeFirstShowPlacement()` call a never-saved position already used, which is
+how "falls back to first placement" and "centre when no geometry can be read"
+turn out to be the same code path rather than two. `ScreenRect` (a plain
+`X, Y, Width, Height` record struct, named apart from the WPF/Avalonia `Rect`
+types already in scope in both files) and the full-containment arithmetic
+(`DetailWindowOnScreenCheck.IsFullyOnScreen`) are each duplicated per skin (D1),
+with a cross-skin fixture holding the two to the same on/off-screen verdict for
+a given rectangle (D5). The real predicate — enumerating every current monitor's
+work area on Windows (`System.Windows.Forms.Screen.AllScreens`) or every current
+`Screens` entry on Linux — is adapter code in each composition root, not unit
+tested, same boundary as every other real-environment read in this repository;
+`DetailWindowOnScreenCheck` itself is proven against fakes, including the
+partial-intersection case named above. Linux's existing request-vs-granted
+logging (`DetailWindow.SetVisible`) already ran on every show, restore included,
+so this slice needed no change there — it was never scoped to first placement
+only. No `UsageDetail`/panel-content state is touched, so D11a's render-proof
+obligation does not apply to this slice; the existing offscreen render hook
+(P0) is unaffected.
+
 ### D5 — The corner rule is duplicated on purpose, and held together by a test rather than by a shared type
 
 The source repository moved the corner rule into shared code
