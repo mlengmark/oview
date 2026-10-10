@@ -67,6 +67,10 @@ public sealed record DetailWindowContent(
     string TodayLine,
     string Window31dLine,
     string Caveat,
+    TokenKindBar TokenKindBarToday,
+    TokenKindBar TokenKindBarWindow31d,
+    IReadOnlyList<TokenKindBreakdownRow> TokenKindBreakdownRows,
+    string TokenKindSectionNote,
     IReadOnlyList<DetailWindowModelRow> ModelRows,
     string ModelSectionNote);
 
@@ -111,6 +115,10 @@ public static class DetailWindowContentBuilder
             Window31dLine: "31-day window: " + UsageFormatter.Tokens(stats.OutputTokensWindow31d)
                 + " tokens, " + UsageFormatter.Usd(stats.EstimatedValueWindow31d) + " estimated value",
             Caveat: PanelTextFormatter.Caveat(stats),
+            TokenKindBarToday: TokenKindBarFormatter.BuildBar("Today", detail.TokensToday),
+            TokenKindBarWindow31d: TokenKindBarFormatter.BuildBar("31 days", detail.Tokens31d),
+            TokenKindBreakdownRows: TokenKindBarFormatter.BuildBreakdownRows(detail.TokensToday, detail.Tokens31d),
+            TokenKindSectionNote: TokenKindSectionNote(detail.TokensToday, detail.Tokens31d),
             ModelRows: BuildModelRows(detail.Models),
             ModelSectionNote: ModelSectionNote(detail.Models, stats.UnpricedModels));
     }
@@ -249,4 +257,15 @@ public static class DetailWindowContentBuilder
             ? "Partial total — " + string.Join(", ", unpriced.ModelIds) + " has no published rate."
             : "";
     }
+
+    /// <summary>
+    /// States plainly when neither window's token-kind totals could be read (gate G7 parity
+    /// slice P12). Worded independently from the Windows skin (ADR-0003). Empty once either
+    /// window is <see cref="UsageValueStatus.Real"/>, matching <see cref="TokenKindBar.HasData"/>'s
+    /// own per-bar fallback.
+    /// </summary>
+    private static string TokenKindSectionNote(TokenKindTotals today, TokenKindTotals window31d) =>
+        today.Status != UsageValueStatus.Real && window31d.Status != UsageValueStatus.Real
+            ? "Token-kind totals not available."
+            : "";
 }

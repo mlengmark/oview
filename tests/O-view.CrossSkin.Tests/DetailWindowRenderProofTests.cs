@@ -90,5 +90,39 @@ public sealed class DetailWindowRenderProofTests : IDisposable
         Assert.True(new FileInfo(path).Length > 0, $"[hover/{theme}] wrote an empty file.");
     }
 
+    /// <summary>
+    /// ADR-0008 D11a's render-proof obligation, applied to gate G7 parity slice P12: the
+    /// token-kind breakdown table's view-switch state renders in both themes, for both skins,
+    /// using <see cref="DetailWindowFixtures.TokenKindTotalsPopulated"/> so the breakdown rows
+    /// are non-empty.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Themes))]
+    public void TrayRenderProofCapturesTheTokenKindBreakdownTableInBothThemes(ThemePreference theme)
+    {
+        var path = Path.Combine(_directory, $"tray-token-kind-breakdown-{theme}.png");
+
+        OView.Tray.Presentation.DetailWindowRenderProof.RenderToFile(
+            DetailWindowFixtures.TokenKindTotalsPopulated.Detail, theme, path, UtcNow,
+            DetailWindowFixtures.TokenKindTotalsPopulated.DisplayZone, showTokenKindBreakdown: true);
+
+        Assert.True(File.Exists(path), $"[token-kind-breakdown/{theme}] wrote no file.");
+        Assert.True(new FileInfo(path).Length > 0, $"[token-kind-breakdown/{theme}] wrote an empty file.");
+    }
+
+    [Theory]
+    [MemberData(nameof(Themes))]
+    public void LinuxRenderProofCapturesTheTokenKindBreakdownTableInBothThemes(ThemePreference theme)
+    {
+        var path = Path.Combine(_directory, $"linux-token-kind-breakdown-{theme}.png");
+
+        OView.Linux.Presentation.DetailWindowRenderProof.RenderToFile(
+            DetailWindowFixtures.TokenKindTotalsPopulated.Detail, theme, path, UtcNow,
+            DetailWindowFixtures.TokenKindTotalsPopulated.DisplayZone, showTokenKindBreakdown: true);
+
+        Assert.True(File.Exists(path), $"[token-kind-breakdown/{theme}] wrote no file.");
+        Assert.True(new FileInfo(path).Length > 0, $"[token-kind-breakdown/{theme}] wrote an empty file.");
+    }
+
     public void Dispose() => Directory.Delete(_directory, recursive: true);
 }
