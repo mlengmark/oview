@@ -10,7 +10,8 @@
   OVI-324/OVI-342); 2026-10-09 (D9b, OVI-601); 2026-10-09 (**gate G7 parity** —
   D4 off-screen fallback, D9e–D9h, new D10, new D11; OVI-585, accepted by the
   board on OVI-591, card `4e515cef`; D9e–D9h transcribed by OVI-602, the rest by
-  OVI-607)
+  OVI-607); 2026-10-10 (slice P2 built, OVI-621 — "built" note under D11, no
+  decision text changed)
 - **Deciders:** Adrian II the Architect, signed off by the board
 - **Scope:** Phase 3 — the tray/status icon, the tooltip, the detail window, the
   alerts, and wiring Phase 2's providers and app shell into each platform's own
@@ -825,6 +826,34 @@ bug by measurement — timings set once on the control silently did not inherit 
 the bar segments (CONFIRMED, source `docs/ui-spec.md` §2) — and a render cannot
 show it. Its Linux half is waiver candidate **W1** in
 [`docs/parity/g7-detail-window-parity.md`](../parity/g7-detail-window-parity.md).
+
+**2026-10-10 built (OVI-621, G7 parity slice P2).** `HoverCard` exists in both
+skins' own `Presentation/` — independently implemented (D1) — with the two
+shapes this section specifies, `Figure` (number, muted caption beneath, optional
+colour swatch) and `Text` (a sentence), each wrapped in a bordered card on the
+window's own `WindowThemeColors`/`LinuxWindowThemeColors`, never the toolkit's
+default tooltip chrome. `ApplyTiming` is called per element, never on a shared
+container, matching the source's own finding; `HoverCardTests` in each skin's
+test project proves the delays resolve independently on at least three distinct
+elements and do not reach a sibling or a child through a container (the
+`HoverTimingFixture` fixture, run against each skin's own timing surface rather
+than as a cross-skin content-fact comparison — D11b already names it as "the one
+that is not a string"). `DetailWindowRenderProof` (P0) gained
+`RenderHoverCardsToFile`, rendering both shapes stacked with no live pointer and
+no `ToolTip` parent (a `ToolTip`/Avalonia tip cannot be given one), proven by
+`O-view.CrossSkin.Tests` in both themes for both skins.
+
+**Windows achieves all three WPF timings** (`InitialShowDelay`/
+`BetweenShowDelay`/`ShowDuration` — 400/3000/20 000 ms). **Linux achieves two of
+three.** Reflecting `Avalonia.Controls.dll` 12.1.3 found `ToolTip.ShowDelay` and
+`ToolTip.BetweenShowDelay` (both applied), and confirmed **no `ShowDuration`
+equivalent exists anywhere in the assembly** — resolving waiver candidate W1's
+"INFERRED unverified" to CONFIRMED (ADR-0002's 2026-10-10 amendment carries the
+new row). This slice does not build a custom popup/timer reimplementation to
+fake the missing cap; W1 itself is still an open card awaiting the board. No
+`UsageDetail`/panel-content state changed, and this slice does not wire any
+detail-window section (B-H) to use `HoverCard` — that is each of P8-P19's own
+obligation, per this table's boundary note on slice P2.
 
 **2026-10-10 built (OVI-622, G7 parity slice P3).** Both skins' `DetailWindow`
 widens `DefaultWidth` from 320 to 400 px, matching the source's own `ui-spec.md`

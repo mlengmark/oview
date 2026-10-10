@@ -47,15 +47,27 @@ first, and the figures light up when the rate card lands.
 
 **W1 — §I's hover timing may not be expressible on Linux.** 400 ms initial
 delay, 3 000 ms between-show, 20 s show duration are three WPF `ToolTipService`
-properties. Avalonia exposes an initial show delay; whether it exposes the other
-two is **INFERRED unverified**. *What the source does:* sets all three, per
-element, on Windows. *Proposed instead:* 400 ms on both platforms; between-show
-and show-duration on Windows; on Linux, whatever the toolkit actually exposes,
-with the shortfall written into ADR-0002 as a named platform limit rather than
-faked. *What the user loses:* on Linux, sliding along bar segments may re-wait
-per segment, and a card may dismiss on the toolkit's schedule. *Verification
-owed before the card is decided:* read Avalonia's tooltip surface and replace the
-label.
+properties. *What the source does:* sets all three, per element, on Windows.
+*Proposed instead:* 400 ms on both platforms; between-show and show-duration on
+Windows; on Linux, whatever the toolkit actually exposes, with the shortfall
+written into ADR-0002 as a named platform limit rather than faked. *What the
+user loses:* on Linux, sliding along bar segments may re-wait per segment, and a
+card may dismiss on the toolkit's schedule.
+
+> **2026-10-10 verification done (OVI-621, slice P2).** The INFERRED label
+> above is resolved to **CONFIRMED**, in the direction this card already
+> expected: `Avalonia.Controls.dll` 12.1.3 exposes `ToolTip.ShowDelay` and
+> `ToolTip.BetweenShowDelay` (both now applied by `HoverCard.ApplyTiming` on
+> Linux; `HoverCardTests` pins each resolving per element, not by inheritance)
+> — but **no `ShowDuration` property exists anywhere in the assembly**, under
+> any name, attached or otherwise. Avalonia's tooltip closes on pointer-exit
+> only and exposes no hook to cap or extend that. ADR-0002 now carries this as
+> a named row (2026-10-10 amendment) rather than an open question. **This
+> slice does not build a custom popup/timer reimplementation to fake the 20 s
+> cap** — that is exactly the "shortfall... faked" this card was written to
+> avoid, and the "proposed instead" column above still needs the board's
+> acceptance before it is more than a proposal. **The card itself is still
+> open** — this only supplies the verification it was waiting on.
 
 **W2 — §D/§I's hover-only per-model figures are an accessibility defect the
 source documents as a known limitation.** Porting it ports the defect. This is
