@@ -18,6 +18,34 @@ public sealed record DetailWindowModelRow(
     string EstimatedSpend);
 
 /// <summary>
+/// The 50/70 colour band a usage bar's fill falls into (ADR-0008 D10b, gate G7 parity slice P9):
+/// the percent and its status are Core's; the band boundaries, like the fill width itself, are
+/// this skin's own presentation decision over a figure Core already handed over. Green below
+/// 50%, amber from 50% up to (not including) 70%, red from 70% up — so 49 is green, 50 and 69
+/// are amber, 70 is red.
+/// </summary>
+public enum UsageBarBand
+{
+    Green,
+    Amber,
+    Red,
+}
+
+/// <summary>
+/// Which of the weekly row's three states applies (ADR-0008 D9f, gate G7 parity slice P9, source
+/// <c>ui-spec.md</c> §"Usage bars"): a reported reset instant, plan data with no reset observed
+/// yet, or no plan data at all. <see cref="UsageSnapshot.WeeklyResetAt"/>'s own status and
+/// <see cref="UsageSnapshot.DataSourceKind"/> already distinguish all three — no new Core field
+/// was needed (D9f).
+/// </summary>
+public enum WeeklyBarState
+{
+    Known,
+    NotKnown,
+    Hidden,
+}
+
+/// <summary>
 /// Everything the detail window renders, built once from one <see cref="UsageDetail"/> and
 /// nothing else (ADR-0008 D9c) — the window draws this record and reads no other source, so it
 /// can never pair a percent from one poll with statistics from an earlier one.
@@ -25,7 +53,13 @@ public sealed record DetailWindowModelRow(
 public sealed record DetailWindowContent(
     string Freshness,
     string SessionLine,
+    double SessionBarFraction,
+    UsageBarBand SessionBarBand,
     string WeeklyLine,
+    WeeklyBarState WeeklyState,
+    double WeeklyBarFraction,
+    UsageBarBand WeeklyBarBand,
+    string WeeklyUnknownHint,
     string ExtraUsageLine,
     string TodayLine,
     string Window31dLine,
@@ -50,13 +84,19 @@ public static class DetailWindowContentBuilder
     {
         var snapshot = detail.Snapshot;
         var stats = detail.Statistics;
+        var weeklyState = ResolveWeeklyState(snapshot);
 
         return new DetailWindowContent(
             Freshness: PanelTextFormatter.Freshness(snapshot, utcNow, displayZone),
             SessionLine: PercentLine("5h", snapshot.SessionUtilizationPercent)
                 + " · " + PanelTextFormatter.SessionReset(snapshot.SessionResetAt, utcNow, displayZone),
-            WeeklyLine: PercentLine("7d", snapshot.WeeklyUtilizationPercent)
-                + " · " + WeeklyResetLine(snapshot.WeeklyResetAt, utcNow, displayZone),
+            SessionBarFraction: BarFraction(snapshot.SessionUtilizationPercent),
+            SessionBarBand: Band(snapshot.SessionUtilizationPercent),
+            WeeklyLine: WeeklyLine(weeklyState, snapshot, utcNow, displayZone),
+            WeeklyState: weeklyState,
+            WeeklyBarFraction: BarFraction(snapshot.WeeklyUtilizationPercent),
+            WeeklyBarBand: Band(snapshot.WeeklyUtilizationPercent),
+            WeeklyUnknownHint: weeklyState == WeeklyBarState.NotKnown ? WeeklyUnknownHintCardText : "",
             ExtraUsageLine: ExtraUsageLine(snapshot.ExtraUsage, utcNow, displayZone),
             TodayLine: "Today: " + UsageFormatter.Tokens(stats.OutputTokensToday)
                 + " tokens · " + UsageFormatter.Usd(stats.EstimatedSpendToday),
@@ -75,10 +115,61 @@ public static class DetailWindowContentBuilder
         ? string.Create(CultureInfo.InvariantCulture, $"{label}: {Marker(percent.Status)}{Round(value)}%")
         : string.Create(CultureInfo.InvariantCulture, $"{label}: ?");
 
-    private static string WeeklyResetLine(UsageInstant resetAt, DateTimeOffset utcNow, TimeZoneInfo zone) =>
-        resetAt.Status == UsageValueStatus.Unavailable || resetAt.Value is not { } reset
-            ? "Reset time unknown (no reset observed yet)"
-            : PanelTextFormatter.WeeklyReset(reset, utcNow, zone);
+    /// <summary>
+    /// The weekly row's three states (ADR-0008 D9f, gate G7 parity slice P9): no plan data at all
+    /// hides the row entirely — the no-data explanation above already covers it; plan data with
+    /// no weekly reset observed yet names the one fix rather than describing an indefinite wait
+    /// (source <c>ui-spec.md</c> §"Weekly reset": "a setup step, not a wait"); otherwise the
+    /// existing <see cref="PanelTextFormatter.WeeklyReset"/> line, unchanged.
+    /// </summary>
+    private static WeeklyBarState ResolveWeeklyState(UsageSnapshot snapshot) =>
+        snapshot.DataSourceKind == DataSourceKind.Unavailable
+            ? WeeklyBarState.Hidden
+            : snapshot.WeeklyResetAt.Status == UsageValueStatus.Unavailable
+                ? WeeklyBarState.NotKnown
+                : WeeklyBarState.Known;
+
+    /// <summary>The weekly row's inline label when the reset is <see cref="WeeklyBarState.NotKnown"/> —
+    /// states the fact; the longer hover card (<see cref="WeeklyUnknownHintCardText"/>) carries the fix.</summary>
+    private const string WeeklyUnknownLabel = "Weekly reset time not known";
+
+    /// <summary>
+    /// The hover card's text for the <see cref="WeeklyBarState.NotKnown"/> state: names the one
+    /// step that ends it (source <c>ui-spec.md</c> §"Weekly reset" — run <c>/usage</c> in Claude
+    /// Code, the only thing that refreshes the cache this reads) and says what a click does.
+    /// </summary>
+    private const string WeeklyUnknownHintCardText =
+        "Run /usage in Claude Code to set this. Click to copy /usage to your clipboard.";
+
+    private static string WeeklyLine(WeeklyBarState state, UsageSnapshot snapshot, DateTimeOffset utcNow, TimeZoneInfo zone) => state switch
+    {
+        WeeklyBarState.Hidden => "",
+        WeeklyBarState.NotKnown => PercentLine("7d", snapshot.WeeklyUtilizationPercent) + " · " + WeeklyUnknownLabel,
+        _ => PercentLine("7d", snapshot.WeeklyUtilizationPercent)
+            + " · " + PanelTextFormatter.WeeklyReset(snapshot.WeeklyResetAt.Value!.Value, utcNow, zone),
+    };
+
+    /// <summary>
+    /// The bar's proportional fill, clamped to <c>0..1</c> (ADR-0008 D10b: a fill width over a
+    /// percent Core already handed over is presentation, not a sum). An unavailable percent
+    /// renders as an empty bar rather than a fabricated reading.
+    /// </summary>
+    private static double BarFraction(UsagePercent percent) =>
+        percent.Value is { } value ? Math.Clamp(value / 100.0, 0.0, 1.0) : 0.0;
+
+    /// <summary>
+    /// The shared 50/70 colour band (ADR-0008 D10b, gate G7 parity slice P9): green under 50%,
+    /// amber from 50% up to 69%, red from 70% up — exact boundaries, not rounded ones, so a
+    /// value of 49.9 stays green and 50.0 is already amber. An unavailable percent reads as
+    /// green, the same "nothing to warn about" default <see cref="UsageLevel.Green"/> uses
+    /// elsewhere in this contract.
+    /// </summary>
+    private static UsageBarBand Band(UsagePercent percent) => percent.Value switch
+    {
+        { } value when value >= 70.0 => UsageBarBand.Red,
+        { } value when value >= 50.0 => UsageBarBand.Amber,
+        _ => UsageBarBand.Green,
+    };
 
     /// <summary>
     /// Omitted entirely when Claude Code's own cache did not say (<see cref="UsageSnapshot.ExtraUsage"/>

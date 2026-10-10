@@ -173,6 +173,97 @@ public sealed class DetailWindowContentBuilderTests
         var content = DetailWindowContentBuilder.Build(detail, UtcNow, TimeZoneInfo.Utc);
 
         Assert.Contains("unknown", content.SessionLine, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("unknown", content.WeeklyLine, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static UsageDetail DetailWithPercent(double sessionPercent) =>
+        new(
+            UsageSnapshot.Unavailable with
+            {
+                DataSourceKind = DataSourceKind.Live,
+                SessionUtilizationPercent = new UsagePercent(sessionPercent, UsageValueStatus.Real),
+                WeeklyResetAt = new UsageInstant(UtcNow.AddDays(3), UsageValueStatus.Real),
+            },
+            UsageStatistics.Unavailable,
+            ModelUsageBreakdown.Unavailable);
+
+    /// <summary>ADR-0008 D10b, gate G7 parity slice P9: the band boundaries are exact, not
+    /// rounded — 49 stays green, 50 and 69 are amber, 70 is red.</summary>
+    [Theory]
+    [InlineData(0, UsageBarBand.Green)]
+    [InlineData(49, UsageBarBand.Green)]
+    [InlineData(50, UsageBarBand.Amber)]
+    [InlineData(69, UsageBarBand.Amber)]
+    [InlineData(70, UsageBarBand.Red)]
+    [InlineData(100, UsageBarBand.Red)]
+    public void Session_bar_band_boundaries_are_exact(double percent, UsageBarBand expected)
+    {
+        var content = DetailWindowContentBuilder.Build(DetailWithPercent(percent), UtcNow, TimeZoneInfo.Utc);
+
+        Assert.Equal(expected, content.SessionBarBand);
+        Assert.Equal(percent / 100.0, content.SessionBarFraction, precision: 10);
+    }
+
+    [Fact]
+    public void An_unavailable_percent_renders_an_empty_green_bar_rather_than_a_fabricated_reading()
+    {
+        var content = DetailWindowContentBuilder.Build(UsageDetail.Unavailable, UtcNow, TimeZoneInfo.Utc);
+
+        Assert.Equal(0.0, content.SessionBarFraction);
+        Assert.Equal(UsageBarBand.Green, content.SessionBarBand);
+        Assert.Equal(0.0, content.WeeklyBarFraction);
+        Assert.Equal(UsageBarBand.Green, content.WeeklyBarBand);
+    }
+
+    /// <summary>ADR-0008 D9f, gate G7 parity slice P9: no plan data at all hides the weekly
+    /// row entirely, replacing the earlier "unknown" line this skin used to render for the
+    /// fully unavailable detail.</summary>
+    [Fact]
+    public void No_plan_data_at_all_hides_the_weekly_row()
+    {
+        var content = DetailWindowContentBuilder.Build(UsageDetail.Unavailable, UtcNow, TimeZoneInfo.Utc);
+
+        Assert.Equal(WeeklyBarState.Hidden, content.WeeklyState);
+        Assert.Equal("", content.WeeklyLine);
+    }
+
+    /// <summary>Plan data present but no weekly reset observed yet names the fix, worded
+    /// independently from the Windows skin (ADR-0003).</summary>
+    [Fact]
+    public void Plan_data_with_no_weekly_reset_observed_names_the_fix_rather_than_an_indefinite_wait()
+    {
+        var snapshot = UsageSnapshot.Unavailable with
+        {
+            DataSourceKind = DataSourceKind.Live,
+            WeeklyUtilizationPercent = new UsagePercent(22, UsageValueStatus.Real),
+        };
+        var detail = new UsageDetail(snapshot, UsageStatistics.Unavailable, ModelUsageBreakdown.Unavailable);
+
+        var content = DetailWindowContentBuilder.Build(detail, UtcNow, TimeZoneInfo.Utc);
+
+        Assert.Equal(WeeklyBarState.NotKnown, content.WeeklyState);
+        Assert.Contains("not known", content.WeeklyLine, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("waiting", content.WeeklyLine, StringComparison.OrdinalIgnoreCase);
+        Assert.NotEqual("", content.WeeklyUnknownHint);
+        Assert.Contains("/usage", content.WeeklyUnknownHint);
+    }
+
+    /// <summary>A reported weekly reset renders the existing <c>WeeklyReset</c> line, unchanged
+    /// by this slice, and carries no hint (the row is not in the <c>NotKnown</c> state).</summary>
+    [Fact]
+    public void A_known_weekly_reset_carries_no_unknown_hint()
+    {
+        var snapshot = UsageSnapshot.Unavailable with
+        {
+            DataSourceKind = DataSourceKind.Live,
+            WeeklyUtilizationPercent = new UsagePercent(22, UsageValueStatus.Real),
+            WeeklyResetAt = new UsageInstant(UtcNow.AddDays(3), UsageValueStatus.Real),
+        };
+        var detail = new UsageDetail(snapshot, UsageStatistics.Unavailable, ModelUsageBreakdown.Unavailable);
+
+        var content = DetailWindowContentBuilder.Build(detail, UtcNow, TimeZoneInfo.Utc);
+
+        Assert.Equal(WeeklyBarState.Known, content.WeeklyState);
+        Assert.Contains("Resets in", content.WeeklyLine);
+        Assert.Equal("", content.WeeklyUnknownHint);
     }
 }

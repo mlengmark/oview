@@ -16,6 +16,13 @@ internal readonly record struct RgbColor(byte R, byte G, byte B);
 internal readonly record struct WindowThemeColors(
     RgbColor Background, RgbColor Foreground, RgbColor Border, RgbColor Accent, RgbColor AccentHover);
 
+/// <summary>The three usage-bar bands (ADR-0008 D10b, gate G7 parity slice P9), reusing this
+/// skin's own existing tray-icon hues (<see cref="StatusIconGlyphRenderer.ColorFor"/>) for visual
+/// continuity between the icon and the detail window — not required to match, but there is no
+/// reason for the same meter to wear two different reds. Does not vary with
+/// <see cref="ThemePreference"/>, same reasoning as <see cref="WindowThemeColors.Accent"/>.</summary>
+internal readonly record struct UsageBarBandColors(RgbColor Green, RgbColor Amber, RgbColor Red);
+
 /// <summary>
 /// This skin's own theme-to-colour mapping (ADR-0009 slice 7, OVI-489; D6 point 2): nothing here
 /// is shared with <see cref="OView.App.IThemeSource"/>, Core, or the Linux skin — the Linux
@@ -61,5 +68,21 @@ internal static class WindowThemePalette
         ThemePreference.Light => LightColors,
         ThemePreference.Unknown => LightColors,
         _ => throw new ArgumentOutOfRangeException(nameof(preference), preference, "Unrecognised theme preference.")
+    };
+
+    /// <summary>`#32A046`/`#EBA50F`/`#D2322D` — this skin's own usage-bar band colours
+    /// (ADR-0008 D10b, gate G7 parity slice P9), matched to <see cref="StatusIconGlyphRenderer"/>'s
+    /// existing green/amber/red (its BGRA32 tuples converted to RGB) rather than picked afresh.</summary>
+    public static readonly UsageBarBandColors BandColors = new(
+        Green: new RgbColor(0x32, 0xA0, 0x46),
+        Amber: new RgbColor(0xEB, 0xA5, 0x0F),
+        Red: new RgbColor(0xD2, 0x32, 0x2D));
+
+    public static RgbColor BandColor(UsageBarBand band) => band switch
+    {
+        UsageBarBand.Green => BandColors.Green,
+        UsageBarBand.Amber => BandColors.Amber,
+        UsageBarBand.Red => BandColors.Red,
+        _ => throw new ArgumentOutOfRangeException(nameof(band), band, "Unrecognised usage bar band."),
     };
 }

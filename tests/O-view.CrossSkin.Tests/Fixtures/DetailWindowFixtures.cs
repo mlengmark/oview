@@ -286,6 +286,63 @@ public static class DetailWindowFixtures
                     && !rendered.Contains("Disabled", StringComparison.Ordinal)),
         });
 
+    /// <summary>
+    /// Gate G7 parity slice P9 (OVI-648): the usage bars' 50/70 colour band at its exact
+    /// boundaries — 49 stays green, 50 is already amber. Named per-boundary rather than one
+    /// shared helper so a render-proof PNG file name states which boundary it captured.
+    /// </summary>
+    private static DetailWindowFixture AtSessionPercent(string name, double percent) => new(
+        Name: name,
+        Detail: new UsageDetail(
+            Snapshot: new UsageSnapshot(
+                DataSourceKind.Live,
+                new DateTimeOffset(2026, 9, 8, 20, 45, 0, TimeSpan.Zero),
+                new UsagePercent(percent, UsageValueStatus.Real),
+                new UsageInstant(SessionReset, UsageValueStatus.Real),
+                new UsagePercent(10, UsageValueStatus.Real),
+                new UsageInstant(WeeklyReset, UsageValueStatus.Real),
+                UsageLevel.Green),
+            Statistics: UsageStatistics.Unavailable,
+            Models: ModelUsageBreakdown.Unavailable),
+        DisplayZone: TimeZoneInfo.Utc,
+        ContentFacts: new[] { ContentFact.Contains($"{(int)percent}%") });
+
+    public static readonly DetailWindowFixture SessionBandBoundaryGreen49 = AtSessionPercent("session-band-boundary-green-49", 49);
+    public static readonly DetailWindowFixture SessionBandBoundaryAmber50 = AtSessionPercent("session-band-boundary-amber-50", 50);
+    public static readonly DetailWindowFixture SessionBandBoundaryAmber69 = AtSessionPercent("session-band-boundary-amber-69", 69);
+    public static readonly DetailWindowFixture SessionBandBoundaryRed70 = AtSessionPercent("session-band-boundary-red-70", 70);
+
+    /// <summary>
+    /// Gate G7 parity slice P9 (OVI-648): plan data is present (a live session percent) but no
+    /// weekly reset has ever been observed — the <c>NotKnown</c> weekly state, distinct from
+    /// <see cref="UnavailableNoDataExplanation"/>'s fully-<c>Hidden</c> row below.
+    /// </summary>
+    public static readonly DetailWindowFixture WeeklyResetNotKnownWithPlanData = new(
+        Name: "weekly-reset-not-known-with-plan-data",
+        Detail: new UsageDetail(
+            Snapshot: new UsageSnapshot(
+                DataSourceKind.Live,
+                new DateTimeOffset(2026, 9, 8, 20, 45, 0, TimeSpan.Zero),
+                new UsagePercent(35, UsageValueStatus.Real),
+                new UsageInstant(SessionReset, UsageValueStatus.Real),
+                new UsagePercent(20, UsageValueStatus.Real),
+                new UsageInstant(null, UsageValueStatus.Unavailable),
+                UsageLevel.Green),
+            Statistics: UsageStatistics.Unavailable,
+            Models: ModelUsageBreakdown.Unavailable),
+        DisplayZone: TimeZoneInfo.Utc,
+        ContentFacts: new[]
+        {
+            ContentFact.Contains("35%"),
+            ContentFact.Contains("20%"),
+            new ContentFact(
+                "names the weekly reset as not known rather than describing an indefinite wait",
+                rendered => rendered.Contains("not known", StringComparison.OrdinalIgnoreCase)),
+            new ContentFact(
+                "never says 'waiting' for a reset ADR-0014/D9f already decided has no derivation",
+                rendered => !rendered.Contains("waiting", StringComparison.OrdinalIgnoreCase)),
+        });
+
     public static IReadOnlyList<DetailWindowFixture> All { get; } = new[]
     {
         OrdinaryLiveReadingExtraUsageOn,
@@ -296,5 +353,10 @@ public static class DetailWindowFixtures
         ModelBreakdownUnavailable,
         UnpricedModelInWindow,
         UnavailableNoDataExplanation,
+        SessionBandBoundaryGreen49,
+        SessionBandBoundaryAmber50,
+        SessionBandBoundaryAmber69,
+        SessionBandBoundaryRed70,
+        WeeklyResetNotKnownWithPlanData,
     };
 }
