@@ -74,7 +74,8 @@ internal static class Program
             settings.PollCadence);
 
         var storeLifetime = new StoreLifetime(directory);
-        var statisticsSource = new LedgerUsageStatisticsSource(storeLifetime.UsageLedgerStore);
+        var statisticsSource = new LedgerUsageStatisticsSource(
+            storeLifetime.UsageLedgerStore, storeLifetime.WeeklyResetAnchorStore);
         var detailCoordinator = new DetailPushCoordinator(statisticsSource, skin, new SystemClock(), TimeZoneInfo.Local);
         pollLoop.SnapshotUpdated += (_, snapshot) => detailCoordinator.OnPollSucceeded(snapshot);
 

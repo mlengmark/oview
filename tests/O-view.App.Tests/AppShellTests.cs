@@ -245,6 +245,14 @@ public class AppShellTests : IDisposable
         public UsageStatistics GetStatistics(DateTimeOffset utcNow, TimeZoneInfo zone) => UsageStatistics.Unavailable;
 
         public ModelUsageBreakdown GetModelBreakdown(DateTimeOffset utcNow, TimeZoneInfo zone) => ModelUsageBreakdown.Unavailable;
+
+        public DailyUsageSeries GetDailySeries(DateTimeOffset utcNow, TimeZoneInfo zone) => DailyUsageSeries.Unavailable;
+
+        public TokenKindTotals GetTokenKindTotals(DateTimeOffset utcNow, TimeZoneInfo zone, StatisticsWindow window) =>
+            TokenKindTotals.Unavailable;
+
+        public WeeklyResetBoundaries GetResetBoundaries(DateTimeOffset utcNow, TimeZoneInfo zone) =>
+            WeeklyResetBoundaries.Unavailable;
     }
 
     private sealed class FakeSkin : IShellToSkin
