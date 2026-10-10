@@ -46,6 +46,49 @@ public enum WeeklyBarState
 }
 
 /// <summary>
+/// Which of the 2x2 statistics tiles a <see cref="StatisticsTile"/> is (ADR-0008 D10b, gate G7
+/// parity slice P10). Core only aggregates the per-model breakdown over the 31-day window
+/// (<see cref="ModelUsageBreakdown"/>'s own remarks) — there is no per-model split for "today" —
+/// so only the two 31-day tiles can ever flip; see <see cref="StatisticsTile.CanFlip"/>.
+/// </summary>
+public enum StatisticsTileKind
+{
+    OutputTokensToday,
+    EstimatedValueToday,
+    OutputTokensWindow31d,
+    EstimatedValueWindow31d,
+}
+
+/// <summary>
+/// One model's proportional share of a flipped tile's figure (ADR-0008 D10b, gate G7 parity
+/// slice P10) — a proportion of a figure Core already handed over, computed here, not a sum
+/// (D10b's own boundary rule). <see cref="Fraction"/> is clamped into <c>0..1</c> and the set of
+/// fractions for one tile never exceeds 1 in total. Carries no colour — the slot palette and the
+/// three-slot cap are slice P11's own obligation; this slice renders every segment in the same
+/// neutral tone.
+/// </summary>
+public sealed record StatisticsTileSegment(string ModelId, double Fraction);
+
+/// <summary>
+/// One of the detail window's 2x2 statistics tiles (ADR-0008 D10b, gate G7 parity slice P10).
+/// <see cref="Breakdown"/> is built here, in <see cref="DetailWindowContentBuilder.Build"/> —
+/// once per pushed <see cref="UsageDetail"/>, never recomputed when a tile is clicked (the "no
+/// I/O on click" requirement) — so the window's own click handler only ever toggles which face of
+/// an already-built tile is visible.
+/// </summary>
+/// <param name="Value">The tile's own figure, already run through <see cref="UsageFormatter"/>.</param>
+/// <param name="CanFlip">Whether this tile has anything to flip to. <see langword="false"/> for
+/// both "today" tiles (no per-model split exists for that window) and for a 31-day tile whose
+/// breakdown could not be read, holds no rows, or sums to nothing to show a proportion of.</param>
+/// <param name="Breakdown">Empty unless <see cref="CanFlip"/>.</param>
+public sealed record StatisticsTile(
+    StatisticsTileKind Kind,
+    string Label,
+    string Value,
+    bool CanFlip,
+    IReadOnlyList<StatisticsTileSegment> Breakdown);
+
+/// <summary>
 /// Everything the detail window renders, built once from one <see cref="UsageDetail"/> and
 /// nothing else (ADR-0008 D9c) — the window draws this record and reads no other source, so it
 /// can never pair a percent from one poll with statistics from an earlier one.
@@ -64,8 +107,8 @@ public sealed record DetailWindowContent(
     UsageBarBand WeeklyBarBand,
     string WeeklyUnknownHint,
     string ExtraUsageLine,
-    string TodayLine,
-    string Window31dLine,
+    IReadOnlyList<StatisticsTile> StatisticsTiles,
+    string CoverageCaption,
     string Caveat,
     TokenKindBar TokenKindBarToday,
     TokenKindBar TokenKindBarWindow31d,
@@ -108,10 +151,8 @@ public static class DetailWindowContentBuilder
             WeeklyBarBand: Band(snapshot.WeeklyUtilizationPercent),
             WeeklyUnknownHint: weeklyState == WeeklyBarState.NotKnown ? WeeklyUnknownHintCardText : "",
             ExtraUsageLine: ExtraUsageLine(snapshot.ExtraUsage, utcNow, displayZone),
-            TodayLine: "Today: " + UsageFormatter.Tokens(stats.OutputTokensToday)
-                + " tokens · " + UsageFormatter.Usd(stats.EstimatedSpendToday),
-            Window31dLine: "31-day window: " + UsageFormatter.Tokens(stats.OutputTokensWindow31d)
-                + " tokens · " + UsageFormatter.Usd(stats.EstimatedValueWindow31d),
+            StatisticsTiles: BuildStatisticsTiles(stats, detail.Models),
+            CoverageCaption: PanelStatisticsFormatter.CoverageCaption(stats.HistoryCoverage),
             Caveat: PanelTextFormatter.Caveat(stats),
             TokenKindBarToday: TokenKindBarFormatter.BuildBar("Today", detail.TokensToday),
             TokenKindBarWindow31d: TokenKindBarFormatter.BuildBar("31 days", detail.Tokens31d),
@@ -184,6 +225,76 @@ public static class DetailWindowContentBuilder
         { } value when value >= 50.0 => UsageBarBand.Amber,
         _ => UsageBarBand.Green,
     };
+
+    /// <summary>
+    /// Builds the 2x2 statistics tiles (ADR-0008 D10b, gate G7 parity slice P10). Each tile's
+    /// own figure is Core's; a flippable tile's per-model breakdown is built here, up front, so
+    /// the window's click handler never reads Core again (the "no I/O on click" requirement).
+    /// </summary>
+    private static IReadOnlyList<StatisticsTile> BuildStatisticsTiles(UsageStatistics stats, ModelUsageBreakdown models) => new[]
+    {
+        new StatisticsTile(
+            StatisticsTileKind.OutputTokensToday,
+            "Output tokens today",
+            UsageFormatter.Tokens(stats.OutputTokensToday),
+            CanFlip: false,
+            Breakdown: Array.Empty<StatisticsTileSegment>()),
+        new StatisticsTile(
+            StatisticsTileKind.EstimatedValueToday,
+            "Est. value today",
+            UsageFormatter.Usd(stats.EstimatedSpendToday),
+            CanFlip: false,
+            Breakdown: Array.Empty<StatisticsTileSegment>()),
+        BuildWindowTile(
+            StatisticsTileKind.OutputTokensWindow31d,
+            "Output tokens · 31 days",
+            UsageFormatter.Tokens(stats.OutputTokensWindow31d),
+            models,
+            row => (double)(row.OutputTokens.Value ?? 0),
+            stats.OutputTokensWindow31d.Value is { } outputTotal ? (double)outputTotal : null),
+        BuildWindowTile(
+            StatisticsTileKind.EstimatedValueWindow31d,
+            "Est. value · 31 days",
+            UsageFormatter.Usd(stats.EstimatedValueWindow31d),
+            models,
+            row => (double)(row.EstimatedSpend.Value ?? 0),
+            stats.EstimatedValueWindow31d.Value is { } spendTotal ? (double)spendTotal : null),
+    };
+
+    /// <summary>
+    /// A 31-day tile's breakdown is each row's share of the window total Core already handed
+    /// over (<paramref name="total"/>) — never a sum this skin performs over the rows itself
+    /// (ADR-0008 D10b). Disabled (no glyph, per the window) when the breakdown could not be
+    /// read, holds no rows, or the window total is unavailable or nothing to show a share of.
+    /// </summary>
+    private static StatisticsTile BuildWindowTile(
+        StatisticsTileKind kind, string label, string value, ModelUsageBreakdown models, Func<ModelUsageRow, double> select, double? total)
+    {
+        if (models.Status != UsageValueStatus.Real || models.Rows.Count == 0 || total is not { } windowTotal || windowTotal <= 0)
+        {
+            return new StatisticsTile(kind, label, value, CanFlip: false, Breakdown: Array.Empty<StatisticsTileSegment>());
+        }
+
+        var segments = new List<StatisticsTileSegment>(models.Rows.Count);
+        foreach (var row in models.Rows)
+        {
+            // A row with nothing to show (e.g. an unpriced model, for the Est. value tile) gets
+            // no segment at all — a zero-width slice would read as "recorded, zero spend", a
+            // different fact from "could not be priced" (D9a's own unpriced-model distinction).
+            var amount = select(row);
+            if (amount > 0)
+            {
+                segments.Add(new StatisticsTileSegment(row.ModelId, Math.Clamp(amount / windowTotal, 0.0, 1.0)));
+            }
+        }
+
+        if (segments.Count == 0)
+        {
+            return new StatisticsTile(kind, label, value, CanFlip: false, Breakdown: Array.Empty<StatisticsTileSegment>());
+        }
+
+        return new StatisticsTile(kind, label, value, CanFlip: true, Breakdown: segments);
+    }
 
     /// <summary>
     /// Omitted entirely when Claude Code's own cache did not say (<see cref="UsageSnapshot.ExtraUsage"/>

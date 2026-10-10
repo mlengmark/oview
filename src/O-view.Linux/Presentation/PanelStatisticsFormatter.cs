@@ -20,4 +20,15 @@ public static class PanelStatisticsFormatter
         coverage.HasPartialHistory
             ? string.Create(CultureInfo.InvariantCulture, $"{coverage.RecordedDays}/{coverage.WindowDays} days of history")
             : "";
+
+    /// <summary>
+    /// The statistics tiles' own coverage caption (ADR-0008 D10b, gate G7 parity slice P10):
+    /// unlike <see cref="CoverageNote"/>, which hides itself once the window is fully covered,
+    /// this caption always states both counts — <see cref="HistoryCoverage.RecordedDays"/>
+    /// counts days Core has data <b>for</b>, never days with usage (D11b's
+    /// <c>CoverageCaptionFixture</c>). Worded independently from the Windows skin (ADR-0003),
+    /// but the harness pins the same content fact: both counts, out of 31.
+    /// </summary>
+    public static string CoverageCaption(HistoryCoverage coverage) =>
+        string.Create(CultureInfo.InvariantCulture, $"{coverage.RecordedDays} of {coverage.WindowDays} days recorded");
 }
