@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Shapes;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Layout;
@@ -54,6 +55,15 @@ internal sealed class DetailWindow : Window
     private const double BarTrackWidth = 350;
     private const double BarTrackHeight = 8;
 
+    /// <summary>The 31-day graph's canvas (gate G7 parity slice P13): width matches the usage
+    /// bars' own track so the graph does not read as a narrower column than everything above it;
+    /// the bar area and the rotated-label area below it are split the same way the source's own
+    /// <c>BuildGraph</c> splits its canvas height.</summary>
+    private const double GraphWidth = BarTrackWidth;
+    private const double GraphBarAreaHeight = 52;
+    private const double GraphLabelAreaHeight = 34;
+    private const double GraphHeight = GraphBarAreaHeight + GraphLabelAreaHeight;
+
     private readonly ISkinToShell _skinToShell;
     private readonly DetailWindowPositionController _position;
     private readonly Action<string> _log;
@@ -85,6 +95,7 @@ internal sealed class DetailWindow : Window
     private readonly ItemsControl _tokenKindBreakdownRows = new() { IsVisible = false };
     private readonly TextBlock _modelNote = NewLine();
     private readonly ItemsControl _modelRows = new();
+    private readonly Canvas _graphCanvas = new() { Width = GraphWidth, Height = GraphHeight };
     private LinuxWindowThemeColors _colors;
 
     /// <summary>Whether the weekly row's click currently copies <c>/usage</c> (gate G7 parity
@@ -279,6 +290,69 @@ internal sealed class DetailWindow : Window
         _modelNote.Text = content.ModelSectionNote;
         _modelNote.IsVisible = !string.IsNullOrEmpty(content.ModelSectionNote);
         _modelRows.ItemsSource = content.ModelRows.Select(ModelRowText).ToList();
+        BuildGraph(content.GraphColumns);
+    }
+
+    /// <summary>
+    /// Draws the 31-day graph (ADR-0008 D10b, gate G7 parity slice P13), the Linux counterpart
+    /// of <c>O-view.Tray</c>'s own <c>BuildGraph</c> — independently implemented, not shared (D1):
+    /// one bar per <see cref="UsageGraphColumn"/>, coloured by <see cref="UsageGraphColumn.Intensity"/>,
+    /// a vertical date label under every column (blank or not), and no gridlines — those are
+    /// slice P14's own addition over the same reset boundaries. The label is measured for real,
+    /// then placed from <see cref="UsageGraphLabelGeometry"/>'s pure rotation math, never a
+    /// constant offset.
+    /// </summary>
+    private void BuildGraph(IReadOnlyList<UsageGraphColumn> columns)
+    {
+        _graphCanvas.Children.Clear();
+
+        if (columns.Count == 0)
+        {
+            return;
+        }
+
+        var col = GraphWidth / columns.Count;
+        var labelBrush = ToBrush(_colors.Foreground);
+
+        for (var i = 0; i < columns.Count; i++)
+        {
+            var column = columns[i];
+            var x = i * col;
+            var centreX = UsageGraphLabelGeometry.ColumnCentre(x, col);
+
+            if (!column.IsBlank)
+            {
+                var barWidth = Math.Max(2, col - 2);
+                var height = Math.Max(2, GraphBarAreaHeight * column.HeightFraction);
+                var bar = new Rectangle
+                {
+                    Width = barWidth,
+                    Height = height,
+                    Fill = ToBrush(LinuxWindowThemePalette.GraphColor(column.Intensity)),
+                    RadiusX = 1,
+                    RadiusY = 1,
+                };
+                HoverCard.Figure(bar, UsageFormatter.Tokens(column.OutputTokens) + " tokens", column.DateLabel, _colors);
+                Canvas.SetLeft(bar, centreX - barWidth / 2);
+                Canvas.SetTop(bar, GraphBarAreaHeight - height);
+                _graphCanvas.Children.Add(bar);
+            }
+
+            var label = new TextBlock
+            {
+                Text = column.DateLabel,
+                FontSize = 8,
+                Foreground = labelBrush,
+                RenderTransform = new RotateTransform(90),
+                Opacity = column.IsBlank ? 0.5 : 1.0,
+            };
+            _graphCanvas.Children.Add(label);
+            label.Measure(Size.Infinity);
+            var (inkLeft, inkTop, inkWidth, _) = UsageGraphLabelGeometry.RotatedInkBounds(
+                label.DesiredSize.Width, label.DesiredSize.Height);
+            Canvas.SetLeft(label, UsageGraphLabelGeometry.CentredLeft(centreX, inkLeft, inkWidth));
+            Canvas.SetTop(label, UsageGraphLabelGeometry.Top(GraphBarAreaHeight + 6, inkTop));
+        }
     }
 
     /// <summary>
@@ -417,6 +491,7 @@ internal sealed class DetailWindow : Window
         stack.Children.Add(_coverageCaption);
         stack.Children.Add(_caveat);
         stack.Children.Add(BuildTokenKindSection());
+        stack.Children.Add(_graphCanvas);
         stack.Children.Add(modelSection);
 
         return new ScrollViewer

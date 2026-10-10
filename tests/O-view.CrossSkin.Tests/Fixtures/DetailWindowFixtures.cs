@@ -429,6 +429,134 @@ public static class DetailWindowFixtures
                 rendered => !rendered.Contains('@')),
         });
 
+    /// <summary>
+    /// Builds a 31-day <see cref="DailyUsageSeries"/> ending on <paramref name="today"/>, calling
+    /// <paramref name="tokensFor"/> for each local day in the window — <see langword="null"/>
+    /// means the day predates recorded history (a blank column), matching
+    /// <see cref="DailyUsagePoint"/>'s own remarks.
+    /// </summary>
+    private static DailyUsageSeries BuildDailySeries(DateOnly today, Func<DateOnly, long?> tokensFor)
+    {
+        var windowStart = today.AddDays(-30);
+        var days = new List<DailyUsagePoint>(31);
+        for (var day = windowStart; day <= today; day = day.AddDays(1))
+        {
+            var tokens = tokensFor(day);
+            days.Add(new DailyUsagePoint(
+                day,
+                tokens is { } value
+                    ? new TokenCount(value, UsageValueStatus.Real)
+                    : new TokenCount(null, UsageValueStatus.Unavailable)));
+        }
+
+        var recordedDays = days.Count(d => d.OutputTokens.Status == UsageValueStatus.Real);
+        return new DailyUsageSeries(windowStart, today, days, new HistoryCoverage(recordedDays, 31), UsageValueStatus.Real);
+    }
+
+    /// <summary>
+    /// Gate G7 parity slice P13 (OVI-668): the 31-day graph's own fixture — ten days before
+    /// install (blank columns, not zero-height bars), two different weeks' worth of varying
+    /// intensity (W3, OVI-594's per-week colour ramp), and the standing weekly-reset boundaries
+    /// alongside it (consumed only for the colour bucketing here — slice P14 draws the
+    /// gridlines).
+    /// </summary>
+    public static readonly DetailWindowFixture GraphWithPartialCoverageAndBlankDays = new(
+        Name: "graph-with-partial-coverage-and-blank-days",
+        Detail: new UsageDetail(
+            Snapshot: new UsageSnapshot(
+                DataSourceKind.Live,
+                new DateTimeOffset(2026, 9, 8, 20, 45, 0, TimeSpan.Zero),
+                new UsagePercent(63, UsageValueStatus.Real),
+                new UsageInstant(SessionReset, UsageValueStatus.Real),
+                new UsagePercent(22, UsageValueStatus.Real),
+                new UsageInstant(WeeklyReset, UsageValueStatus.Real),
+                UsageLevel.Amber),
+            Statistics: UsageStatistics.Unavailable,
+            Models: ModelUsageBreakdown.Unavailable)
+        {
+            History = BuildDailySeries(new DateOnly(2026, 9, 8), day =>
+                day < new DateOnly(2026, 8, 19) ? null : (long)(100 + 50 * (day.DayOfYear % 5))),
+            ResetBoundaries = new WeeklyResetBoundaries(
+                new DateOnly(2026, 8, 9),
+                new DateOnly(2026, 9, 8),
+                new[]
+                {
+                    new WeeklyResetBoundary(new DateTimeOffset(2026, 8, 10, 23, 0, 0, TimeSpan.Zero), WeeklyResetBoundaryKind.DerivedFromObserved),
+                    new WeeklyResetBoundary(new DateTimeOffset(2026, 8, 17, 23, 0, 0, TimeSpan.Zero), WeeklyResetBoundaryKind.DerivedFromObserved),
+                    new WeeklyResetBoundary(new DateTimeOffset(2026, 8, 24, 23, 0, 0, TimeSpan.Zero), WeeklyResetBoundaryKind.DerivedFromObserved),
+                    new WeeklyResetBoundary(new DateTimeOffset(2026, 8, 31, 23, 0, 0, TimeSpan.Zero), WeeklyResetBoundaryKind.DerivedFromObserved),
+                    new WeeklyResetBoundary(WeeklyReset, WeeklyResetBoundaryKind.Observed),
+                },
+                UsageValueStatus.Real),
+        },
+        DisplayZone: TimeZoneInfo.Utc,
+        ContentFacts: new[]
+        {
+            ContentFact.Contains("63%"),
+        });
+
+    /// <summary>
+    /// A synthetic zone with a US-shaped DST rule effective only around 2026, so this fixture
+    /// renders deterministically regardless of which OS tz database (or none) the machine
+    /// building the PNG has — never <see cref="TimeZoneInfo.FindSystemTimeZoneById"/>. Mirrors
+    /// <c>LedgerUsageStatisticsSourceTests.CreateDstZone</c> in <c>O-view.Core.Tests</c>.
+    /// </summary>
+    private static TimeZoneInfo CreateDstZone()
+    {
+        var toDaylight = TimeZoneInfo.TransitionTime.CreateFixedDateRule(new DateTime(1, 1, 1, 2, 0, 0), 3, 8);
+        var toStandard = TimeZoneInfo.TransitionTime.CreateFixedDateRule(new DateTime(1, 1, 1, 2, 0, 0), 11, 1);
+        var rule = TimeZoneInfo.AdjustmentRule.CreateAdjustmentRule(
+            new DateTime(2020, 1, 1),
+            new DateTime(2030, 12, 31),
+            TimeSpan.FromHours(1),
+            toDaylight,
+            toStandard);
+
+        return TimeZoneInfo.CreateCustomTimeZone(
+            "OView.Tests.Dst",
+            TimeSpan.FromHours(-5),
+            "Test DST zone",
+            "Test standard time",
+            "Test daylight time",
+            new[] { rule });
+    }
+
+    /// <summary>
+    /// Gate G7 parity slice P13 (OVI-668): the graph's 31-day window spans this fixture's own
+    /// DST zone's 23-hour spring-forward day (2026-03-08) — proves the render proof produces a
+    /// file for a window that cannot assume every local day is 24 hours.
+    /// </summary>
+    public static readonly DetailWindowFixture GraphAcrossADstSpringForwardDay = new(
+        Name: "graph-across-a-dst-spring-forward-day",
+        Detail: new UsageDetail(
+            Snapshot: new UsageSnapshot(
+                DataSourceKind.Live,
+                new DateTimeOffset(2026, 3, 15, 20, 45, 0, TimeSpan.Zero),
+                new UsagePercent(40, UsageValueStatus.Real),
+                new UsageInstant(SessionReset, UsageValueStatus.Real),
+                new UsagePercent(15, UsageValueStatus.Real),
+                new UsageInstant(WeeklyReset, UsageValueStatus.Real),
+                UsageLevel.Green),
+            Statistics: UsageStatistics.Unavailable,
+            Models: ModelUsageBreakdown.Unavailable)
+        {
+            History = BuildDailySeries(new DateOnly(2026, 3, 15), day => (long)(50 + 20 * (day.DayOfYear % 7))),
+            ResetBoundaries = new WeeklyResetBoundaries(
+                new DateOnly(2026, 2, 13),
+                new DateOnly(2026, 3, 15),
+                new[]
+                {
+                    new WeeklyResetBoundary(new DateTimeOffset(2026, 3, 2, 23, 0, 0, TimeSpan.Zero), WeeklyResetBoundaryKind.DerivedFromObserved),
+                    new WeeklyResetBoundary(new DateTimeOffset(2026, 3, 9, 23, 0, 0, TimeSpan.Zero), WeeklyResetBoundaryKind.DerivedFromObserved),
+                },
+                UsageValueStatus.Real),
+        },
+        DisplayZone: CreateDstZone(),
+        ContentFacts: new[]
+        {
+            ContentFact.Contains("40%"),
+        });
+
     public static IReadOnlyList<DetailWindowFixture> All { get; } = new[]
     {
         OrdinaryLiveReadingExtraUsageOn,
@@ -447,5 +575,7 @@ public static class DetailWindowFixtures
         WeeklyResetNotKnownWithPlanData,
         OrdinaryReadingWithKnownAccountIdentity,
         UnavailableAccountIdentity,
+        GraphWithPartialCoverageAndBlankDays,
+        GraphAcrossADstSpringForwardDay,
     };
 }

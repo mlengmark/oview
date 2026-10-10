@@ -116,7 +116,8 @@ public sealed record DetailWindowContent(
     IReadOnlyList<TokenKindBreakdownRow> TokenKindBreakdownRows,
     string TokenKindSectionNote,
     IReadOnlyList<DetailWindowModelRow> ModelRows,
-    string ModelSectionNote);
+    string ModelSectionNote,
+    IReadOnlyList<UsageGraphColumn> GraphColumns);
 
 /// <summary>
 /// Builds the Linux detail window's content from a pushed <see cref="UsageDetail"/> (ADR-0008
@@ -162,7 +163,8 @@ public static class DetailWindowContentBuilder
             TokenKindBreakdownRows: TokenKindBarFormatter.BuildBreakdownRows(detail.TokensToday, detail.Tokens31d),
             TokenKindSectionNote: TokenKindSectionNote(detail.TokensToday, detail.Tokens31d),
             ModelRows: BuildModelRows(detail.Models),
-            ModelSectionNote: ModelSectionNote(detail.Models, stats.UnpricedModels));
+            ModelSectionNote: ModelSectionNote(detail.Models, stats.UnpricedModels),
+            GraphColumns: UsageGraphContentBuilder.Build(detail.History, detail.ResetBoundaries, displayZone));
     }
 
     /// <summary>

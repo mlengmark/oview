@@ -1,6 +1,7 @@
 using System.IO;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Shapes;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
@@ -136,6 +137,74 @@ public static class DetailWindowRenderProof
     private const double BarTrackWidth = 350;
     private const double BarTrackHeight = 8;
 
+    /// <summary>Matches <see cref="DetailWindow"/>'s own graph constants (gate G7 parity slice
+    /// P13) so the render proof shows the same proportions the real window would.</summary>
+    private const double GraphWidth = BarTrackWidth;
+    private const double GraphBarAreaHeight = 52;
+    private const double GraphLabelAreaHeight = 34;
+    private const double GraphHeight = GraphBarAreaHeight + GraphLabelAreaHeight;
+
+    /// <summary>
+    /// Renders the 31-day graph (ADR-0008 D10b, gate G7 parity slice P13), mirroring
+    /// <see cref="DetailWindow.BuildGraph"/> — hand-duplicated, not shared, per this class's own
+    /// remarks: one bar per <see cref="UsageGraphColumn"/>, coloured by its own
+    /// <see cref="UsageGraphColumn.Intensity"/>, a measured, centred vertical date label under
+    /// every column (blank or not), and no gridlines (slice P14's own addition).
+    /// </summary>
+    private static Canvas BuildGraph(IReadOnlyList<UsageGraphColumn> columns, LinuxWindowThemeColors colors)
+    {
+        var canvas = new Canvas { Width = GraphWidth, Height = GraphHeight };
+
+        if (columns.Count == 0)
+        {
+            return canvas;
+        }
+
+        var col = GraphWidth / columns.Count;
+        var labelBrush = ToBrush(colors.Foreground);
+
+        for (var i = 0; i < columns.Count; i++)
+        {
+            var column = columns[i];
+            var x = i * col;
+            var centreX = UsageGraphLabelGeometry.ColumnCentre(x, col);
+
+            if (!column.IsBlank)
+            {
+                var barWidth = Math.Max(2, col - 2);
+                var height = Math.Max(2, GraphBarAreaHeight * column.HeightFraction);
+                var bar = new Rectangle
+                {
+                    Width = barWidth,
+                    Height = height,
+                    Fill = ToBrush(LinuxWindowThemePalette.GraphColor(column.Intensity)),
+                    RadiusX = 1,
+                    RadiusY = 1,
+                };
+                Canvas.SetLeft(bar, centreX - barWidth / 2);
+                Canvas.SetTop(bar, GraphBarAreaHeight - height);
+                canvas.Children.Add(bar);
+            }
+
+            var label = new TextBlock
+            {
+                Text = column.DateLabel,
+                FontSize = 8,
+                Foreground = labelBrush,
+                RenderTransform = new RotateTransform(90),
+                Opacity = column.IsBlank ? 0.5 : 1.0,
+            };
+            canvas.Children.Add(label);
+            label.Measure(Size.Infinity);
+            var (inkLeft, inkTop, inkWidth, _) = UsageGraphLabelGeometry.RotatedInkBounds(
+                label.DesiredSize.Width, label.DesiredSize.Height);
+            Canvas.SetLeft(label, UsageGraphLabelGeometry.CentredLeft(centreX, inkLeft, inkWidth));
+            Canvas.SetTop(label, UsageGraphLabelGeometry.Top(GraphBarAreaHeight + 6, inkTop));
+        }
+
+        return canvas;
+    }
+
     private static Border BuildVisual(DetailWindowContent content, LinuxWindowThemeColors colors, bool showTokenKindBreakdown, bool flipWindowTiles)
     {
         var stack = new StackPanel { Margin = new Thickness(12) };
@@ -163,6 +232,7 @@ public static class DetailWindowRenderProof
         }
 
         stack.Children.Add(BuildTokenKindSection(content, colors, showTokenKindBreakdown));
+        stack.Children.Add(BuildGraph(content.GraphColumns, colors));
 
         var modelSection = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
         modelSection.Children.Add(Line("By model", colors));
