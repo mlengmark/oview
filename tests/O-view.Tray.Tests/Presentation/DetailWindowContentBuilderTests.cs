@@ -270,4 +270,181 @@ public sealed class DetailWindowContentBuilderTests
         Assert.Contains("Resets in", content.WeeklyLine);
         Assert.Equal("", content.WeeklyUnknownHint);
     }
+
+    private static ModelUsageBreakdown BreakdownWith(params ModelUsageRow[] rows) => new(
+        new DateOnly(2026, 8, 9),
+        new DateOnly(2026, 9, 8),
+        rows,
+        new HistoryCoverage(31, 31),
+        new RateCardStamp(RateCardSource.Bundled, new DateOnly(2026, 9, 8), isStale: false),
+        UsageValueStatus.Real);
+
+    /// <summary>ADR-0008 D10b, gate G7 parity slice P10: all four tiles always build, in order,
+    /// with Core's own figures run through the existing formatters.</summary>
+    [Fact]
+    public void Builds_four_statistics_tiles_in_order_with_cores_own_figures()
+    {
+        var stats = new UsageStatistics(
+            new TokenCount(10_000, UsageValueStatus.Real),
+            new EstimatedUsd(2.50m, UsageValueStatus.Estimated),
+            new TokenCount(250_000, UsageValueStatus.Real),
+            new EstimatedUsd(40.00m, UsageValueStatus.Estimated),
+            new HistoryCoverage(31, 31));
+        var detail = new UsageDetail(UsageSnapshot.Unavailable, stats, ModelUsageBreakdown.Unavailable);
+
+        var content = DetailWindowContentBuilder.Build(detail, UtcNow, TimeZoneInfo.Utc);
+
+        Assert.Equal(4, content.StatisticsTiles.Count);
+        Assert.Equal(StatisticsTileKind.OutputTokensToday, content.StatisticsTiles[0].Kind);
+        Assert.Equal(UsageFormatter.Tokens(stats.OutputTokensToday), content.StatisticsTiles[0].Value);
+        Assert.Equal(StatisticsTileKind.EstimatedValueToday, content.StatisticsTiles[1].Kind);
+        Assert.Equal(UsageFormatter.Usd(stats.EstimatedSpendToday), content.StatisticsTiles[1].Value);
+        Assert.Equal(StatisticsTileKind.OutputTokensWindow31d, content.StatisticsTiles[2].Kind);
+        Assert.Equal(UsageFormatter.Tokens(stats.OutputTokensWindow31d), content.StatisticsTiles[2].Value);
+        Assert.Equal(StatisticsTileKind.EstimatedValueWindow31d, content.StatisticsTiles[3].Kind);
+        Assert.Equal(UsageFormatter.Usd(stats.EstimatedValueWindow31d), content.StatisticsTiles[3].Value);
+    }
+
+    /// <summary>Neither "today" tile can ever flip — Core only aggregates the per-model
+    /// breakdown over the 31-day window (<see cref="ModelUsageBreakdown"/>'s own remarks), so
+    /// there is nothing a "today" tile could show a proportion of.</summary>
+    [Fact]
+    public void Today_tiles_never_flip_even_with_a_real_populated_breakdown()
+    {
+        var row = new ModelUsageRow(
+            "claude-sonnet-5", 10,
+            new TokenCount(1_000, UsageValueStatus.Real),
+            new TokenCount(500, UsageValueStatus.Real),
+            new TokenCount(0, UsageValueStatus.Real),
+            new TokenCount(0, UsageValueStatus.Real),
+            new EstimatedUsd(1.00m, UsageValueStatus.Estimated));
+        var detail = new UsageDetail(UsageSnapshot.Unavailable, UsageStatistics.Unavailable, BreakdownWith(row));
+
+        var content = DetailWindowContentBuilder.Build(detail, UtcNow, TimeZoneInfo.Utc);
+
+        Assert.False(content.StatisticsTiles[0].CanFlip);
+        Assert.Empty(content.StatisticsTiles[0].Breakdown);
+        Assert.False(content.StatisticsTiles[1].CanFlip);
+        Assert.Empty(content.StatisticsTiles[1].Breakdown);
+    }
+
+    /// <summary>A 31-day tile with a real, populated breakdown can flip, and its segments are a
+    /// proportion of Core's own rows — never a sum this skin performs (D10b) — so they sum to 1.</summary>
+    [Fact]
+    public void A_31d_tile_with_a_real_breakdown_can_flip_and_its_segments_sum_to_one()
+    {
+        var rowA = new ModelUsageRow(
+            "claude-sonnet-5", 10,
+            new TokenCount(1_000, UsageValueStatus.Real),
+            new TokenCount(300, UsageValueStatus.Real),
+            new TokenCount(0, UsageValueStatus.Real),
+            new TokenCount(0, UsageValueStatus.Real),
+            new EstimatedUsd(3.00m, UsageValueStatus.Estimated));
+        var rowB = new ModelUsageRow(
+            "claude-haiku-5", 5,
+            new TokenCount(500, UsageValueStatus.Real),
+            new TokenCount(100, UsageValueStatus.Real),
+            new TokenCount(0, UsageValueStatus.Real),
+            new TokenCount(0, UsageValueStatus.Real),
+            new EstimatedUsd(1.00m, UsageValueStatus.Estimated));
+        var detail = new UsageDetail(UsageSnapshot.Unavailable, UsageStatistics.Unavailable, BreakdownWith(rowA, rowB));
+
+        var content = DetailWindowContentBuilder.Build(detail, UtcNow, TimeZoneInfo.Utc);
+
+        var outputTokensTile = content.StatisticsTiles[2];
+        Assert.True(outputTokensTile.CanFlip);
+        Assert.Equal(2, outputTokensTile.Breakdown.Count);
+        Assert.Equal(1.0, outputTokensTile.Breakdown.Sum(s => s.Fraction), precision: 10);
+        Assert.Equal(0.75, outputTokensTile.Breakdown[0].Fraction, precision: 10);
+
+        var estimatedValueTile = content.StatisticsTiles[3];
+        Assert.True(estimatedValueTile.CanFlip);
+        Assert.Equal(1.0, estimatedValueTile.Breakdown.Sum(s => s.Fraction), precision: 10);
+    }
+
+    /// <summary>A 31-day tile with nothing recorded is disabled — "nothing to break down" means
+    /// no glyph and no click, not an empty but flippable breakdown.</summary>
+    [Fact]
+    public void A_31d_tile_with_an_empty_real_breakdown_cannot_flip()
+    {
+        var detail = new UsageDetail(UsageSnapshot.Unavailable, UsageStatistics.Unavailable, BreakdownWith());
+
+        var content = DetailWindowContentBuilder.Build(detail, UtcNow, TimeZoneInfo.Utc);
+
+        Assert.False(content.StatisticsTiles[2].CanFlip);
+        Assert.False(content.StatisticsTiles[3].CanFlip);
+    }
+
+    /// <summary>A 31-day tile cannot flip when Core could not read the ledger at all — the same
+    /// "unavailable, not empty" distinction <see cref="ModelUsageBreakdown"/>'s own remarks draw.</summary>
+    [Fact]
+    public void A_31d_tile_cannot_flip_when_the_breakdown_is_unavailable()
+    {
+        var detail = new UsageDetail(UsageSnapshot.Unavailable, UsageStatistics.Unavailable, ModelUsageBreakdown.Unavailable);
+
+        var content = DetailWindowContentBuilder.Build(detail, UtcNow, TimeZoneInfo.Utc);
+
+        Assert.False(content.StatisticsTiles[2].CanFlip);
+        Assert.False(content.StatisticsTiles[3].CanFlip);
+    }
+
+    /// <summary>An unpriced model contributes nothing to the "Est. value" tile's breakdown (its
+    /// own <see cref="ModelUsageRow.EstimatedSpend"/> is unavailable) but still appears in the
+    /// "Output tokens" tile's breakdown, since output tokens were recorded either way.</summary>
+    [Fact]
+    public void An_unpriced_model_is_excluded_from_the_value_breakdown_but_not_the_token_breakdown()
+    {
+        var priced = new ModelUsageRow(
+            "claude-sonnet-5", 10,
+            new TokenCount(1_000, UsageValueStatus.Real),
+            new TokenCount(400, UsageValueStatus.Real),
+            new TokenCount(0, UsageValueStatus.Real),
+            new TokenCount(0, UsageValueStatus.Real),
+            new EstimatedUsd(4.00m, UsageValueStatus.Estimated));
+        var unpriced = new ModelUsageRow(
+            "some-new-model", 2,
+            new TokenCount(100, UsageValueStatus.Real),
+            new TokenCount(100, UsageValueStatus.Real),
+            new TokenCount(0, UsageValueStatus.Real),
+            new TokenCount(0, UsageValueStatus.Real),
+            new EstimatedUsd(null, UsageValueStatus.Unavailable));
+        var detail = new UsageDetail(UsageSnapshot.Unavailable, UsageStatistics.Unavailable, BreakdownWith(priced, unpriced));
+
+        var content = DetailWindowContentBuilder.Build(detail, UtcNow, TimeZoneInfo.Utc);
+
+        Assert.True(content.StatisticsTiles[2].CanFlip);
+        Assert.Equal(2, content.StatisticsTiles[2].Breakdown.Count);
+
+        Assert.True(content.StatisticsTiles[3].CanFlip);
+        Assert.Single(content.StatisticsTiles[3].Breakdown);
+        Assert.Equal("claude-sonnet-5", content.StatisticsTiles[3].Breakdown[0].ModelId);
+    }
+
+    /// <summary>ADR-0008 D11b's <c>CoverageCaptionFixture</c> pin: the caption always states
+    /// both counts, even for a fully-covered window — unlike <see cref="PanelStatisticsFormatter.CoverageNote"/>,
+    /// which hides itself in that case.</summary>
+    [Fact]
+    public void Coverage_caption_always_states_both_counts_even_when_fully_covered()
+    {
+        var stats = UsageStatistics.Unavailable with { HistoryCoverage = new HistoryCoverage(31, 31) };
+        var detail = new UsageDetail(UsageSnapshot.Unavailable, stats, ModelUsageBreakdown.Unavailable);
+
+        var content = DetailWindowContentBuilder.Build(detail, UtcNow, TimeZoneInfo.Utc);
+
+        Assert.Contains("31", content.CoverageCaption);
+        Assert.Contains("31 of 31", content.CoverageCaption);
+    }
+
+    /// <summary>The caption counts days Core has data <b>for</b>, not days with usage — the
+    /// same distinction <see cref="HistoryCoverage"/>'s own remarks draw.</summary>
+    [Fact]
+    public void Coverage_caption_states_a_partial_count()
+    {
+        var stats = UsageStatistics.Unavailable with { HistoryCoverage = new HistoryCoverage(12, 31) };
+        var detail = new UsageDetail(UsageSnapshot.Unavailable, stats, ModelUsageBreakdown.Unavailable);
+
+        var content = DetailWindowContentBuilder.Build(detail, UtcNow, TimeZoneInfo.Utc);
+
+        Assert.Equal("12 of 31 days recorded", content.CoverageCaption);
+    }
 }
