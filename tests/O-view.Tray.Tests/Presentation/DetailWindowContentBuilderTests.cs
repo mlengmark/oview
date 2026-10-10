@@ -347,7 +347,12 @@ public sealed class DetailWindowContentBuilderTests
             new TokenCount(0, UsageValueStatus.Real),
             new TokenCount(0, UsageValueStatus.Real),
             new EstimatedUsd(1.00m, UsageValueStatus.Estimated));
-        var detail = new UsageDetail(UsageSnapshot.Unavailable, UsageStatistics.Unavailable, BreakdownWith(rowA, rowB));
+        var stats = UsageStatistics.Unavailable with
+        {
+            OutputTokensWindow31d = new TokenCount(400, UsageValueStatus.Real),
+            EstimatedValueWindow31d = new EstimatedUsd(4.00m, UsageValueStatus.Estimated),
+        };
+        var detail = new UsageDetail(UsageSnapshot.Unavailable, stats, BreakdownWith(rowA, rowB));
 
         var content = DetailWindowContentBuilder.Build(detail, UtcNow, TimeZoneInfo.Utc);
 
@@ -408,7 +413,12 @@ public sealed class DetailWindowContentBuilderTests
             new TokenCount(0, UsageValueStatus.Real),
             new TokenCount(0, UsageValueStatus.Real),
             new EstimatedUsd(null, UsageValueStatus.Unavailable));
-        var detail = new UsageDetail(UsageSnapshot.Unavailable, UsageStatistics.Unavailable, BreakdownWith(priced, unpriced));
+        var stats = UsageStatistics.Unavailable with
+        {
+            OutputTokensWindow31d = new TokenCount(500, UsageValueStatus.Real),
+            EstimatedValueWindow31d = new EstimatedUsd(4.00m, UsageValueStatus.Estimated),
+        };
+        var detail = new UsageDetail(UsageSnapshot.Unavailable, stats, BreakdownWith(priced, unpriced));
 
         var content = DetailWindowContentBuilder.Build(detail, UtcNow, TimeZoneInfo.Utc);
 
