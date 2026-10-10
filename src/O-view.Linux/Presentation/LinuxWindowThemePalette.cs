@@ -7,8 +7,13 @@ namespace OView.Linux.Presentation;
 /// that turns it into one (ADR-0009 D6 point 2).</summary>
 internal readonly record struct LinuxRgbColor(byte R, byte G, byte B);
 
-/// <summary>The three colours an adapter needs to repaint itself on a theme change.</summary>
-internal readonly record struct LinuxWindowThemeColors(LinuxRgbColor Background, LinuxRgbColor Foreground, LinuxRgbColor Border);
+/// <summary>The colours an adapter needs to repaint itself on a theme change. <see cref="Accent"/>
+/// and <see cref="AccentHover"/> do not vary with <see cref="ThemePreference"/> (ADR-0008
+/// slicing-table slice P3, OVI-622) — the source's own measurement (<c>ui-spec.md</c> §5) picked
+/// one stepped-down fill that already clears a white label against both panels, so there is
+/// nothing for light/dark to pick between.</summary>
+internal readonly record struct LinuxWindowThemeColors(
+    LinuxRgbColor Background, LinuxRgbColor Foreground, LinuxRgbColor Border, LinuxRgbColor Accent, LinuxRgbColor AccentHover);
 
 /// <summary>
 /// This skin's own theme-to-colour mapping (ADR-0009 slice 10; D6 point 2): nothing here is
@@ -24,15 +29,29 @@ internal readonly record struct LinuxWindowThemeColors(LinuxRgbColor Background,
 /// </summary>
 internal static class LinuxWindowThemePalette
 {
+    /// <summary>`#BE4E29` — the source's measured accent fill (<c>ui-spec.md</c> §5): 4.87:1
+    /// against white label text, 4.63:1 against the light panel, 3.34:1 against the dark one.</summary>
+    private static readonly LinuxRgbColor Accent = new(0xBE, 0x4E, 0x29);
+
+    /// <summary>`#B84A27` — the source's measured hover step: 5.19:1 against white label text,
+    /// 4.93:1 against the light panel, 3.14:1 against the dark one. The source stops here
+    /// deliberately — the next step down lands on exactly 3.00:1 against the dark panel and
+    /// reads as no longer a button there.</summary>
+    private static readonly LinuxRgbColor AccentHover = new(0xB8, 0x4A, 0x27);
+
     private static readonly LinuxWindowThemeColors LightColors = new(
         Background: new LinuxRgbColor(250, 250, 250),
         Foreground: new LinuxRgbColor(20, 20, 20),
-        Border: new LinuxRgbColor(160, 160, 160));
+        Border: new LinuxRgbColor(160, 160, 160),
+        Accent: Accent,
+        AccentHover: AccentHover);
 
     private static readonly LinuxWindowThemeColors DarkColors = new(
         Background: new LinuxRgbColor(45, 45, 48),
         Foreground: new LinuxRgbColor(225, 225, 225),
-        Border: new LinuxRgbColor(80, 80, 85));
+        Border: new LinuxRgbColor(80, 80, 85),
+        Accent: Accent,
+        AccentHover: AccentHover);
 
     public static LinuxWindowThemeColors Resolve(ThemePreference preference) => preference switch
     {
