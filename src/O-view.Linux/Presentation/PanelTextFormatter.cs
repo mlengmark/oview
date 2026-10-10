@@ -299,6 +299,14 @@ public static class PanelTextFormatter
     public const string UsageSettingsLinkLabel = "Open Claude's usage settings";
 
     /// <summary>
+    /// What clicking the weekly row's "not known" hint copies to the clipboard (ADR-0008
+    /// slicing-table slice P9): the exact command that refreshes the cache this row reads,
+    /// typed into Claude Code. Pinned equal to <c>O-view.Tray</c>'s constant of the same name —
+    /// a literal command, not wording, same reasoning as <see cref="UsageSettingsUrl"/>.
+    /// </summary>
+    public const string RunUsageCommand = "/usage";
+
+    /// <summary>
     /// The off-plan banner's heading (OVI-168; ADR-0001's 2026-09-27 amendment). Worded
     /// independently from the Windows skin (ADR-0003), but tells the same three-way story: an
     /// exhausted window asserts a charge only where the account setting supports it, and a

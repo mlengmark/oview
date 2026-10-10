@@ -45,19 +45,35 @@ internal sealed class DetailWindow : Window
     public const double DefaultWidth = 400;
     public const double DefaultHeight = 360;
 
+    /// <summary>The usage bars' track width (ADR-0008 D10b, gate G7 parity slice P9) — this
+    /// window's content width (<see cref="DefaultWidth"/> less its 12px margin on each side)
+    /// less a little more room than the text rows need, so the bar never touches the scrollbar.</summary>
+    private const double BarTrackWidth = 350;
+    private const double BarTrackHeight = 8;
+
     private readonly ISkinToShell _skinToShell;
     private readonly DetailWindowPositionController _position;
     private readonly ThemeRepaintController _theme;
     private readonly ForegroundWindowTaker _foreground = new();
     private readonly TextBlock _freshness = NewLine();
     private readonly TextBlock _session = NewLine();
+    private readonly Border _sessionBarFill = NewBarFill();
+    private readonly StackPanel _weeklyRow = new();
     private readonly TextBlock _weekly = NewLine();
+    private readonly Border _weeklyBarFill = NewBarFill();
     private readonly TextBlock _extraUsage = NewLine();
     private readonly TextBlock _today = NewLine();
     private readonly TextBlock _window31d = NewLine();
     private readonly TextBlock _caveat = NewLine();
     private readonly TextBlock _modelNote = NewLine();
     private readonly ItemsControl _modelRows = new();
+    private WindowThemeColors _colors;
+
+    /// <summary>Whether the weekly row's click currently copies <c>/usage</c> (gate G7 parity
+    /// slice P9) — only while <see cref="WeeklyBarState.NotKnown"/>; a click anywhere else on
+    /// this row does nothing but start a window drag, same as every other row.</summary>
+    private bool _weeklyRowCopiesUsageCommand;
+
     private bool _dragging;
     private System.Windows.Point _dragStartMouse;
     private System.Windows.Point _dragStartWindow;
@@ -86,6 +102,7 @@ internal sealed class DetailWindow : Window
         MouseMove += OnMouseMove;
         Deactivated += (_, _) => _skinToShell.RequestWidget(false);
         PreviewKeyDown += (_, e) => { if (e.Key == Key.Escape) _skinToShell.RequestWidget(false); };
+        _weeklyRow.MouseLeftButtonDown += OnWeeklyRowClicked;
 
         _theme = new ThemeRepaintController(themeSource, ApplyTheme);
     }
@@ -94,12 +111,25 @@ internal sealed class DetailWindow : Window
     /// <see cref="IThemeSource"/> reading (ADR-0009 slice 7). <see cref="TextBlock.Foreground"/>
     /// is set once here, at the window root, and reaches every child <see cref="TextBlock"/> in
     /// <see cref="BuildLayout"/> through WPF's own property-value inheritance — none of them set
-    /// a local <c>Foreground</c> that would shadow it.</summary>
+    /// a local <c>Foreground</c> that would shadow it. Also repaints the bar tracks (gate G7
+    /// parity slice P9), which are plain <see cref="Border"/>s with no inherited brush to read.</summary>
     private void ApplyTheme(WindowThemeColors colors)
     {
+        _colors = colors;
         Background = ToBrush(colors.Background);
         BorderBrush = ToBrush(colors.Border);
         Foreground = ToBrush(colors.Foreground);
+
+        var track = ToBrush(colors.Border);
+        if (_sessionBarFill.Parent is Border sessionTrack)
+        {
+            sessionTrack.Background = track;
+        }
+
+        if (_weeklyBarFill.Parent is Border weeklyTrack)
+        {
+            weeklyTrack.Background = track;
+        }
     }
 
     private static SolidColorBrush ToBrush(RgbColor color) =>
@@ -141,7 +171,27 @@ internal sealed class DetailWindow : Window
 
         _freshness.Text = content.Freshness;
         _session.Text = content.SessionLine;
+        _sessionBarFill.Width = BarTrackWidth * content.SessionBarFraction;
+        _sessionBarFill.Background = ToBrush(WindowThemePalette.BandColor(content.SessionBarBand));
+
         _weekly.Text = content.WeeklyLine;
+        _weeklyBarFill.Width = BarTrackWidth * content.WeeklyBarFraction;
+        _weeklyBarFill.Background = ToBrush(WindowThemePalette.BandColor(content.WeeklyBarBand));
+        _weeklyRow.Visibility = content.WeeklyState == WeeklyBarState.Hidden ? Visibility.Collapsed : Visibility.Visible;
+
+        _weeklyRowCopiesUsageCommand = content.WeeklyState == WeeklyBarState.NotKnown;
+        if (_weeklyRowCopiesUsageCommand)
+        {
+            _weeklyRow.ToolTip = HoverCard.Text(content.WeeklyUnknownHint, _colors);
+            HoverCard.ApplyTiming(_weeklyRow);
+            _weeklyRow.Cursor = System.Windows.Input.Cursors.Hand;
+        }
+        else
+        {
+            _weeklyRow.ToolTip = null;
+            _weeklyRow.Cursor = System.Windows.Input.Cursors.Arrow;
+        }
+
         _extraUsage.Text = content.ExtraUsageLine;
         _extraUsage.Visibility = string.IsNullOrEmpty(content.ExtraUsageLine) ? Visibility.Collapsed : Visibility.Visible;
         _today.Text = content.TodayLine;
@@ -151,6 +201,24 @@ internal sealed class DetailWindow : Window
         _modelNote.Text = content.ModelSectionNote;
         _modelNote.Visibility = string.IsNullOrEmpty(content.ModelSectionNote) ? Visibility.Collapsed : Visibility.Visible;
         _modelRows.ItemsSource = content.ModelRows.Select(ModelRowText).ToList();
+    }
+
+    /// <summary>
+    /// Copies <see cref="PanelTextFormatter.RunUsageCommand"/> to the clipboard when the weekly
+    /// reset is <see cref="WeeklyBarState.NotKnown"/> (gate G7 parity slice P9, source
+    /// <c>ui-spec.md</c> §"Weekly reset": "clicking copies <c>/usage</c>"). Marks the event
+    /// handled so the window-level drag handler (<see cref="OnMouseLeftButtonDown"/>) does not
+    /// also start a drag from the same click.
+    /// </summary>
+    private void OnWeeklyRowClicked(object sender, MouseButtonEventArgs e)
+    {
+        if (!_weeklyRowCopiesUsageCommand)
+        {
+            return;
+        }
+
+        System.Windows.Clipboard.SetText(PanelTextFormatter.RunUsageCommand);
+        e.Handled = true;
     }
 
     private static string ModelRowText(DetailWindowModelRow row) =>
@@ -164,10 +232,17 @@ internal sealed class DetailWindow : Window
         modelSection.Children.Add(_modelNote);
         modelSection.Children.Add(_modelRows);
 
+        var sessionRow = new StackPanel();
+        sessionRow.Children.Add(BuildBarTrack(_sessionBarFill));
+        sessionRow.Children.Add(_session);
+
+        _weeklyRow.Children.Add(BuildBarTrack(_weeklyBarFill));
+        _weeklyRow.Children.Add(_weekly);
+
         var stack = new StackPanel { Margin = new Thickness(12) };
         stack.Children.Add(_freshness);
-        stack.Children.Add(_session);
-        stack.Children.Add(_weekly);
+        stack.Children.Add(sessionRow);
+        stack.Children.Add(_weeklyRow);
         stack.Children.Add(_extraUsage);
         stack.Children.Add(new Separator { Margin = new Thickness(0, 8, 0, 8) });
         stack.Children.Add(_today);
@@ -177,6 +252,27 @@ internal sealed class DetailWindow : Window
 
         return new ScrollViewer { Content = stack, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
     }
+
+    /// <summary>The bar track (gate G7 parity slice P9): a fixed-width background strip holding
+    /// <paramref name="fill"/>, whose width <see cref="ShowDetail"/> sets to the proportional
+    /// fill — the track's own background is the only thing <see cref="ApplyTheme"/> repaints on
+    /// it, since <paramref name="fill"/> paints its own band colour.</summary>
+    private static Border BuildBarTrack(Border fill) => new()
+    {
+        Width = BarTrackWidth,
+        Height = BarTrackHeight,
+        CornerRadius = new CornerRadius(BarTrackHeight / 2),
+        Margin = new Thickness(0, 4, 0, 2),
+        Child = fill,
+        ClipToBounds = true,
+    };
+
+    private static Border NewBarFill() => new()
+    {
+        Height = BarTrackHeight,
+        HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
+        CornerRadius = new CornerRadius(BarTrackHeight / 2),
+    };
 
     private static TextBlock NewLine() => new() { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 2) };
 

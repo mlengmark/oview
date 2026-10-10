@@ -15,6 +15,14 @@ internal readonly record struct LinuxRgbColor(byte R, byte G, byte B);
 internal readonly record struct LinuxWindowThemeColors(
     LinuxRgbColor Background, LinuxRgbColor Foreground, LinuxRgbColor Border, LinuxRgbColor Accent, LinuxRgbColor AccentHover);
 
+/// <summary>The three usage-bar bands (ADR-0008 D10b, gate G7 parity slice P9), reusing this
+/// skin's own existing tray-icon hues (<see cref="StatusIconGlyphRenderer.ColorFor"/>, converted
+/// from its BGRA32 tuples) for visual continuity between the icon and the detail window.
+/// Independently declared from <c>O-view.Tray</c>'s own <c>UsageBarBandColors</c> (D1), and need
+/// not agree with it. Does not vary with <see cref="ThemePreference"/>, same reasoning as
+/// <see cref="LinuxWindowThemeColors.Accent"/>.</summary>
+internal readonly record struct UsageBarBandColors(LinuxRgbColor Green, LinuxRgbColor Amber, LinuxRgbColor Red);
+
 /// <summary>
 /// This skin's own theme-to-colour mapping (ADR-0009 slice 10; D6 point 2): nothing here is
 /// shared with <see cref="OView.App.IThemeSource"/>, Core, or <c>O-view.Tray</c>'s own
@@ -59,5 +67,22 @@ internal static class LinuxWindowThemePalette
         ThemePreference.Light => LightColors,
         ThemePreference.Unknown => LightColors,
         _ => throw new ArgumentOutOfRangeException(nameof(preference), preference, "Unrecognised theme preference.")
+    };
+
+    /// <summary>`#3CAA50`/`#F5AF0A`/`#DC3732` — this skin's own usage-bar band colours
+    /// (ADR-0008 D10b, gate G7 parity slice P9), matched to
+    /// <see cref="StatusIconGlyphRenderer"/>'s existing green/amber/red (its BGRA32 tuples
+    /// converted to RGB) rather than picked afresh.</summary>
+    public static readonly UsageBarBandColors BandColors = new(
+        Green: new LinuxRgbColor(0x3C, 0xAA, 0x50),
+        Amber: new LinuxRgbColor(0xF5, 0xAF, 0x0A),
+        Red: new LinuxRgbColor(0xDC, 0x37, 0x32));
+
+    public static LinuxRgbColor BandColor(UsageBarBand band) => band switch
+    {
+        UsageBarBand.Green => BandColors.Green,
+        UsageBarBand.Amber => BandColors.Amber,
+        UsageBarBand.Red => BandColors.Red,
+        _ => throw new ArgumentOutOfRangeException(nameof(band), band, "Unrecognised usage bar band."),
     };
 }

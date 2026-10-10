@@ -126,12 +126,24 @@ public static class DetailWindowRenderProof
         }
     }
 
+    /// <summary>The usage bars' track width (gate G7 parity slice P9) — matches
+    /// <see cref="DetailWindow"/>'s own constant so the render proof shows the same proportions
+    /// the real window would.</summary>
+    private const double BarTrackWidth = 350;
+    private const double BarTrackHeight = 8;
+
     private static Border BuildVisual(DetailWindowContent content, LinuxWindowThemeColors colors)
     {
         var stack = new StackPanel { Margin = new Thickness(12) };
         stack.Children.Add(Line(content.Freshness, colors));
         stack.Children.Add(Line(content.SessionLine, colors));
-        stack.Children.Add(Line(content.WeeklyLine, colors));
+        stack.Children.Add(BuildBar(content.SessionBarFraction, content.SessionBarBand, colors));
+        if (content.WeeklyState != WeeklyBarState.Hidden)
+        {
+            stack.Children.Add(Line(content.WeeklyLine, colors));
+            stack.Children.Add(BuildBar(content.WeeklyBarFraction, content.WeeklyBarBand, colors));
+        }
+
         if (!string.IsNullOrEmpty(content.ExtraUsageLine))
         {
             stack.Children.Add(Line(content.ExtraUsageLine, colors));
@@ -169,6 +181,28 @@ public static class DetailWindowRenderProof
             Child = stack,
         };
     }
+
+    /// <summary>The bar track + proportional fill (ADR-0008 D10b, gate G7 parity slice P9):
+    /// the band colour is <see cref="LinuxWindowThemePalette.BandColor"/>, the width is
+    /// <paramref name="fraction"/> of <see cref="BarTrackWidth"/> — the same computation
+    /// <see cref="DetailWindow.ShowDetail"/> does against its own live track.</summary>
+    private static Border BuildBar(double fraction, UsageBarBand band, LinuxWindowThemeColors colors) => new()
+    {
+        Width = BarTrackWidth,
+        Height = BarTrackHeight,
+        CornerRadius = new CornerRadius(BarTrackHeight / 2),
+        Margin = new Thickness(0, 4, 0, 2),
+        ClipToBounds = true,
+        Background = ToBrush(colors.Border),
+        Child = new Border
+        {
+            Width = BarTrackWidth * fraction,
+            Height = BarTrackHeight,
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left,
+            CornerRadius = new CornerRadius(BarTrackHeight / 2),
+            Background = ToBrush(LinuxWindowThemePalette.BandColor(band)),
+        },
+    };
 
     private static TextBlock Line(string text, LinuxWindowThemeColors colors) => new()
     {

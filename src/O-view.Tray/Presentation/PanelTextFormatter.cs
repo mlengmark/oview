@@ -332,6 +332,13 @@ public static class PanelTextFormatter
     public const string UsageSettingsLinkLabel = "Open usage settings in Claude";
 
     /// <summary>
+    /// What clicking the weekly row's "not known" hint copies to the clipboard (ADR-0008
+    /// slicing-table slice P9): the exact command that refreshes the cache this row reads,
+    /// typed into Claude Code.
+    /// </summary>
+    public const string RunUsageCommand = "/usage";
+
+    /// <summary>
     /// The off-plan banner's heading (OVI-168; ADR-0001's 2026-09-27 amendment).
     ///
     /// <para>Empty when <paramref name="divergence"/> is not off-plan
