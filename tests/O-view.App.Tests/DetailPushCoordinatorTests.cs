@@ -51,7 +51,7 @@ public sealed class DetailPushCoordinatorTests
 
         Assert.True(skin.LastVisible);
         Assert.Equal(new UsageDetail(snapshot, RealStatistics(), RealBreakdown()), skin.LastDetail);
-        Assert.Equal(2, source.CallCount);
+        Assert.Equal(6, source.CallCount);
     }
 
     [Fact]
@@ -81,7 +81,7 @@ public sealed class DetailPushCoordinatorTests
         coordinator.OnPollSucceeded(polled);
 
         Assert.Equal(new UsageDetail(polled, RealStatistics(), RealBreakdown()), skin.LastDetail);
-        Assert.Equal(2, source.CallCount);
+        Assert.Equal(6, source.CallCount);
     }
 
     [Fact]
@@ -208,6 +208,24 @@ public sealed class DetailPushCoordinatorTests
         {
             CallCount++;
             return _breakdown;
+        }
+
+        public DailyUsageSeries GetDailySeries(DateTimeOffset utcNow, TimeZoneInfo zone)
+        {
+            CallCount++;
+            return DailyUsageSeries.Unavailable;
+        }
+
+        public TokenKindTotals GetTokenKindTotals(DateTimeOffset utcNow, TimeZoneInfo zone, StatisticsWindow window)
+        {
+            CallCount++;
+            return TokenKindTotals.Unavailable;
+        }
+
+        public WeeklyResetBoundaries GetResetBoundaries(DateTimeOffset utcNow, TimeZoneInfo zone)
+        {
+            CallCount++;
+            return WeeklyResetBoundaries.Unavailable;
         }
     }
 

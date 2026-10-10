@@ -3,9 +3,11 @@ using OView.Core.Models;
 namespace OView.Core.Statistics;
 
 /// <summary>
-/// Core's ledger-read seam (ADR-0005 D6c, amended by ADR-0008 D9a/OVI-326): one interface over
-/// <see cref="OView.Core.Storage.UsageLedgerStore"/> with two queries, both answering from
-/// accumulated local history rather than a live vendor read. <b>Not</b> an
+/// Core's ledger-read seam (ADR-0005 D6c, amended by ADR-0008 D9a/OVI-326 and, for the three
+/// members added here, by the 2026-10-09 gate G7 parity amendment/OVI-635): one interface over
+/// <see cref="OView.Core.Storage.UsageLedgerStore"/> and
+/// <see cref="OView.Core.Storage.WeeklyResetAnchorStore"/>, all answering from accumulated local
+/// history rather than a live vendor read. <b>Not</b> an
 /// <see cref="OView.Core.Providers.IUsageProvider"/> — it is not part of composition
 /// (ADR-0005 D3) and has no <see cref="DataSourceKind"/>; each value in the result carries its
 /// own status flag instead.
@@ -42,4 +44,37 @@ public interface IUsageStatisticsSource
     /// Core. Returns <see cref="ModelUsageBreakdown.Unavailable"/> if the ledger cannot be read.
     /// </summary>
     ModelUsageBreakdown GetModelBreakdown(DateTimeOffset utcNow, TimeZoneInfo zone);
+
+    /// <summary>
+    /// The 31-day output-token history behind the detail window's graph
+    /// (<see cref="OView.Core.Models.DailyUsageSeries"/>, ADR-0008 D9e). Every local day in the
+    /// window is present — a day before the ledger's own first recorded day is an
+    /// <see cref="UsageValueStatus.Unavailable"/> point (a gap), never a fabricated zero; a
+    /// recorded, idle day is <see cref="UsageValueStatus.Real"/> with value <c>0</c>. Returns
+    /// <see cref="OView.Core.Models.DailyUsageSeries.Unavailable"/> if the ledger cannot be read.
+    /// </summary>
+    DailyUsageSeries GetDailySeries(DateTimeOffset utcNow, TimeZoneInfo zone);
+
+    /// <summary>
+    /// The input/output/cache-creation/cache-read token totals for <paramref name="window"/>
+    /// (<see cref="OView.Core.Models.TokenKindTotals"/>, ADR-0008 D9e), summed across every
+    /// model. Returns <see cref="OView.Core.Models.TokenKindTotals.Unavailable"/> if the ledger
+    /// cannot be read.
+    /// </summary>
+    TokenKindTotals GetTokenKindTotals(
+        DateTimeOffset utcNow, TimeZoneInfo zone, StatisticsWindow window);
+
+    /// <summary>
+    /// Every weekly-reset gridline inside the 31-day window
+    /// (<see cref="OView.Core.Models.WeeklyResetBoundaries"/>, ADR-0008 D9e), derived at query
+    /// time from <see cref="OView.Core.Storage.WeeklyResetAnchorStore"/>'s single stored anchor
+    /// — nothing new is persisted. With no anchor stored yet, the whole list falls back to the
+    /// Monday convention; with one, the anchor's own instant inside the window is
+    /// <see cref="OView.Core.Models.WeeklyResetBoundaryKind.Observed"/> and every other boundary,
+    /// stepped from it by the known cadence, is
+    /// <see cref="OView.Core.Models.WeeklyResetBoundaryKind.DerivedFromObserved"/>. Never
+    /// <see cref="OView.Core.Models.WeeklyResetBoundaries.Unavailable"/> in normal operation —
+    /// an empty or all-fallback list is still a real answer.
+    /// </summary>
+    WeeklyResetBoundaries GetResetBoundaries(DateTimeOffset utcNow, TimeZoneInfo zone);
 }

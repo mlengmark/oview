@@ -118,9 +118,28 @@ public sealed class DetailPushCoordinator
         var statistics = _statistics.GetStatistics(utcNow, _zone);
         var models = _statistics.GetModelBreakdown(utcNow, _zone);
 
-        var detail = statistics == UsageStatistics.Unavailable || models == ModelUsageBreakdown.Unavailable
-            ? UsageDetail.Unavailable
-            : new UsageDetail(snapshot, statistics, models);
+        if (statistics == UsageStatistics.Unavailable || models == ModelUsageBreakdown.Unavailable)
+        {
+            _skin.ShowDetail(UsageDetail.Unavailable);
+            return;
+        }
+
+        // ADR-0008 D9e/D9g (gate G7 parity P6, OVI-635): the four members below ride the same
+        // push as Statistics/Models above — no new seam member, no second schedule. Account
+        // (D9e's fifth new member) is a separate slice (P7) and stays at its Unavailable
+        // default here.
+        var history = _statistics.GetDailySeries(utcNow, _zone);
+        var resetBoundaries = _statistics.GetResetBoundaries(utcNow, _zone);
+        var tokensToday = _statistics.GetTokenKindTotals(utcNow, _zone, StatisticsWindow.Today);
+        var tokens31d = _statistics.GetTokenKindTotals(utcNow, _zone, StatisticsWindow.ThirtyOneDays);
+
+        var detail = new UsageDetail(snapshot, statistics, models)
+        {
+            History = history,
+            ResetBoundaries = resetBoundaries,
+            TokensToday = tokensToday,
+            Tokens31d = tokens31d,
+        };
 
         _skin.ShowDetail(detail);
     }

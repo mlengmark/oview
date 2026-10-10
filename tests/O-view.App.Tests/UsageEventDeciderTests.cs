@@ -330,6 +330,15 @@ public sealed class UsageEventDeciderTests
 
         public ModelUsageBreakdown GetModelBreakdown(DateTimeOffset utcNow, TimeZoneInfo zone) =>
             ModelUsageBreakdown.Unavailable;
+
+        public DailyUsageSeries GetDailySeries(DateTimeOffset utcNow, TimeZoneInfo zone) =>
+            DailyUsageSeries.Unavailable;
+
+        public TokenKindTotals GetTokenKindTotals(DateTimeOffset utcNow, TimeZoneInfo zone, StatisticsWindow window) =>
+            TokenKindTotals.Unavailable;
+
+        public WeeklyResetBoundaries GetResetBoundaries(DateTimeOffset utcNow, TimeZoneInfo zone) =>
+            WeeklyResetBoundaries.Unavailable;
     }
 
     private sealed class FakeClock : IClock

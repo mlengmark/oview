@@ -9,7 +9,8 @@
 - **Date:** 2026-09-27 · **Amended** 2026-10-02 (D6c, OVI-326/OVI-332);
   2026-10-09 (**gate G7 parity** — D2 Cowork ingest source, two more D6c ledger
   queries, new D7 account-identity reader; OVI-585, accepted by the board on
-  OVI-591, card `4e515cef`, transcribed into this record by OVI-607)
+  OVI-591, card `4e515cef`, transcribed into this record by OVI-607);
+  2026-10-10 (D6c's "built" note for gate G7 parity slice P6, OVI-635)
 - **Deciders:** proposed by Adrian II the Architect; accepted by the Oview board 2026-09-28
 - **Formalizes:** the approved PDR (rev. 2, `oview-pdr-reissued`), §3 and
   §3.3 — the *input* half of the Core boundary, which Phase 1 did not touch
@@ -603,6 +604,32 @@ them, per that ADR's own rule.
   > list is Monday-fallback and says so. Nothing new is persisted —
   > [ADR-0006](0006-local-storage-contract.md) D1's "rollups are computed at query
   > time, never stored" covers this.
+  >
+  > **2026-10-10 — slice P6 landed (Kit the Builder, OVI-635).** All three ride
+  > the same `IUsageStatisticsSource`/`LedgerUsageStatisticsSource` seam 5a
+  > already built, under D1's same four obligations:
+  > `GetDailySeries(utcNow, zone)` and `GetTokenKindTotals(utcNow, zone, window)`
+  > (a new `StatisticsWindow { Today, ThirtyOneDays }` enum selects the window;
+  > `IUsageProvider` is still untouched) aggregate the same
+  > `UsageLedgerStore.QueryDailyUsage` rows seam 5a's two queries already read —
+  > no new ledger query, no schema change. `GetResetBoundaries(utcNow, zone)`
+  > takes an optional `WeeklyResetAnchorStore?` in the constructor (defaulting
+  > to `null`, matching `CachedUtilizationProvider`'s own optional-store
+  > pattern) and steps back from its stored anchor by local-calendar days, not
+  > a fixed 168-hour duration, so a DST transition inside the 31-day window
+  > changes a boundary's UTC instant by the real elapsed time rather than a
+  > wrong one — covered by `LedgerUsageStatisticsSourceTests`' spring-forward
+  > and fall-back fixtures, built against a synthetic `TimeZoneInfo` rather
+  > than a named system zone so the fixtures never depend on the test
+  > runner's own tz database. A day before the ledger's first recorded day is
+  > `DailyUsagePoint.OutputTokens.Status == Unavailable` (a gap); a recorded,
+  > idle day is `Real` with value `0` — proven by a dedicated test, not just
+  > asserted in the doc comment. `DetailPushCoordinator.PushDetail` now
+  > assembles `History`/`ResetBoundaries`/`TokensToday`/`Tokens31d` onto the
+  > pushed `UsageDetail` the same way it already assembled `Statistics`/
+  > `Models` (ADR-0008 D9g — no new seam member, no second schedule);
+  > `Account` (D9e's fifth new member) is out of scope here (slice P7). No
+  > skin reads any of the four assembled members yet.
 
   **Rejected: widening `IUsageProvider` to return both** (a second method, a
   tuple, or a combined record). D1's single method is accepted board contract,
