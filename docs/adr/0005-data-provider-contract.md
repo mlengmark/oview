@@ -239,9 +239,21 @@ put identity on the tooltip's poll path.
 
 The tier value itself is `oauthAccount.organizationType` and nothing else;
 `seatTier` and `userRateLimitTier` are empty in the artefact (CONFIRMED in the
-source repository per OVI-584's evidence table; **INFERRED** here — no live
-`~/.claude.json` has been read from this repository, and the slice that builds
-this owes that reading).
+source repository per OVI-584's evidence table; **CONFIRMED here too** — OVI-636
+read a live `~/.claude.json` on a development machine: `organizationType` carried
+`"claude_max"` while both `seatTier` and `userRateLimitTier` were `null`).
+
+**Landed 2026-10-10 (OVI-636, slicing table slice P7).**
+`IAccountIdentitySource`/`AccountIdentitySource` in
+`src/O-view.Core/Providers/Identity/` implement this reader exactly as specified
+above: three string properties read off `oauthAccount` (`displayName`,
+`emailAddress`, `organizationType`), nothing else, over candidate roots from
+`ClaudeDataRoots.ClaudeCliConfigRoots`. A missing file, unreadable file,
+malformed JSON, or absent/non-object `oauthAccount` all yield
+`AccountIdentity.Unavailable`. Not wired into either skin's `Program.cs`
+composition root, and not consumed by any skin — assembling it into
+`UsageDetail.Account` and rendering it is slice P8's header UI, per the
+slicing table.
 
 ## Board questions
 
