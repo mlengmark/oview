@@ -82,7 +82,9 @@ internal static class Program
         var storeLifetime = new StoreLifetime(directory);
         var statisticsSource = new LedgerUsageStatisticsSource(
             storeLifetime.UsageLedgerStore, storeLifetime.WeeklyResetAnchorStore);
-        var detailCoordinator = new DetailPushCoordinator(statisticsSource, skin, new SystemClock(), TimeZoneInfo.Local);
+        var identitySource = new AccountIdentitySource(
+            ClaudeDataRoots.ClaudeCliConfigRoots(Environment.GetEnvironmentVariable("HOME")));
+        var detailCoordinator = new DetailPushCoordinator(statisticsSource, identitySource, skin, new SystemClock(), TimeZoneInfo.Local);
         pollLoop.SnapshotUpdated += (_, snapshot) => detailCoordinator.OnPollSucceeded(snapshot);
 
         var diagnosticsWriter = new DiagnosticsBundleWriter(directory, new SystemClock());

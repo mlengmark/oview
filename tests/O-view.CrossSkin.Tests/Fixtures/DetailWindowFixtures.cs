@@ -343,6 +343,49 @@ public static class DetailWindowFixtures
                 rendered => !rendered.Contains("waiting", StringComparison.OrdinalIgnoreCase)),
         });
 
+    /// <summary>
+    /// Gate G7 parity slice P8 (OVI-645): a known account identity carried on the header
+    /// alongside an ordinary reading — exercises the render-proof hook's header path for the
+    /// "known identity" state, both themes, both skins (ADR-0008 D11a).
+    /// </summary>
+    public static readonly DetailWindowFixture OrdinaryReadingWithKnownAccountIdentity = new(
+        Name: "ordinary-reading-with-known-account-identity",
+        Detail: new UsageDetail(
+            Snapshot: new UsageSnapshot(
+                DataSourceKind.Live,
+                new DateTimeOffset(2026, 9, 8, 20, 45, 0, TimeSpan.Zero),
+                new UsagePercent(63, UsageValueStatus.Real),
+                new UsageInstant(SessionReset, UsageValueStatus.Real),
+                new UsagePercent(22, UsageValueStatus.Real),
+                new UsageInstant(WeeklyReset, UsageValueStatus.Real),
+                UsageLevel.Amber),
+            Statistics: UsageStatistics.Unavailable,
+            Models: ModelUsageBreakdown.Unavailable)
+        {
+            Account = new AccountIdentity("Jane Doe", "jane@example.com", "claude_max", UsageValueStatus.Real),
+        },
+        DisplayZone: TimeZoneInfo.Utc,
+        ContentFacts: new[]
+        {
+            ContentFact.Contains("Jane Doe"),
+            ContentFact.Contains("claude_max"),
+        });
+
+    /// <summary>
+    /// Gate G7 parity slice P8 (OVI-645): no account identity at all, alongside the fully
+    /// unavailable detail — the header's own "no data" explanation must never guess a name.
+    /// </summary>
+    public static readonly DetailWindowFixture UnavailableAccountIdentity = new(
+        Name: "unavailable-account-identity",
+        Detail: UsageDetail.Unavailable,
+        DisplayZone: TimeZoneInfo.Utc,
+        ContentFacts: new[]
+        {
+            new ContentFact(
+                "never renders a guessed email address for an unavailable identity",
+                rendered => !rendered.Contains('@')),
+        });
+
     public static IReadOnlyList<DetailWindowFixture> All { get; } = new[]
     {
         OrdinaryLiveReadingExtraUsageOn,
@@ -358,5 +401,7 @@ public static class DetailWindowFixtures
         SessionBandBoundaryAmber69,
         SessionBandBoundaryRed70,
         WeeklyResetNotKnownWithPlanData,
+        OrdinaryReadingWithKnownAccountIdentity,
+        UnavailableAccountIdentity,
     };
 }

@@ -1,4 +1,5 @@
 using OView.Core.Models;
+using OView.Core.Providers;
 using OView.Core.Statistics;
 
 namespace OView.App.Tests;
@@ -51,7 +52,7 @@ public class AppShellTests : IDisposable
             timer,
             settings.PollCadence);
         var detailCoordinator = new DetailPushCoordinator(
-            new FakeStatisticsSource(), new FakeSkin(), new FakeClock(DateTimeOffset.UnixEpoch), TimeZoneInfo.Utc);
+            new FakeStatisticsSource(), new FakeAccountIdentitySource(), new FakeSkin(), new FakeClock(DateTimeOffset.UnixEpoch), TimeZoneInfo.Utc);
         var diagnosticsWriter = new DiagnosticsBundleWriter(_directory, new FakeClock(DateTimeOffset.UnixEpoch));
 
         return new AppShell(settingsStore, settings, pollLoop, detailCoordinator, diagnosticsWriter, new FakeSkin(), new StoreLifetime(_directory));
@@ -77,7 +78,7 @@ public class AppShellTests : IDisposable
         using var pollLoop = new UsagePollLoop(
             new FakeUsageProvider(_ => UsageSnapshot.Unavailable), new FakeClock(DateTimeOffset.UnixEpoch), timer, TimeSpan.FromMinutes(1));
         var detailCoordinator = new DetailPushCoordinator(
-            new FakeStatisticsSource(), skin, new FakeClock(DateTimeOffset.UnixEpoch), TimeZoneInfo.Utc);
+            new FakeStatisticsSource(), new FakeAccountIdentitySource(), skin, new FakeClock(DateTimeOffset.UnixEpoch), TimeZoneInfo.Utc);
         var diagnosticsWriter = new DiagnosticsBundleWriter(_directory, new FakeClock(DateTimeOffset.UnixEpoch));
         var shell = new AppShell(settingsStore, ShellSettings.Default, pollLoop, detailCoordinator, diagnosticsWriter, skin, new StoreLifetime(_directory));
 
@@ -95,7 +96,7 @@ public class AppShellTests : IDisposable
         using var pollLoop = new UsagePollLoop(
             new FakeUsageProvider(_ => UsageSnapshot.Unavailable), new FakeClock(DateTimeOffset.UnixEpoch), timer, TimeSpan.FromMinutes(1));
         var detailCoordinator = new DetailPushCoordinator(
-            new FakeStatisticsSource(), skin, new FakeClock(DateTimeOffset.UnixEpoch), TimeZoneInfo.Utc);
+            new FakeStatisticsSource(), new FakeAccountIdentitySource(), skin, new FakeClock(DateTimeOffset.UnixEpoch), TimeZoneInfo.Utc);
         var diagnosticsWriter = new DiagnosticsBundleWriter(_directory, new FakeClock(DateTimeOffset.UnixEpoch));
         var shell = new AppShell(settingsStore, ShellSettings.Default, pollLoop, detailCoordinator, diagnosticsWriter, skin, new StoreLifetime(_directory));
 
@@ -180,7 +181,7 @@ public class AppShellTests : IDisposable
         var pollLoop = new UsagePollLoop(
             new FakeUsageProvider(_ => UsageSnapshot.Unavailable), new FakeClock(DateTimeOffset.UnixEpoch), timer, TimeSpan.FromMinutes(1));
         var detailCoordinator = new DetailPushCoordinator(
-            new FakeStatisticsSource(), skin, new FakeClock(DateTimeOffset.UnixEpoch), TimeZoneInfo.Utc);
+            new FakeStatisticsSource(), new FakeAccountIdentitySource(), skin, new FakeClock(DateTimeOffset.UnixEpoch), TimeZoneInfo.Utc);
         var diagnosticsWriter = new DiagnosticsBundleWriter(_directory, new FakeClock(DateTimeOffset.UnixEpoch));
         var shell = new AppShell(settingsStore, ShellSettings.Default, pollLoop, detailCoordinator, diagnosticsWriter, skin, storeLifetime);
 
@@ -253,6 +254,11 @@ public class AppShellTests : IDisposable
 
         public WeeklyResetBoundaries GetResetBoundaries(DateTimeOffset utcNow, TimeZoneInfo zone) =>
             WeeklyResetBoundaries.Unavailable;
+    }
+
+    private sealed class FakeAccountIdentitySource : IAccountIdentitySource
+    {
+        public AccountIdentity GetIdentity() => AccountIdentity.Unavailable;
     }
 
     private sealed class FakeSkin : IShellToSkin

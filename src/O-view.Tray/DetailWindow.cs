@@ -56,6 +56,10 @@ internal sealed class DetailWindow : Window
     private readonly ThemeRepaintController _theme;
     private readonly ForegroundWindowTaker _foreground = new();
     private readonly TextBlock _freshness = NewLine();
+    private readonly TextBlock _accountDisplayName = NewLine();
+    private readonly TextBlock _accountEmail = NewLine();
+    private readonly TextBlock _accountTierBadgeText = new() { FontSize = 10, FontWeight = FontWeights.SemiBold, Foreground = System.Windows.Media.Brushes.White };
+    private readonly Border _accountTierBadge;
     private readonly TextBlock _session = NewLine();
     private readonly Border _sessionBarFill = NewBarFill();
     private readonly StackPanel _weeklyRow = new();
@@ -86,6 +90,14 @@ internal sealed class DetailWindow : Window
 
         _skinToShell = skinToShell;
         _position = position;
+        _accountTierBadge = new Border
+        {
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(6, 1, 6, 1),
+            Margin = new Thickness(0, 2, 0, 0),
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
+            Child = _accountTierBadgeText,
+        };
 
         Title = "O-view";
         Width = DefaultWidth;
@@ -119,6 +131,7 @@ internal sealed class DetailWindow : Window
         Background = ToBrush(colors.Background);
         BorderBrush = ToBrush(colors.Border);
         Foreground = ToBrush(colors.Foreground);
+        _accountTierBadge.Background = ToBrush(colors.Accent);
 
         var track = ToBrush(colors.Border);
         if (_sessionBarFill.Parent is Border sessionTrack)
@@ -170,6 +183,10 @@ internal sealed class DetailWindow : Window
         var content = DetailWindowContentBuilder.Build(detail, DateTimeOffset.UtcNow, TimeZoneInfo.Local);
 
         _freshness.Text = content.Freshness;
+        _accountDisplayName.Text = content.AccountDisplayName;
+        _accountEmail.Text = content.AccountEmail;
+        _accountTierBadgeText.Text = content.AccountTierBadge;
+        _accountTierBadge.Visibility = string.IsNullOrEmpty(content.AccountTierBadge) ? Visibility.Collapsed : Visibility.Visible;
         _session.Text = content.SessionLine;
         _sessionBarFill.Width = BarTrackWidth * content.SessionBarFraction;
         _sessionBarFill.Background = ToBrush(WindowThemePalette.BandColor(content.SessionBarBand));
@@ -225,6 +242,34 @@ internal sealed class DetailWindow : Window
         $"{row.ModelId} — {row.Requests} req · in {row.InputTokens} · out {row.OutputTokens} " +
         $"· cache w {row.CacheWriteTokens} · cache r {row.CacheReadTokens} · {row.EstimatedSpend}";
 
+    /// <summary>
+    /// The header (ADR-0008 D2 §B, gate G7 parity slice P8): the <c>O-view</c> title and the
+    /// freshness line at the left, the account block (display name, email, tier badge) at the
+    /// right — <c>ui-spec.md</c>'s own "top left"/"top right" placement, built from two
+    /// vertical stacks side by side rather than a <see cref="System.Windows.Controls.Grid"/>,
+    /// matching every other layout in this window.
+    /// </summary>
+    private UIElement BuildHeader()
+    {
+        var left = new StackPanel();
+        left.Children.Add(new TextBlock { Text = "O-view", FontWeight = FontWeights.Bold, FontSize = 14 });
+        left.Children.Add(_freshness);
+
+        var right = new StackPanel { HorizontalAlignment = System.Windows.HorizontalAlignment.Right };
+        right.Children.Add(_accountDisplayName);
+        right.Children.Add(_accountEmail);
+        right.Children.Add(_accountTierBadge);
+
+        var header = new Grid();
+        header.ColumnDefinitions.Add(new ColumnDefinition());
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Grid.SetColumn(right, 1);
+        header.Children.Add(left);
+        header.Children.Add(right);
+
+        return header;
+    }
+
     private UIElement BuildLayout()
     {
         var modelSection = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
@@ -240,7 +285,8 @@ internal sealed class DetailWindow : Window
         _weeklyRow.Children.Add(_weekly);
 
         var stack = new StackPanel { Margin = new Thickness(12) };
-        stack.Children.Add(_freshness);
+        stack.Children.Add(BuildHeader());
+        stack.Children.Add(new Separator { Margin = new Thickness(0, 8, 0, 8) });
         stack.Children.Add(sessionRow);
         stack.Children.Add(_weeklyRow);
         stack.Children.Add(_extraUsage);
