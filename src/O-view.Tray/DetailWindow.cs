@@ -66,8 +66,8 @@ internal sealed class DetailWindow : Window
     private readonly TextBlock _weekly = NewLine();
     private readonly Border _weeklyBarFill = NewBarFill();
     private readonly TextBlock _extraUsage = NewLine();
-    private readonly TextBlock _today = NewLine();
-    private readonly TextBlock _window31d = NewLine();
+    private readonly StatisticsTileView[] _tiles = { new(), new(), new(), new() };
+    private readonly TextBlock _coverageCaption = NewLine();
     private readonly TextBlock _caveat = NewLine();
     private readonly TextBlock _modelNote = NewLine();
     private readonly ItemsControl _modelRows = new();
@@ -143,6 +143,11 @@ internal sealed class DetailWindow : Window
         {
             weeklyTrack.Background = track;
         }
+
+        foreach (var tile in _tiles)
+        {
+            tile.ApplyTheme(colors);
+        }
     }
 
     private static SolidColorBrush ToBrush(RgbColor color) =>
@@ -211,8 +216,12 @@ internal sealed class DetailWindow : Window
 
         _extraUsage.Text = content.ExtraUsageLine;
         _extraUsage.Visibility = string.IsNullOrEmpty(content.ExtraUsageLine) ? Visibility.Collapsed : Visibility.Visible;
-        _today.Text = content.TodayLine;
-        _window31d.Text = content.Window31dLine;
+        for (var i = 0; i < _tiles.Length && i < content.StatisticsTiles.Count; i++)
+        {
+            _tiles[i].Populate(content.StatisticsTiles[i], _colors);
+        }
+
+        _coverageCaption.Text = content.CoverageCaption;
         _caveat.Text = content.Caveat;
         _caveat.Visibility = string.IsNullOrEmpty(content.Caveat) ? Visibility.Collapsed : Visibility.Visible;
         _modelNote.Text = content.ModelSectionNote;
@@ -284,6 +293,19 @@ internal sealed class DetailWindow : Window
         _weeklyRow.Children.Add(BuildBarTrack(_weeklyBarFill));
         _weeklyRow.Children.Add(_weekly);
 
+        var statisticsGrid = new Grid { Margin = new Thickness(0, 0, 0, 4) };
+        statisticsGrid.ColumnDefinitions.Add(new ColumnDefinition());
+        statisticsGrid.ColumnDefinitions.Add(new ColumnDefinition());
+        statisticsGrid.RowDefinitions.Add(new RowDefinition());
+        statisticsGrid.RowDefinitions.Add(new RowDefinition());
+        for (var i = 0; i < _tiles.Length; i++)
+        {
+            _tiles[i].Margin = new Thickness(0, 0, 4, 4);
+            Grid.SetColumn(_tiles[i], i % 2);
+            Grid.SetRow(_tiles[i], i / 2);
+            statisticsGrid.Children.Add(_tiles[i]);
+        }
+
         var stack = new StackPanel { Margin = new Thickness(12) };
         stack.Children.Add(BuildHeader());
         stack.Children.Add(new Separator { Margin = new Thickness(0, 8, 0, 8) });
@@ -291,8 +313,8 @@ internal sealed class DetailWindow : Window
         stack.Children.Add(_weeklyRow);
         stack.Children.Add(_extraUsage);
         stack.Children.Add(new Separator { Margin = new Thickness(0, 8, 0, 8) });
-        stack.Children.Add(_today);
-        stack.Children.Add(_window31d);
+        stack.Children.Add(statisticsGrid);
+        stack.Children.Add(_coverageCaption);
         stack.Children.Add(_caveat);
         stack.Children.Add(modelSection);
 

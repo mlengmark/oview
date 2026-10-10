@@ -32,9 +32,10 @@ public static class DetailWindowRenderProof
     private static bool _platformInitialized;
 
     public static void RenderToFile(
-        UsageDetail detail, ThemePreference theme, string filePath, DateTimeOffset utcNow, TimeZoneInfo displayZone)
+        UsageDetail detail, ThemePreference theme, string filePath, DateTimeOffset utcNow, TimeZoneInfo displayZone,
+        bool flipWindowTiles = false)
     {
-        File.WriteAllBytes(filePath, Render(detail, theme, utcNow, displayZone));
+        File.WriteAllBytes(filePath, Render(detail, theme, utcNow, displayZone, flipWindowTiles));
     }
 
     /// <summary>
@@ -79,13 +80,14 @@ public static class DetailWindowRenderProof
         return stream.ToArray();
     }
 
-    public static byte[] Render(UsageDetail detail, ThemePreference theme, DateTimeOffset utcNow, TimeZoneInfo displayZone)
+    public static byte[] Render(
+        UsageDetail detail, ThemePreference theme, DateTimeOffset utcNow, TimeZoneInfo displayZone, bool flipWindowTiles = false)
     {
         EnsurePlatformInitialized();
 
         var content = DetailWindowContentBuilder.Build(detail, utcNow, displayZone);
         var colors = LinuxWindowThemePalette.Resolve(theme);
-        var visual = BuildVisual(content, colors);
+        var visual = BuildVisual(content, colors, flipWindowTiles);
 
         visual.Measure(new Size(Width, Height));
         visual.Arrange(new Rect(0, 0, Width, Height));
@@ -133,7 +135,7 @@ public static class DetailWindowRenderProof
     private const double BarTrackWidth = 350;
     private const double BarTrackHeight = 8;
 
-    private static Border BuildVisual(DetailWindowContent content, LinuxWindowThemeColors colors)
+    private static Border BuildVisual(DetailWindowContent content, LinuxWindowThemeColors colors, bool flipWindowTiles)
     {
         var stack = new StackPanel { Margin = new Thickness(12) };
         stack.Children.Add(BuildHeader(content, colors));
@@ -152,8 +154,8 @@ public static class DetailWindowRenderProof
         }
 
         stack.Children.Add(new Separator { Margin = new Thickness(0, 8, 0, 8), Background = ToBrush(colors.Border) });
-        stack.Children.Add(Line(content.TodayLine, colors));
-        stack.Children.Add(Line(content.Window31dLine, colors));
+        stack.Children.Add(BuildStatisticsTilesGrid(content.StatisticsTiles, colors, flipWindowTiles));
+        stack.Children.Add(Line(content.CoverageCaption, colors));
         if (!string.IsNullOrEmpty(content.Caveat))
         {
             stack.Children.Add(Line(content.Caveat, colors));
@@ -249,6 +251,89 @@ public static class DetailWindowRenderProof
         header.Children.Add(right);
 
         return header;
+    }
+
+    /// <summary>
+    /// Mirrors <see cref="StatisticsTileView"/>'s own front/back faces (gate G7 parity slice
+    /// P10), minimally — a static picture, not an interactive control — so the render proof
+    /// shows exactly what <see cref="DetailWindow.ShowDetail"/> would paint for each tile: its
+    /// own figure, or (when <paramref name="flipWindowTiles"/> asks for it and the tile actually
+    /// has something to show) its per-model stacked bar. A tile with nothing to flip to never
+    /// shows the affordance glyph, matching the live control's own disabled-tile rule.
+    /// </summary>
+    private static Control BuildStatisticsTilesGrid(IReadOnlyList<StatisticsTile> tiles, LinuxWindowThemeColors colors, bool flipWindowTiles)
+    {
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition());
+        grid.ColumnDefinitions.Add(new ColumnDefinition());
+        grid.RowDefinitions.Add(new RowDefinition());
+        grid.RowDefinitions.Add(new RowDefinition());
+
+        for (var i = 0; i < tiles.Count; i++)
+        {
+            var tileVisual = BuildStatisticsTile(tiles[i], colors, flipWindowTiles && tiles[i].CanFlip);
+            Grid.SetColumn(tileVisual, i % 2);
+            Grid.SetRow(tileVisual, i / 2);
+            grid.Children.Add(tileVisual);
+        }
+
+        return grid;
+    }
+
+    private static Border BuildStatisticsTile(StatisticsTile tile, LinuxWindowThemeColors colors, bool flipped)
+    {
+        var faces = new Grid();
+
+        if (!flipped)
+        {
+            var front = new StackPanel();
+            front.Children.Add(new TextBlock { Text = tile.Label, FontSize = 10, TextWrapping = TextWrapping.Wrap, Foreground = ToBrush(colors.Foreground) });
+            front.Children.Add(new TextBlock { Text = tile.Value, FontSize = 16, FontWeight = FontWeight.SemiBold, Margin = new Thickness(0, 2, 0, 0), Foreground = ToBrush(colors.Foreground) });
+            faces.Children.Add(front);
+        }
+        else
+        {
+            var bar = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center };
+            foreach (var segment in tile.Breakdown)
+            {
+                bar.Children.Add(new Border
+                {
+                    Width = Math.Max(2.0, 150 * segment.Fraction),
+                    Height = 16,
+                    Margin = new Thickness(0, 0, 1, 0),
+                    Background = ToBrush(colors.Accent),
+                });
+            }
+
+            faces.Children.Add(bar);
+        }
+
+        var root = new Grid();
+        root.Children.Add(new Border { Padding = new Thickness(10, 8, 10, 8), Child = faces });
+        if (tile.CanFlip)
+        {
+            root.Children.Add(new Border
+            {
+                Width = 8,
+                Height = 8,
+                CornerRadius = new CornerRadius(4),
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top,
+                Background = ToBrush(colors.Accent),
+            });
+        }
+
+        return new Border
+        {
+            Width = StatisticsTileView.TileWidth,
+            Height = StatisticsTileView.TileHeight,
+            Margin = new Thickness(0, 0, 4, 4),
+            CornerRadius = new CornerRadius(6),
+            BorderThickness = new Thickness(1),
+            BorderBrush = ToBrush(colors.Border),
+            Background = ToBrush(colors.Background),
+            Child = root,
+        };
     }
 
     private static TextBlock Line(string text, LinuxWindowThemeColors colors) => new()
