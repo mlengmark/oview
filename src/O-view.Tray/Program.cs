@@ -126,7 +126,10 @@ internal static class Program
                 SystemParameters.WorkArea.Height,
                 DetailWindow.DefaultWidth,
                 DetailWindow.DefaultHeight),
-            (x, y) => preferenceStore.Save(x, y));
+            (x, y) => preferenceStore.Save(x, y),
+            IsOnScreen,
+            DetailWindow.DefaultWidth,
+            DetailWindow.DefaultHeight);
 
         var detailWindow = new DetailWindow(skinToShell, positionController, themeSource);
         skin.DetailShown += detailWindow.ShowDetail;
@@ -184,6 +187,26 @@ internal static class Program
 
         return Path.Combine(localAppData, "O-view", "Tray");
     }
+
+    /// <summary>
+    /// ADR-0008 D4's 2026-10-09 amendment, slice P1: the real half of
+    /// <see cref="DetailWindowPositionController"/>'s <c>isOnScreen</c> predicate. Adapter code,
+    /// not unit-tested, same boundary as every other real-environment read in this file —
+    /// <see cref="DetailWindowOnScreenCheck.IsFullyOnScreen"/> carries the actual decision and is
+    /// proven against fakes. Reads every <see cref="System.Windows.Forms.Screen"/>'s work area,
+    /// not just the primary one, since the amendment asks whether the saved rectangle intersects
+    /// <i>any</i> current work area.
+    /// </summary>
+    private static bool IsOnScreen(Presentation.ScreenRect candidate) =>
+        DetailWindowOnScreenCheck.IsFullyOnScreen(
+            candidate,
+            System.Windows.Forms.Screen.AllScreens
+                .Select(screen => new Presentation.ScreenRect(
+                    screen.WorkingArea.Left,
+                    screen.WorkingArea.Top,
+                    screen.WorkingArea.Width,
+                    screen.WorkingArea.Height))
+                .ToArray());
 
     /// <summary>
     /// A real, read-only <see cref="IUsageProvider"/> over the current user's Claude Desktop

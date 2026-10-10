@@ -65,7 +65,10 @@ internal sealed class App : Application
                 WorkArea(windowRef).Height,
                 DetailWindow.DefaultWidth,
                 DetailWindow.DefaultHeight),
-            (x, y) => _preferenceStore.Save(x, y));
+            (x, y) => _preferenceStore.Save(x, y),
+            candidate => IsOnScreen(windowRef, candidate),
+            DetailWindow.DefaultWidth,
+            DetailWindow.DefaultHeight);
 
         var detailWindow = new DetailWindow(_skinToShell, position);
         windowRef = detailWindow;
@@ -85,4 +88,31 @@ internal sealed class App : Application
     /// <c>Centered</c>, so this never needs its own fallback.</summary>
     private static PixelRect WorkArea(DetailWindow? window) =>
         window?.Screens?.Primary?.WorkingArea ?? default;
+
+    /// <summary>
+    /// ADR-0008 D4's 2026-10-09 amendment, slice P1: the real half of
+    /// <see cref="DetailWindowPositionController"/>'s <c>isOnScreen</c> predicate. Adapter code,
+    /// not unit-tested, same "not verified" boundary as the rest of this platform-timing-bound
+    /// class — <see cref="DetailWindowOnScreenCheck.IsFullyOnScreen"/> carries the actual
+    /// decision and is proven against fakes. Reads every current <c>Screens</c> entry's work
+    /// area, not just the primary one, since the amendment asks whether the saved rectangle
+    /// intersects <i>any</i> current work area; before the window (and so its <c>Screens</c>
+    /// property) exists, this reads none, which <see cref="DetailWindowOnScreenCheck"/> already
+    /// treats as "nothing can contain it" — the same "geometry unreadable" case D4's existing
+    /// centring answer names.
+    /// </summary>
+    private static bool IsOnScreen(DetailWindow? window, Presentation.ScreenRect candidate)
+    {
+        var screens = window?.Screens?.All ?? Array.Empty<Avalonia.Platform.Screen>();
+
+        return DetailWindowOnScreenCheck.IsFullyOnScreen(
+            candidate,
+            screens
+                .Select(screen => new Presentation.ScreenRect(
+                    screen.WorkingArea.X,
+                    screen.WorkingArea.Y,
+                    screen.WorkingArea.Width,
+                    screen.WorkingArea.Height))
+                .ToArray());
+    }
 }
