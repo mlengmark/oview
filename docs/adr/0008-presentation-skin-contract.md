@@ -6,7 +6,11 @@
   closed). The slicing table is therefore open for decomposition. Living
   document: amend in place, as [ADR-0001](0001-core-to-skin-data-contract.md)
   does.
-- **Date:** 2026-10-02 · **Amended** 2026-10-02 (D9, OVI-326; D7 note, OVI-324/OVI-342)
+- **Date:** 2026-10-02 · **Amended** 2026-10-02 (D9, OVI-326; D7 note,
+  OVI-324/OVI-342); 2026-10-09 (D9b, OVI-601); 2026-10-09 (**gate G7 parity** —
+  D4 off-screen fallback, D9e–D9h, new D10, new D11; OVI-585, accepted by the
+  board on OVI-591, card `4e515cef`; D9e–D9h transcribed by OVI-602, the rest by
+  OVI-607)
 - **Deciders:** Adrian II the Architect, signed off by the board
 - **Scope:** Phase 3 — the tray/status icon, the tooltip, the detail window, the
   alerts, and wiring Phase 2's providers and app shell into each platform's own
@@ -207,6 +211,47 @@ outright. So the Linux skin **logs the position it asked for and the position it
 was given**, so one round trip answers "did the corner take?". Where screen
 geometry cannot be read at all, centre — half off-screen reads as broken where
 plainly-centred does not.
+
+> **2026-10-09 amendment (OVI-585/591, gate G7).** The board has confirmed this
+> decision rather than reopening it: the detail window stays a **draggable widget
+> that remembers its last position, on both platforms**, and the source's docked
+> flyout (`PopupPositioner.cs`) and docked-edge rise animation
+> (`FlyoutAnimation.cs`) remain explicitly **not** parity items. D4 is not
+> re-decided. One rule is added.
+>
+> **A remembered position is a request, not an instruction.** On every show, a
+> saved position is re-validated against the screens as they are *now*. If the
+> saved rectangle does not intersect any current work area — monitor unplugged,
+> resolution or scaling changed, a VM resized while the app was shut — the window
+> falls back to first placement and opens in the corner. It never opens where it
+> cannot be seen, and it never opens half off-screen: partial intersection is
+> treated as failure, not nudged back into view, because "nudge it back" is a
+> second placement rule for a skin to get subtly different from the other one.
+> `DetailWindowPositionController.ResolveShowPosition()` today returns a saved
+> position with no screen check (CONFIRMED, both skins).
+>
+> **Where the rule lives.** In each skin, behind an injected
+> `Func<Rect, bool> isOnScreen` predicate, so the ordering rule stays provable
+> against fakes with no window and no disk — exactly the shape ADR-0008's slice 6
+> already built. The predicate's *implementation* is per-OS (Windows work areas;
+> Linux where the geometry can be read at all). D5 applies unchanged: both skins
+> compute it, and one cross-skin test asserts they agree on the content facts for
+> a given screen rectangle.
+>
+> **Linux keeps D4's existing honesty rule**, now covering restores too: the
+> position asked for and the position granted are both logged, because a Wayland
+> compositor can refuse a restore exactly as it can refuse a first placement.
+> Where no geometry can be read, D4's existing "centre" answer stands — a restore
+> cannot be validated against screens that cannot be enumerated, and centring is
+> the one placement that is never half off-screen.
+>
+> **Rejected: clamping the saved position into the nearest work area.** It keeps
+> the window near where the user left it, and it is two geometry implementations
+> drifting against each other for a case that happens once per hardware change.
+> **Rejected: storing the monitor identity beside the position** and restoring
+> only on a match. It is more faithful and it needs a stable per-monitor
+> identifier, which Linux does not reliably give (INFERRED) — a Windows-first
+> mechanism, which is the shape D4 exists to refuse.
 
 ### D5 — The corner rule is duplicated on purpose, and held together by a test rather than by a shared type
 
@@ -672,6 +717,90 @@ and touch no credential. No escalation required.
 > (or `null`, for the two boost members) on every existing `UsageDetail`/
 > `UsageSnapshot` construction in this repository — a pure, additive contract
 > widening with no behaviour change.
+
+### D10 — The parity bar, and who owns each half of it — added 2026-10-09 (OVI-585/591, gate G7)
+
+**D10a — the bar.** The detail window and the surfaces in OVI-584 §K are
+**complete only when every item in OVI-584's checklist A–K is met on the
+platform(s) named there, or waived by a board card.** That checklist, not this
+ADR's prose, is the acceptance list; this record exists to say which layer owes
+each item, because the same checklist line often has a Core half and a skin half.
+The checklist, the build order that works through it, the one blocking
+prerequisite and the waiver candidates are transcribed in
+[`docs/parity/g7-detail-window-parity.md`](../parity/g7-detail-window-parity.md).
+
+**D10b — the boundary, stated as a rule rather than a list.** The existing D9c
+split ("the shell assembles; the skin re-buckets nothing") does not decide the
+new cases, so:
+
+> **A proportion of two figures the skin was already handed is presentation.** A
+> bar's fill width, a segment's share text, and a per-week intensity ramp are the
+> same computation as drawing the bar at all, and refusing it would mean Core
+> computing pixel ratios.
+>
+> **A sum, an average, or a bucketing over vendor-derived rows is Core's.** Day
+> boundaries, daily totals, window totals, per-kind totals, per-model
+> aggregation, and reset-boundary derivation all cross that line.
+
+Applied to the checklist (section letters are OVI-584's):
+
+| Item | Core / shell | Skin |
+|---|---|---|
+| §C bars | the percent and its status | fill width, the 50/70 bands, every word |
+| §D tiles | the four figures, coverage, unpriced set | labels, "Est.", the flip, tile geometry |
+| §D colour | the per-model aggregate, ranked by 31-day tokens | the slot palette, the three-slot cap, the "Other" fold |
+| §E kind bars | per-kind tokens and values, and `Total` | the share text, segment order, the view switch |
+| §F columns | one output-token figure per local day, status per day | bar heights, the per-week intensity ramp, the blank-column rule |
+| §F gridlines | the boundary instants and their three kinds | the fractional position inside a column, amber, dotted, drawn last |
+| §G banner | `Divergence`, `ExtraUsage`, `OffPlanUsageAmount`, `LastIngestAt` | all three wordings, the provenance sentence, the link |
+| §H fold | nothing | all of it — timings, curve, chevron, grow-upward geometry |
+| §I cards | nothing | all of it |
+
+**Colour order is ranked by 31-day tokens, and the ranking is Core's** —
+`ModelUsageBreakdown.Rows` arrive ordered by 31-day output tokens descending, so
+both skins fold the same models into "Other" without either sorting vendor data.
+Which three hues, and that there is never a fourth, is the skin's (the validated
+palette in the source's `docs/ui-spec.md` §2). This is the one place the source
+repository put a presentation concern in Core — `ModelBreakdown.ColourOrder`
+(CONFIRMED, source) — and the rebuild splits it: the **order** is data, the
+**colours** are not.
+
+### D11 — Parity is proven by renders and timing tests, or it is not proven — added 2026-10-09 (OVI-585/591, gate G7)
+
+**D11a — the render-proof obligation.** Each skin gains an offscreen render hook
+that writes every panel state to PNG **in both themes**, the rebuild's equivalent
+of the source's `--popup-samples` / `--tile-samples` / `--menu-samples` /
+`--dialog-samples`. **Every parity PR attaches the renders for the states it
+touches**, and the reviewer compares them against renders from the source at the
+same fixture. A parity PR with no renders is incomplete, the way a PR with no
+tests is. Required states: ordinary; partial coverage; no data; off-plan On /
+Off / Unknown; boost chip; weekly reset known and unknown; and 1 / 2 / 3 /
+5-model and unpriced tiles.
+
+This grows D7's reasoning rather than replacing it: D7 accepted a harness cost as
+the price of G4 = A, and renders are that same cost for the half of the surface a
+string fixture cannot see.
+
+**D11b — eight new [ADR-0003](0003-paneltext-anti-drift-mechanism.md) fixture
+families**, because every item below is a *content fact* both skins must state
+identically, and a render proves only one skin at a time:
+
+| Family | Pins |
+|---|---|
+| `AccountIdentityFixture` | the badge for each known `organizationType`, and verbatim rendering of an unknown one |
+| `DailySeriesFixture` | the absent-day rule — blank column vs. recorded-zero bar — and that all 31 date labels render |
+| `ResetBoundaryFixture` | the hover wording for each of the three boundary kinds |
+| `ModelColourOrderFixture` | slot assignment at 1/2/3/4/5 models, and that a model's slot is identical on all four tiles |
+| `TokenKindFixture` | kind names, display order, share wording, and the unpriced-kind case |
+| `OffPlanBannerFixture` | the three extra-usage wordings and the provenance clause |
+| `CoverageCaptionFixture` | `N of 31 days recorded` — days **with data**, not days with usage |
+| `HoverTimingFixture` | that 400 / 3000 / 20 000 ms actually resolve **on each element**, not on the container |
+
+`HoverTimingFixture` is the one that is not a string. The source found this exact
+bug by measurement — timings set once on the control silently did not inherit to
+the bar segments (CONFIRMED, source `docs/ui-spec.md` §2) — and a render cannot
+show it. Its Linux half is waiver candidate **W1** in
+[`docs/parity/g7-detail-window-parity.md`](../parity/g7-detail-window-parity.md).
 
 ## Alternatives considered
 

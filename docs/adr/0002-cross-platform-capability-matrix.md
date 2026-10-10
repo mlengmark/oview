@@ -5,7 +5,8 @@
   new, dated verification event.
 - **Date:** 2026-09-08 · **Amended** 2026-09-10 (OVI-30), 2026-09-25 (OVI-135),
   2026-09-26 (OVI-140), 2026-10-02 (OVI-342 — seam cross-references only),
-  2026-10-09 (OVI-570 — seam cross-references and one new row; no label moved)
+  2026-10-09 (OVI-570 — seam cross-references and one new row; no label moved),
+  2026-10-09 (OVI-607 — gate G7 parity note; no cell and no label changed)
 - **Deciders:** Adrian II the Architect, per board sign-off at gate G1
   (2026-09-08T19:53:12Z)
 - **Formalizes:** the approved PDR (rev. 2, `oview-pdr-reissued`), §4
@@ -204,6 +205,16 @@ repository:
   diagnostic hooks (`--diagnose`, `--probe`) on this (Windows) machine —
   confirming the shared data layer degrades gracefully off-target, which
   is **not** evidence about real Linux desktop UI behaviour.
+- **2026-10-09 note (OVI-585/591, gate G7 detail-window parity — no cell
+  changes).** The G7 parity amendment to
+  [ADR-0008](0008-presentation-skin-contract.md) (D4, D10, D11) and
+  [ADR-0005](0005-data-provider-contract.md) (D2, D6c, D7) changes **no cell in
+  this matrix**. Every cell that work touches is still **never observed on real
+  hardware**, and G7 does not close until each platform has had a real-desktop
+  observation of the panel (dragged, restarted, reopened where it was left) and
+  of the menu. Agents cannot perform that step. This matrix is updated from those
+  observations, never from merged slices. Recorded here so a reader of the
+  amendment does not infer that building the slices moved a label.
 
 ## Alternatives considered
 

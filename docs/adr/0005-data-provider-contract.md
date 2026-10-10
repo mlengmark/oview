@@ -6,7 +6,10 @@
   (SQLite) was answered in [ADR-0006](0006-local-storage-contract.md): yes.
   No question on this record is open. Acceptance still authorises no slice on
   its own; each slice in the table below is its own PR and its own review.
-- **Date:** 2026-09-27
+- **Date:** 2026-09-27 · **Amended** 2026-10-02 (D6c, OVI-326/OVI-332);
+  2026-10-09 (**gate G7 parity** — D2 Cowork ingest source, two more D6c ledger
+  queries, new D7 account-identity reader; OVI-585, accepted by the board on
+  OVI-591, card `4e515cef`, transcribed into this record by OVI-607)
 - **Deciders:** proposed by Adrian II the Architect; accepted by the Oview board 2026-09-28
 - **Formalizes:** the approved PDR (rev. 2, `oview-pdr-reissued`), §3 and
   §3.3 — the *input* half of the Core boundary, which Phase 1 did not touch
@@ -141,6 +144,20 @@ that vendor has had its own audit. Nothing in this ADR is generalized
 "ready for" a second source, and the shape must not be defended on those
 grounds in review.
 
+> **2026-10-09 amendment (OVI-585/591, gate G7) — a fourth Claude-family source:
+> Cowork audit logs.** The rebuild reads none today (CONFIRMED — zero references
+> in `src/`, against 23 files in the source repository), so the tiles, the graph
+> and every per-model figure **undercount on any machine that uses Cowork**.
+> Corrected against OVI-584's framing: audit logs are transcript-shaped token
+> records, not a plan meter, so this is an **ingest source on
+> `JsonlUsageProvider`'s path writing to the ledger**, not a fifth snapshot
+> source. It reports its own provenance (`JsonlFallback`), is read-only, and is a
+> Claude-family artefact — **G5 is untouched**: Cowork is the same vendor, and
+> nothing here is shaped for, named for, or defended as readiness for any other
+> system. Treating it as another snapshot source would put token counts on the
+> tooltip's path, which D6b and [ADR-0008](0008-presentation-skin-contract.md)
+> D9d both already rejected.
+
 ### D3 — Composition selects by information value; the winner keeps its own source label
 
 `CompositeUsageProvider` is carried forward with the source's rule intact,
@@ -200,6 +217,31 @@ Carried forward from `ClaudeDataRoots` unchanged in spirit:
 **Rejected: `Environment.SpecialFolder` called directly inside a
 provider.** It is what makes the layout rules untestable off-target, and
 the source already avoids it for exactly this reason.
+
+### D7 — An account-identity reader, which is not an `IUsageProvider` — added 2026-10-09 (OVI-585/591, gate G7)
+
+`IAccountIdentitySource.GetIdentity()` reads `~/.claude.json` → `oauthAccount`,
+located through D5's injected root, and returns
+[ADR-0008](0008-presentation-skin-contract.md) D9e's `AccountIdentity`. It takes
+no clock (identity is not time-varying), produces no `DataSourceKind`, and is not
+part of composition (D3). A missing or malformed file yields
+`AccountIdentity.Unavailable`, never a guess.
+
+**It reads only `oauthAccount`'s display name, email and `organizationType`, and
+touches no token field in that file, by contract.** The standing "no credential
+handling" principle is the reason, and this reader is the first thing in the
+repository that opens a file which also contains credentials — so the restriction
+is contract, with a test asserting the reader never surfaces any other key.
+
+*Rejected: putting identity on `CachedUtilizationProvider`*, which already opens
+that very file. It would make one provider answer two unrelated questions and
+put identity on the tooltip's poll path.
+
+The tier value itself is `oauthAccount.organizationType` and nothing else;
+`seatTier` and `userRateLimitTier` are empty in the artefact (CONFIRMED in the
+source repository per OVI-584's evidence table; **INFERRED** here — no live
+`~/.claude.json` has been read from this repository, and the slice that builds
+this owes that reading).
 
 ## Board questions
 
@@ -543,6 +585,24 @@ them, per that ADR's own rule.
   > (`RateCardSource` is reserved, nothing emits a `RateCardStamp`), so every
   > `EstimatedUsd` both queries produce is `UsageValueStatus.Unavailable` —
   > honest, not a placeholder; pricing is a later amendment with its own seam.
+  >
+  > **2026-10-09 amendment (OVI-585/591, gate G7) — two more ledger queries.**
+  > Under D1's same four obligations and the same `(utcNow, zone)` parameter pair
+  > as the existing two: `GetDailySeries(utcNow, zone)` →
+  > [ADR-0008](0008-presentation-skin-contract.md) D9e's `DailyUsageSeries`, and
+  > `GetTokenKindTotals(utcNow, zone, window)` → `TokenKindTotals`. Still not an
+  > `IUsageProvider`, still not in composition, still no `DataSourceKind`.
+  > `UsageLedgerStore.QueryDailyUsage(zone)` already returns (local date × model)
+  > rows, so both queries are aggregation over data this repository already holds
+  > (CONFIRMED).
+  >
+  > **Reset boundaries are derived, not stored.** `WeeklyResetAnchorStore` holds a
+  > single anchor (`Read()` / `Save()`, CONFIRMED). The boundary list is stepped
+  > back from it at query time and labelled per D9e's three kinds
+  > (`Observed`, `DerivedFromObserved`, `MondayFallback`); with no anchor, the
+  > list is Monday-fallback and says so. Nothing new is persisted —
+  > [ADR-0006](0006-local-storage-contract.md) D1's "rollups are computed at query
+  > time, never stored" covers this.
 
   **Rejected: widening `IUsageProvider` to return both** (a second method, a
   tuple, or a combined record). D1's single method is accepted board contract,
