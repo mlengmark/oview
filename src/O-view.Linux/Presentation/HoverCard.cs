@@ -13,17 +13,20 @@ namespace OView.Linux.Presentation;
 /// carry no user-facing copy of their own (the caller supplies every string); the chrome and the
 /// timing are each this skin's own, following Avalonia's own tooltip model rather than WPF's.
 ///
-/// <para><b>The 20 s show duration is a named platform limit, not ported (waiver candidate W1,
-/// <c>docs/parity/g7-detail-window-parity.md</c>).</b> Avalonia's <see cref="ToolTip"/> exposes
-/// <see cref="ToolTip.ShowDelayProperty"/> and <see cref="ToolTip.BetweenShowDelayProperty"/> —
-/// both applied below — but no show-duration equivalent (CONFIRMED by reading
-/// <c>Avalonia.Controls.dll</c>'s own attached-property surface: no <c>ShowDuration</c>,
-/// <c>GetShowDuration</c> or <c>SetShowDuration</c> member exists anywhere in it, 2026-10-10).
-/// Avalonia tooltips instead close when the pointer leaves the owning element, with no exposed
-/// hook to force an earlier or later close. A custom popup-and-timer reimplementation could fake
-/// the 20 s cap, but W1 asks the board first rather than have a skin quietly diverge from what
-/// it actually says it does — this slice does not build that reimplementation. See
-/// <see cref="ApplyTiming"/>.</para>
+/// <para><b>Waiver W1 (accepted by the board on OVI-593, 2026-10-10): only the 400 ms initial
+/// delay is a cross-platform guarantee. The other two timings stay Windows-only; this skin uses
+/// whatever the toolkit itself offers, not a forced match to the Windows numbers.</b> Reflecting
+/// <c>Avalonia.Controls.dll</c> 12.1.3 (confirmed by a unit test against the real default) shows
+/// <see cref="ToolTip.BetweenShowDelayProperty"/> exists and defaults, unset, to <b>100 ms</b> —
+/// not the Windows skin's 3000 ms — so <see cref="ApplyTiming"/> leaves it unset rather than
+/// overriding it to a number this toolkit does not naturally produce. No
+/// <c>ShowDuration</c>/<c>GetShowDuration</c>/<c>SetShowDuration</c> member exists anywhere in the
+/// assembly (CONFIRMED 2026-10-10), and Avalonia tooltips close when the pointer leaves the owning
+/// element instead, with no exposed hook to force an earlier or later close. A custom
+/// popup-and-timer reimplementation could fake either Windows number, but W1 asks for the real
+/// toolkit shortfall to be recorded rather than have a skin quietly diverge from what it actually
+/// does — this slice does not build that reimplementation. See <see cref="ApplyTiming"/> and
+/// <c>docs/adr/0002-cross-platform-capability-matrix.md</c>'s "Hover card timing" row.</para>
 ///
 /// <para>This slice only builds the primitive and proves its timing — it does not yet wire any
 /// of the detail window's own elements (sections B-H) to use it; later slices (P8-P19) do that as
@@ -31,13 +34,25 @@ namespace OView.Linux.Presentation;
 /// </summary>
 internal static class HoverCard
 {
-    /// <summary>400 ms — matches the Windows skin's own constant; both resolve independently
-    /// (D1), not from a shared source, and happen to agree because the design calls for one
-    /// delay regardless of platform.</summary>
+    /// <summary>400 ms — matches the Windows skin's own constant and is applied on both
+    /// platforms per waiver W1; both resolve independently (D1), not from a shared source.</summary>
     public const int InitialDelayMs = 400;
 
-    /// <summary>3000 ms — matches the Windows skin's own constant; see <see cref="InitialDelayMs"/>.</summary>
+    /// <summary>
+    /// 3000 ms — the Windows skin's own constant, carried here only for the caller
+    /// (<c>HoverTimingFixtureTests</c>, <c>HoverCardTests</c>) that needs to state what Windows
+    /// achieves and this skin deliberately does not match, per waiver W1. Not applied by
+    /// <see cref="ApplyTiming"/>.
+    /// </summary>
     public const int BetweenDelayMs = 3000;
+
+    /// <summary>
+    /// 100 ms — this toolkit's own unset default for <see cref="ToolTip.BetweenShowDelayProperty"/>
+    /// (CONFIRMED by reflecting <c>Avalonia.Controls.dll</c> 12.1.3 and by a unit test against the
+    /// real default, 2026-10-10). This is what Linux actually shows between tips, per waiver W1 —
+    /// "Linux uses what the toolkit offers" — rather than the Windows 3000 ms.
+    /// </summary>
+    public const int LinuxBetweenShowDelayDefaultMs = 100;
 
     /// <summary>
     /// 20000 ms — the design value, carried here for the one caller
@@ -48,18 +63,19 @@ internal static class HoverCard
     public const int DurationMs = 20_000;
 
     /// <summary>
-    /// Applies the shared delays this toolkit actually exposes. Must be called on each element
-    /// that owns a card — timing set on a container and relied on to inherit is exactly the bug
-    /// the source found on Windows (see <c>O-view.Tray.Presentation.HoverCard</c>'s remarks);
-    /// nothing here assumes Avalonia's attached properties behave any differently, so the same
-    /// per-element discipline applies.
+    /// Applies only the timing waiver W1 actually guarantees on this platform: the 400 ms
+    /// initial delay, per element — timing set on a container and relied on to inherit is
+    /// exactly the bug the source found on Windows (see
+    /// <c>O-view.Tray.Presentation.HoverCard</c>'s remarks), so the same per-element discipline
+    /// applies here too. The between-show delay is deliberately left unset, so it resolves to
+    /// this toolkit's own default (<see cref="LinuxBetweenShowDelayDefaultMs"/>) rather than
+    /// being forced to the Windows number — see the type remarks.
     /// </summary>
     public static void ApplyTiming(Control element)
     {
         ArgumentNullException.ThrowIfNull(element);
 
         ToolTip.SetShowDelay(element, InitialDelayMs);
-        ToolTip.SetBetweenShowDelay(element, BetweenDelayMs);
     }
 
     /// <summary>

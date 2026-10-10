@@ -8,7 +8,9 @@
   2026-10-09 (OVI-570 — seam cross-references and one new row; no label moved),
   2026-10-09 (OVI-607 — gate G7 parity note; no cell and no label changed),
   2026-10-10 (OVI-621 — gate G7 parity slice P2; one new row, W1's Linux gap
-  moved from INFERRED to CONFIRMED)
+  moved from INFERRED to CONFIRMED),
+  2026-10-10 (OVI-665 — waiver W1 accepted on OVI-593; Linux hover-card cell
+  revised to the measured between-show shortfall, no label moved)
 - **Deciders:** Adrian II the Architect, per board sign-off at gate G1
   (2026-09-08T19:53:12Z)
 - **Formalizes:** the approved PDR (rev. 2, `oview-pdr-reissued`), §4
@@ -59,7 +61,7 @@ not re-tested" or "never observed" into "supported."
 | Self-update | Act on the shared update check's result: self-replace only if the OS's package model allows it, else notify-only. The check itself (fetch, rate-limit detection, `retryAfterUtc`) is **not** per-skin — see the 2026-09-25 (OVI-135) note below. **The "if" is one shared predicate, not two skin opinions:** `UpdatePolicy.MayDownloadAndRun(InstallKind)` ([ADR-0010](0010-update-execution-and-packaging-contract.md), shipped PR #89) is the only thing that decides, over the `InstallKind` the Install row's seam reports; the per-OS variance is which execution path that answer selects — `WindowsUpdateExecutor` (PR #92) or Linux notify-only (PR #94) | **CONFIRMED** — installer self-replaces via Restart Manager, checksum-verified first | **Must never self-replace** under a package-manager install (the package manager owns those files) — getting this wrong already shipped a real bug once (source repo ADR-0009 amendment) |
 | Menu / control surface | Offer the same control items from the tray/menu-bar icon ([ADR-0009](0009-control-surface-contract.md) D1/D2), each skin deciding every item's rendered state by re-reading the live source on open — never a cached copy — and wording its own labels. Adds no shell↔skin seam member; the menu is a skin surface over seams that already exist. **Who paints the menu is a per-OS fact, not a shared one** — see the two cells beside this one; a skin must not assume it owns its menu's colours | Skin-painted: a `ContextMenuStrip` on the existing `NotifyIcon`, so the skin owns its colours and must repaint it itself on an `IThemeSource` change. **INFERRED from code** — `TrayMenuController`/`TrayMenu` (PR #84), repaint via `ThemeRepaintController` (PR #86); the adapter layer is untested, and the source app's own tray context menu is the CONFIRMED precedent for the mechanism, not for this implementation | Host-drawn: a `NativeMenu` assigned to the existing `TrayIcon.Menu`, rendered by the host desktop's own menu widget — it already follows the desktop theme and **has no themeable part a skin can set**, so the Windows cell's repaint obligation has no Linux counterpart. **Never observed on real hardware** — shipped labelled unverified, no interactive Linux display reachable (`LinuxMenuController`/`LinuxTrayMenu`, PR #85; PR #88's note) |
 | Menu-dismiss-on-outside-click | Dismiss the widget/menu on an outside click | **CONFIRMED** — Win32 `AttachThreadInput`-based fix | No direct equivalent; compositor-dependent. One hardware-found bug here (#129, panel self-dismissing on an unfocused compositor) fixed but not re-tested |
-| Hover card timing | Own styled hover card (ADR-0008 D11a §I), with 400 ms initial delay and 3000 ms between-show delay applied per element, never inherited from a container — see the 2026-10-10 note below | **CONFIRMED** — `ToolTipService.InitialShowDelay`/`BetweenShowDelay`/`ShowDuration`, all three settable per element; 20 s show duration applied exactly as designed | **CONFIRMED, narrow** — `Avalonia.Controls.ToolTip` exposes `ShowDelay` and `BetweenShowDelay` (both applied); **no show-duration equivalent exists** — Avalonia tooltips close on pointer-exit only, with no exposed hook to cap how long one stays open. Named platform limit, not faked (waiver candidate W1, `docs/parity/g7-detail-window-parity.md`) |
+| Hover card timing | Own styled hover card (ADR-0008 D11a §I). The 400 ms initial delay is the one cross-platform guarantee (waiver W1, board-accepted on OVI-593); the 3000 ms between-show delay and the 20 s show duration are Windows-only design values — see the 2026-10-10 notes below | **CONFIRMED** — `ToolTipService.InitialShowDelay`/`BetweenShowDelay`/`ShowDuration`, all three settable per element; 20 s show duration applied exactly as designed | **CONFIRMED, narrow** — `Avalonia.Controls.ToolTip` exposes `ShowDelay` (applied, 400 ms) and `BetweenShowDelay` (deliberately left unset, so it resolves to this toolkit's own default — measured **100 ms**, not the Windows 3000 ms); **no show-duration equivalent exists** — Avalonia tooltips close on pointer-exit only, with no exposed hook to cap how long one stays open. Both gaps are named platform limits, not faked (waiver W1, accepted; `docs/parity/g7-detail-window-parity.md`) |
 
 ### 2026-09-10 update — `O-view.Linux` project scaffolded (OVI-30)
 
@@ -243,6 +245,33 @@ properties that exist and documents the third's absence at the call site.
 
 **No existing cell's label moved** except the one above (the Linux hover-card
 cell is new, not relocated). Nothing else in this table changed.
+
+### 2026-10-10 amendment — waiver W1 accepted; Linux's between-show shortfall is now a measured number, not a placeholder (OVI-593 decision, applied OVI-665)
+
+**The board accepted waiver W1, Option A, on OVI-593 (2026-10-10):** the
+400 ms initial delay is a cross-platform guarantee; the 3000 ms between-show
+delay and the 20 s show duration stay Windows-only design values, and Linux
+uses whatever its own toolkit offers instead of being forced to match the
+Windows numbers.
+
+**The actual Linux shortfall, measured, not guessed:** the previous entry
+above already found that `Avalonia.Controls.ToolTip.BetweenShowDelay` exists
+and is settable — it does not have the same "no such property" shortfall as
+show-duration. The shortfall the waiver actually covers is narrower: this
+toolkit's own **unset default for `BetweenShowDelay` is 100 ms**, not 3000 ms
+(CONFIRMED by reflecting `Avalonia.Controls.dll` 12.1.3 and by a unit test
+against the real default). `HoverCard.ApplyTiming` on Linux (`O-view.Linux`)
+now applies only `ShowDelay` (400 ms) and deliberately leaves
+`BetweenShowDelay` unset, so a Linux user sees roughly 1/30th of the
+between-tooltip pause a Windows user sees. Nothing here was forced to the
+Windows number and silently diverged from what it says it does — the gap is
+this row, not a hidden mismatch. `ShowDuration` is unchanged from the entry
+above: no such property exists on Linux at all, so nothing is applied or
+left unset — there is nothing to apply it to.
+
+**No existing cell's label moved.** The hover-card row's Linux cell text is
+revised to state this measured number instead of "both applied"; its
+evidence label stays **CONFIRMED, narrow**.
 
 ## Alternatives considered
 
