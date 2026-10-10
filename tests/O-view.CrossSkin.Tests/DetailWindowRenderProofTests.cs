@@ -54,5 +54,41 @@ public sealed class DetailWindowRenderProofTests : IDisposable
         Assert.True(new FileInfo(path).Length > 0, $"[{fixture.Name}/{theme}] wrote an empty file.");
     }
 
+    public static IEnumerable<object[]> Themes()
+    {
+        yield return new object[] { ThemePreference.Light };
+        yield return new object[] { ThemePreference.Dark };
+    }
+
+    /// <summary>
+    /// ADR-0008 slicing-table slice P2 (OVI-621): the render-proof hook must capture a hovered
+    /// state in both themes, for both skins — the hover card is the one surface a plain content
+    /// render can never show (a <see cref="System.Windows.Controls.ToolTip"/>/Avalonia
+    /// <c>ToolTip</c> cannot be given a parent to screenshot it inside).
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Themes))]
+    public void TrayRenderProofCapturesTheHoveredStateInBothThemes(ThemePreference theme)
+    {
+        var path = Path.Combine(_directory, $"tray-hover-cards-{theme}.png");
+
+        OView.Tray.Presentation.DetailWindowRenderProof.RenderHoverCardsToFile(theme, path);
+
+        Assert.True(File.Exists(path), $"[hover/{theme}] wrote no file.");
+        Assert.True(new FileInfo(path).Length > 0, $"[hover/{theme}] wrote an empty file.");
+    }
+
+    [Theory]
+    [MemberData(nameof(Themes))]
+    public void LinuxRenderProofCapturesTheHoveredStateInBothThemes(ThemePreference theme)
+    {
+        var path = Path.Combine(_directory, $"linux-hover-cards-{theme}.png");
+
+        OView.Linux.Presentation.DetailWindowRenderProof.RenderHoverCardsToFile(theme, path);
+
+        Assert.True(File.Exists(path), $"[hover/{theme}] wrote no file.");
+        Assert.True(new FileInfo(path).Length > 0, $"[hover/{theme}] wrote an empty file.");
+    }
+
     public void Dispose() => Directory.Delete(_directory, recursive: true);
 }

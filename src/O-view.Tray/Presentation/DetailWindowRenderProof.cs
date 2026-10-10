@@ -35,6 +35,77 @@ public static class DetailWindowRenderProof
     }
 
     /// <summary>
+    /// ADR-0008 slicing-table slice P2 (OVI-621): captures the hovered state — both
+    /// <see cref="HoverCard"/> shapes, stacked — in a given theme. A <see cref="ToolTip"/> cannot
+    /// be given a parent (it throws), so it can never appear inside a screenshot of anything
+    /// else; this renders the two cards' own content directly, the same reason the source's
+    /// <c>--tile-samples</c> wrote its hover cards to a standalone file rather than inside the
+    /// panel screenshot.
+    /// </summary>
+    public static void RenderHoverCardsToFile(ThemePreference theme, string filePath)
+    {
+        File.WriteAllBytes(filePath, RenderHoverCards(theme));
+    }
+
+    public static byte[] RenderHoverCards(ThemePreference theme)
+    {
+        byte[]? result = null;
+        Exception? error = null;
+
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                result = RenderHoverCardsOnStaThread(theme);
+            }
+            catch (Exception ex)
+            {
+                error = ex;
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+
+        if (error is not null)
+        {
+            throw error;
+        }
+
+        return result!;
+    }
+
+    private static byte[] RenderHoverCardsOnStaThread(ThemePreference theme)
+    {
+        var colors = WindowThemePalette.Resolve(theme);
+
+        var stack = new StackPanel { Margin = new Thickness(16) };
+        stack.Children.Add(HoverCard.BuildFigureCard("47%", "session · resets 16:32", colors));
+        stack.Children.Add(new System.Windows.Controls.Border { Height = 16 });
+        stack.Children.Add(HoverCard.BuildTextCard("Local estimate — based on parsed transcripts, not vendor totals.", colors));
+
+        var root = new Border
+        {
+            Background = ToBrush(colors.Background),
+            Child = stack,
+        };
+
+        root.Measure(new System.Windows.Size(double.PositiveInfinity, double.PositiveInfinity));
+        root.Arrange(new Rect(0, 0, root.DesiredSize.Width, root.DesiredSize.Height));
+
+        var bitmap = new RenderTargetBitmap(
+            Math.Max(1, (int)root.DesiredSize.Width), Math.Max(1, (int)root.DesiredSize.Height), 96, 96, PixelFormats.Pbgra32);
+        bitmap.Render(root);
+
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+
+        using var stream = new MemoryStream();
+        encoder.Save(stream);
+        return stream.ToArray();
+    }
+
+    /// <summary>
     /// Every WPF type below <see cref="FrameworkElement"/> asserts it was created on an STA
     /// thread (not just <see cref="Window"/>) — xUnit does not run tests on one, so this spins up
     /// a dedicated STA thread for the whole build-measure-arrange-render sequence and joins it,

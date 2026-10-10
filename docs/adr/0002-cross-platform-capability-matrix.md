@@ -6,7 +6,9 @@
 - **Date:** 2026-09-08 · **Amended** 2026-09-10 (OVI-30), 2026-09-25 (OVI-135),
   2026-09-26 (OVI-140), 2026-10-02 (OVI-342 — seam cross-references only),
   2026-10-09 (OVI-570 — seam cross-references and one new row; no label moved),
-  2026-10-09 (OVI-607 — gate G7 parity note; no cell and no label changed)
+  2026-10-09 (OVI-607 — gate G7 parity note; no cell and no label changed),
+  2026-10-10 (OVI-621 — gate G7 parity slice P2; one new row, W1's Linux gap
+  moved from INFERRED to CONFIRMED)
 - **Deciders:** Adrian II the Architect, per board sign-off at gate G1
   (2026-09-08T19:53:12Z)
 - **Formalizes:** the approved PDR (rev. 2, `oview-pdr-reissued`), §4
@@ -57,6 +59,7 @@ not re-tested" or "never observed" into "supported."
 | Self-update | Act on the shared update check's result: self-replace only if the OS's package model allows it, else notify-only. The check itself (fetch, rate-limit detection, `retryAfterUtc`) is **not** per-skin — see the 2026-09-25 (OVI-135) note below. **The "if" is one shared predicate, not two skin opinions:** `UpdatePolicy.MayDownloadAndRun(InstallKind)` ([ADR-0010](0010-update-execution-and-packaging-contract.md), shipped PR #89) is the only thing that decides, over the `InstallKind` the Install row's seam reports; the per-OS variance is which execution path that answer selects — `WindowsUpdateExecutor` (PR #92) or Linux notify-only (PR #94) | **CONFIRMED** — installer self-replaces via Restart Manager, checksum-verified first | **Must never self-replace** under a package-manager install (the package manager owns those files) — getting this wrong already shipped a real bug once (source repo ADR-0009 amendment) |
 | Menu / control surface | Offer the same control items from the tray/menu-bar icon ([ADR-0009](0009-control-surface-contract.md) D1/D2), each skin deciding every item's rendered state by re-reading the live source on open — never a cached copy — and wording its own labels. Adds no shell↔skin seam member; the menu is a skin surface over seams that already exist. **Who paints the menu is a per-OS fact, not a shared one** — see the two cells beside this one; a skin must not assume it owns its menu's colours | Skin-painted: a `ContextMenuStrip` on the existing `NotifyIcon`, so the skin owns its colours and must repaint it itself on an `IThemeSource` change. **INFERRED from code** — `TrayMenuController`/`TrayMenu` (PR #84), repaint via `ThemeRepaintController` (PR #86); the adapter layer is untested, and the source app's own tray context menu is the CONFIRMED precedent for the mechanism, not for this implementation | Host-drawn: a `NativeMenu` assigned to the existing `TrayIcon.Menu`, rendered by the host desktop's own menu widget — it already follows the desktop theme and **has no themeable part a skin can set**, so the Windows cell's repaint obligation has no Linux counterpart. **Never observed on real hardware** — shipped labelled unverified, no interactive Linux display reachable (`LinuxMenuController`/`LinuxTrayMenu`, PR #85; PR #88's note) |
 | Menu-dismiss-on-outside-click | Dismiss the widget/menu on an outside click | **CONFIRMED** — Win32 `AttachThreadInput`-based fix | No direct equivalent; compositor-dependent. One hardware-found bug here (#129, panel self-dismissing on an unfocused compositor) fixed but not re-tested |
+| Hover card timing | Own styled hover card (ADR-0008 D11a §I), with 400 ms initial delay and 3000 ms between-show delay applied per element, never inherited from a container — see the 2026-10-10 note below | **CONFIRMED** — `ToolTipService.InitialShowDelay`/`BetweenShowDelay`/`ShowDuration`, all three settable per element; 20 s show duration applied exactly as designed | **CONFIRMED, narrow** — `Avalonia.Controls.ToolTip` exposes `ShowDelay` and `BetweenShowDelay` (both applied); **no show-duration equivalent exists** — Avalonia tooltips close on pointer-exit only, with no exposed hook to cap how long one stays open. Named platform limit, not faked (waiver candidate W1, `docs/parity/g7-detail-window-parity.md`) |
 
 ### 2026-09-10 update — `O-view.Linux` project scaffolded (OVI-30)
 
@@ -215,6 +218,31 @@ repository:
   of the menu. Agents cannot perform that step. This matrix is updated from those
   observations, never from merged slices. Recorded here so a reader of the
   amendment does not infer that building the slices moved a label.
+
+### 2026-10-10 amendment — Hover card timing gets a row; W1's Linux gap is now measured, not guessed (OVI-621, gate G7 parity slice P2)
+
+**New row.** Both skins now build the one styled hover card ADR-0008 D11a §I
+describes (`HoverCard` in each skin's own `Presentation/`), replacing every
+default system tooltip in the detail window with a bordered card on the
+window's own theme colours, in two shapes (`Figure`, `Text`).
+
+**W1's "INFERRED unverified" is resolved to CONFIRMED, in the direction the
+waiver candidate expected.** `docs/parity/g7-detail-window-parity.md` W1 asked
+for Avalonia's actual tooltip surface to be read before the board decides
+anything. Done: reflecting `Avalonia.Controls.dll` 12.1.3 (and confirmed by a
+failing-on-purpose unit test against the real default) shows `ToolTip.ShowDelay`
+and `ToolTip.BetweenShowDelay` exist and behave as expected — `ShowDelay`'s own
+unset default is already 400 ms, `BetweenShowDelay`'s is 100 ms — but **no
+`ShowDuration` property, attached or otherwise, exists anywhere in the
+assembly.** Avalonia's tooltip popup closes when the pointer leaves the owning
+element and exposes no hook to force an earlier or later close. This slice does
+not build a custom popup-and-timer reimplementation to fake the 20 s cap — W1 is
+still open, and a skin quietly diverging from what it says it does is the
+mistake W1 exists to prevent. `HoverCard.ApplyTiming` on Linux applies the two
+properties that exist and documents the third's absence at the call site.
+
+**No existing cell's label moved** except the one above (the Linux hover-card
+cell is new, not relocated). Nothing else in this table changed.
 
 ## Alternatives considered
 

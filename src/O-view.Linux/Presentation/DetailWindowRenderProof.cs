@@ -36,6 +36,48 @@ public static class DetailWindowRenderProof
         File.WriteAllBytes(filePath, Render(detail, theme, utcNow, displayZone));
     }
 
+    /// <summary>
+    /// ADR-0008 slicing-table slice P2 (OVI-621), the Linux counterpart of
+    /// <c>O-view.Tray</c>'s own <c>RenderHoverCardsToFile</c> — independently implemented, not
+    /// shared (D1): captures the hovered state — both <see cref="HoverCard"/> shapes, stacked —
+    /// in a given theme, so review can compare it against the Windows render for the same
+    /// fixture even though this skin's own timing cannot show the 20 s cap (see
+    /// <see cref="HoverCard"/>'s remarks and waiver candidate W1).
+    /// </summary>
+    public static void RenderHoverCardsToFile(ThemePreference theme, string filePath)
+    {
+        File.WriteAllBytes(filePath, RenderHoverCards(theme));
+    }
+
+    public static byte[] RenderHoverCards(ThemePreference theme)
+    {
+        EnsurePlatformInitialized();
+
+        var colors = LinuxWindowThemePalette.Resolve(theme);
+
+        var stack = new StackPanel { Margin = new Thickness(16) };
+        stack.Children.Add(HoverCard.BuildFigureCard("47%", "session · resets 16:32", colors));
+        stack.Children.Add(new Border { Height = 16 });
+        stack.Children.Add(HoverCard.BuildTextCard("Local estimate — based on parsed transcripts, not vendor totals.", colors));
+
+        var root = new Border
+        {
+            Background = ToBrush(colors.Background),
+            Child = stack,
+        };
+
+        root.Measure(Size.Infinity);
+        root.Arrange(new Rect(0, 0, root.DesiredSize.Width, root.DesiredSize.Height));
+
+        using var bitmap = new RenderTargetBitmap(
+            new PixelSize(Math.Max(1, (int)root.DesiredSize.Width), Math.Max(1, (int)root.DesiredSize.Height)));
+        bitmap.Render(root);
+
+        using var stream = new MemoryStream();
+        bitmap.Save(stream, new PngBitmapEncoderOptions());
+        return stream.ToArray();
+    }
+
     public static byte[] Render(UsageDetail detail, ThemePreference theme, DateTimeOffset utcNow, TimeZoneInfo displayZone)
     {
         EnsurePlatformInitialized();
