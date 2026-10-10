@@ -241,7 +241,15 @@ public class UsagePollLoopTests
             new FakeUsageProvider(_ =>
             {
                 pollEntered.Set();
-                releasePoll.Wait(TimeSpan.FromSeconds(5));
+                // 30s, not 5s (OVI-678): this is a safety net against a genuine hang, not the
+                // window the assertion below relies on. A loaded CI runner can stall the test
+                // thread itself for longer than a 5s margin between pollEntered.Set() and the
+                // disposeFinishedEarly check below, letting this wait give up on its own before
+                // the test calls releasePoll.Set() — which frees the lock Dispose is waiting on
+                // and makes Dispose return fast, failing the assertion even though Dispose never
+                // raced the poll. 30s makes that false failure implausible while still bounding
+                // a real deadlock.
+                releasePoll.Wait(TimeSpan.FromSeconds(30));
                 return UsageSnapshot.Unavailable;
             }),
             new FakeClock(DateTimeOffset.UnixEpoch),
