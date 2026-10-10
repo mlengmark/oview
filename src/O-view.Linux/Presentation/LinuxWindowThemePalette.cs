@@ -85,4 +85,23 @@ internal static class LinuxWindowThemePalette
         UsageBarBand.Red => BandColors.Red,
         _ => throw new ArgumentOutOfRangeException(nameof(band), band, "Unrecognised usage bar band."),
     };
+
+    /// <summary>A fixed, four-colour palette for the token-kind bars (gate G7 parity slice P12),
+    /// independently declared from <c>O-view.Tray</c>'s own palette (D1) and need not agree with
+    /// it. Unrelated to <see cref="BandColors"/> (those warn; these just identify) and unrelated
+    /// to slice P11's own per-model colour slots. Does not vary with <see cref="ThemePreference"/>,
+    /// same reasoning as <see cref="LinuxWindowThemeColors.Accent"/>.</summary>
+    private static readonly LinuxRgbColor TokenKindInput = new(0x45, 0x86, 0xBE);
+    private static readonly LinuxRgbColor TokenKindOutput = new(0x55, 0xB0, 0x84);
+    private static readonly LinuxRgbColor TokenKindCacheCreation = new(0xA5, 0x76, 0xD6);
+    private static readonly LinuxRgbColor TokenKindCacheRead = new(0xA6, 0xA6, 0xA6);
+
+    public static LinuxRgbColor TokenKindColor(TokenKind kind) => kind switch
+    {
+        TokenKind.Input => TokenKindInput,
+        TokenKind.Output => TokenKindOutput,
+        TokenKind.CacheCreation => TokenKindCacheCreation,
+        TokenKind.CacheRead => TokenKindCacheRead,
+        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unrecognised token kind."),
+    };
 }

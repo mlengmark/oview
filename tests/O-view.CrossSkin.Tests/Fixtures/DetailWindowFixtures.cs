@@ -268,6 +268,49 @@ public static class DetailWindowFixtures
         });
 
     /// <summary>
+    /// Gate G7 parity slice P12 (OVI-667): a detail with real <see cref="UsageDetail.TokensToday"/>
+    /// and <see cref="UsageDetail.Tokens31d"/> — the two <see cref="TokenKindTotals"/> no fixture
+    /// above this one ever populates (both default to <see cref="TokenKindTotals.Unavailable"/>).
+    /// Reuses <see cref="UnpricedModelInWindow"/>'s own snapshot/statistics/model slice so this
+    /// fixture only adds what P12 itself needs.
+    /// </summary>
+    public static readonly DetailWindowFixture TokenKindTotalsPopulated = new(
+        Name: "token-kind-totals-populated",
+        Detail: UnpricedModelInWindow.Detail with
+        {
+            TokensToday = new TokenKindTotals(
+                new DateOnly(2026, 9, 8),
+                new DateOnly(2026, 9, 8),
+                Input: new TokenKindAmount(new TokenCount(4_000, UsageValueStatus.Real), new EstimatedUsd(0.40m, UsageValueStatus.Estimated)),
+                Output: new TokenKindAmount(new TokenCount(3_000, UsageValueStatus.Real), new EstimatedUsd(0.90m, UsageValueStatus.Estimated)),
+                CacheCreation: new TokenKindAmount(new TokenCount(2_000, UsageValueStatus.Real), new EstimatedUsd(0.08m, UsageValueStatus.Estimated)),
+                CacheRead: new TokenKindAmount(new TokenCount(1_000, UsageValueStatus.Real), new EstimatedUsd(0.02m, UsageValueStatus.Estimated)),
+                Total: new TokenCount(10_000, UsageValueStatus.Real),
+                Rates: new RateCardStamp(RateCardSource.Bundled, new DateOnly(2026, 9, 8), isStale: false),
+                Status: UsageValueStatus.Real),
+            Tokens31d = new TokenKindTotals(
+                new DateOnly(2026, 8, 9),
+                new DateOnly(2026, 9, 8),
+                Input: new TokenKindAmount(new TokenCount(100_000, UsageValueStatus.Real), new EstimatedUsd(10.00m, UsageValueStatus.Estimated)),
+                Output: new TokenKindAmount(new TokenCount(80_000, UsageValueStatus.Real), new EstimatedUsd(24.00m, UsageValueStatus.Estimated)),
+                CacheCreation: new TokenKindAmount(new TokenCount(40_000, UsageValueStatus.Real), new EstimatedUsd(1.60m, UsageValueStatus.Estimated)),
+                CacheRead: new TokenKindAmount(new TokenCount(30_000, UsageValueStatus.Real), new EstimatedUsd(0.30m, UsageValueStatus.Estimated)),
+                Total: new TokenCount(250_000, UsageValueStatus.Real),
+                Rates: new RateCardStamp(RateCardSource.Bundled, new DateOnly(2026, 9, 8), isStale: false),
+                Status: UsageValueStatus.Real),
+        },
+        DisplayZone: TimeZoneInfo.Utc,
+        ContentFacts: new[]
+        {
+            new ContentFact(
+                "today's four kinds sum to the carried total of 10000",
+                _ => 4_000 + 3_000 + 2_000 + 1_000 == 10_000),
+            new ContentFact(
+                "the 31-day window's four kinds sum to the carried total of 250000",
+                _ => 100_000 + 80_000 + 40_000 + 30_000 == 250_000),
+        });
+
+    /// <summary>
     /// The fully unavailable detail — the "no data" explanation D2 requires. Never a
     /// fabricated zero, same rule as <see cref="UsageStatisticsFixtures.Unavailable"/>.
     /// </summary>
@@ -395,6 +438,7 @@ public static class DetailWindowFixtures
         RecordedWindowNoActivity,
         ModelBreakdownUnavailable,
         UnpricedModelInWindow,
+        TokenKindTotalsPopulated,
         UnavailableNoDataExplanation,
         SessionBandBoundaryGreen49,
         SessionBandBoundaryAmber50,

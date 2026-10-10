@@ -85,4 +85,23 @@ internal static class WindowThemePalette
         UsageBarBand.Red => BandColors.Red,
         _ => throw new ArgumentOutOfRangeException(nameof(band), band, "Unrecognised usage bar band."),
     };
+
+    /// <summary>A fixed, four-colour palette for the token-kind bars (gate G7 parity slice P12) —
+    /// unrelated to <see cref="BandColors"/> (those warn; these just identify) and unrelated to
+    /// slice P11's own per-model colour slots (those are assigned per model, these are fixed per
+    /// kind). Does not vary with <see cref="ThemePreference"/>, same reasoning as
+    /// <see cref="WindowThemeColors.Accent"/>.</summary>
+    private static readonly RgbColor TokenKindInput = new(0x3E, 0x7C, 0xB1);
+    private static readonly RgbColor TokenKindOutput = new(0x4F, 0xA6, 0x7A);
+    private static readonly RgbColor TokenKindCacheCreation = new(0x9B, 0x6B, 0xC7);
+    private static readonly RgbColor TokenKindCacheRead = new(0x9A, 0x9A, 0x9A);
+
+    public static RgbColor TokenKindColor(TokenKind kind) => kind switch
+    {
+        TokenKind.Input => TokenKindInput,
+        TokenKind.Output => TokenKindOutput,
+        TokenKind.CacheCreation => TokenKindCacheCreation,
+        TokenKind.CacheRead => TokenKindCacheRead,
+        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unrecognised token kind."),
+    };
 }

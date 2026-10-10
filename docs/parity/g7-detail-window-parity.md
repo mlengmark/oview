@@ -119,7 +119,7 @@ anything touching `UsageDetail`, `ISkinToShell`/`IShellToSkin` or an ADR is a
 | **P9** | Usage bars: proportional fill, 50/70 bands, both reset formats, weekly-unknown hover + `/usage` copy | C | agent | band boundaries at 49/50/69/70; the three weekly states | P3 |
 | **P10** | Statistics tiles 2×2, coverage caption, no-I/O flip, **size stability**, affordance glyph, disabled tile | D | agent | tile size identical in both views; breakdown built in populate, not on click; `CoverageCaptionFixture` | P3, P5 |
 | **P11** | Model colour: Core-ranked order, three chromatic slots, the "Other" fold, legend names-only, unpriced relief | D | agent | `ModelColourOrderFixture` — same slot on all four tiles at 1/2/3/4/5 models | P10 |
-| **P12** | Token-kind bars for today and 31 days, per-segment hover cards, breakdown table behind the view switch | E | agent | `TokenKindFixture`; share text against carried `Total` | P6, P2 |
+| **P12** | **Built 2026-10-10 (OVI-667).** Token-kind bars for today and 31 days, per-segment hover cards, breakdown table behind the view switch | E | agent | `TokenKindFixture`; share text against carried `Total` | P6, P2 |
 | **P13** | The 31-day graph: one column per local day, per-week intensity ramp, vertical centred date labels, blank columns | F | agent | `DailySeriesFixture`; label centring from measured transform bounds, not a constant | P6 |
 | **P14** | Reset gridlines: amber dotted, drawn **last**, true fractional position in the day, kind on hover | F | agent | `ResetBoundaryFixture`; a Monday-fallback line lands on a column edge, a plan line inside one | P13 |
 | **P15** | Off-plan live banner: three wordings, provenance clause, link to Claude's usage settings | G | agent | `OffPlanBannerFixture` | P3 |

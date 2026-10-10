@@ -32,9 +32,10 @@ public static class DetailWindowRenderProof
     private static bool _platformInitialized;
 
     public static void RenderToFile(
-        UsageDetail detail, ThemePreference theme, string filePath, DateTimeOffset utcNow, TimeZoneInfo displayZone)
+        UsageDetail detail, ThemePreference theme, string filePath, DateTimeOffset utcNow, TimeZoneInfo displayZone,
+        bool showTokenKindBreakdown = false)
     {
-        File.WriteAllBytes(filePath, Render(detail, theme, utcNow, displayZone));
+        File.WriteAllBytes(filePath, Render(detail, theme, utcNow, displayZone, showTokenKindBreakdown));
     }
 
     /// <summary>
@@ -79,13 +80,15 @@ public static class DetailWindowRenderProof
         return stream.ToArray();
     }
 
-    public static byte[] Render(UsageDetail detail, ThemePreference theme, DateTimeOffset utcNow, TimeZoneInfo displayZone)
+    public static byte[] Render(
+        UsageDetail detail, ThemePreference theme, DateTimeOffset utcNow, TimeZoneInfo displayZone,
+        bool showTokenKindBreakdown = false)
     {
         EnsurePlatformInitialized();
 
         var content = DetailWindowContentBuilder.Build(detail, utcNow, displayZone);
         var colors = LinuxWindowThemePalette.Resolve(theme);
-        var visual = BuildVisual(content, colors);
+        var visual = BuildVisual(content, colors, showTokenKindBreakdown);
 
         visual.Measure(new Size(Width, Height));
         visual.Arrange(new Rect(0, 0, Width, Height));
@@ -133,7 +136,7 @@ public static class DetailWindowRenderProof
     private const double BarTrackWidth = 350;
     private const double BarTrackHeight = 8;
 
-    private static Border BuildVisual(DetailWindowContent content, LinuxWindowThemeColors colors)
+    private static Border BuildVisual(DetailWindowContent content, LinuxWindowThemeColors colors, bool showTokenKindBreakdown)
     {
         var stack = new StackPanel { Margin = new Thickness(12) };
         stack.Children.Add(BuildHeader(content, colors));
@@ -158,6 +161,8 @@ public static class DetailWindowRenderProof
         {
             stack.Children.Add(Line(content.Caveat, colors));
         }
+
+        stack.Children.Add(BuildTokenKindSection(content, colors, showTokenKindBreakdown));
 
         var modelSection = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
         modelSection.Children.Add(Line("By model", colors));
@@ -205,6 +210,69 @@ public static class DetailWindowRenderProof
             Background = ToBrush(LinuxWindowThemePalette.BandColor(band)),
         },
     };
+
+    /// <summary>
+    /// The token-kind bars section (gate G7 parity slice P12), mirroring
+    /// <see cref="DetailWindow.BuildTokenKindSection"/> — hand-duplicated, not shared, per this
+    /// class's own remarks. <paramref name="showTokenKindBreakdown"/> captures the view switch's
+    /// two states, the same way <c>flipWindowTiles</c> captures slice P10's own flip.
+    /// </summary>
+    private static StackPanel BuildTokenKindSection(DetailWindowContent content, LinuxWindowThemeColors colors, bool showTokenKindBreakdown)
+    {
+        var section = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
+        section.Children.Add(new TextBlock { Text = "Token usage by kind", FontWeight = FontWeight.Bold, Foreground = ToBrush(colors.Foreground) });
+        if (!string.IsNullOrEmpty(content.TokenKindSectionNote))
+        {
+            section.Children.Add(Line(content.TokenKindSectionNote, colors));
+        }
+
+        section.Children.Add(Line(content.TokenKindBarToday.Label + ": " + content.TokenKindBarToday.Total, colors));
+        section.Children.Add(BuildTokenKindBar(content.TokenKindBarToday, colors));
+        section.Children.Add(Line(content.TokenKindBarWindow31d.Label + ": " + content.TokenKindBarWindow31d.Total, colors));
+        section.Children.Add(BuildTokenKindBar(content.TokenKindBarWindow31d, colors));
+
+        if (showTokenKindBreakdown)
+        {
+            foreach (var row in content.TokenKindBreakdownRows)
+            {
+                section.Children.Add(Line(TokenKindBreakdownRowText(row), colors));
+            }
+        }
+
+        return section;
+    }
+
+    /// <summary>The segmented bar (gate G7 parity slice P12): each kind's own share, in a fixed
+    /// colour (<see cref="LinuxWindowThemePalette.TokenKindColor"/>) — a proportion of
+    /// <see cref="TokenKindBar.Total"/> already computed by <see cref="TokenKindBarFormatter"/>,
+    /// never re-summed here.</summary>
+    private static Border BuildTokenKindBar(TokenKindBar bar, LinuxWindowThemeColors colors)
+    {
+        var segments = new StackPanel { Orientation = Orientation.Horizontal };
+        foreach (var segment in bar.Segments)
+        {
+            segments.Children.Add(new Border
+            {
+                Width = BarTrackWidth * segment.Fraction,
+                Height = BarTrackHeight,
+                Background = ToBrush(LinuxWindowThemePalette.TokenKindColor(segment.Kind)),
+            });
+        }
+
+        return new Border
+        {
+            Width = BarTrackWidth,
+            Height = BarTrackHeight,
+            CornerRadius = new CornerRadius(BarTrackHeight / 2),
+            Margin = new Thickness(0, 4, 0, 2),
+            ClipToBounds = true,
+            Background = ToBrush(colors.Border),
+            Child = segments,
+        };
+    }
+
+    private static string TokenKindBreakdownRowText(TokenKindBreakdownRow row) =>
+        $"{row.Label} — today {row.TodayTokens} tokens ({row.TodayValue}) · 31 days {row.Window31dTokens} tokens ({row.Window31dValue})";
 
     /// <summary>
     /// The header (ADR-0008 D2 §B, gate G7 parity slice P8), mirroring
