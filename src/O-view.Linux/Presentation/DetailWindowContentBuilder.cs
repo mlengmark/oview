@@ -257,46 +257,47 @@ public static class DetailWindowContentBuilder
             "Output tokens, 31 days",
             UsageFormatter.Tokens(stats.OutputTokensWindow31d),
             models,
-            row => (double)(row.OutputTokens.Value ?? 0)),
+            row => (double)(row.OutputTokens.Value ?? 0),
+            stats.OutputTokensWindow31d.Value is { } outputTotal ? (double)outputTotal : null),
         BuildWindowTile(
             StatisticsTileKind.EstimatedValueWindow31d,
             "Estimated value, 31 days",
             UsageFormatter.Usd(stats.EstimatedValueWindow31d),
             models,
-            row => (double)(row.EstimatedSpend.Value ?? 0)),
+            row => (double)(row.EstimatedSpend.Value ?? 0),
+            stats.EstimatedValueWindow31d.Value is { } spendTotal ? (double)spendTotal : null),
     };
 
     /// <summary>
-    /// A 31-day tile's breakdown is a proportion of rows Core already aggregated — never a sum
-    /// this skin performs over anything Core did not already total (D10b). Disabled (no glyph)
-    /// when the breakdown could not be read, holds no rows, or every row's own figure for this
-    /// tile is nothing to show a share of.
+    /// A 31-day tile's breakdown is each row's share of the window total Core already handed
+    /// over (<paramref name="total"/>) — never a sum this skin performs over the rows itself
+    /// (ADR-0008 D10b). Disabled (no glyph) when the breakdown could not be read, holds no
+    /// rows, or the window total is unavailable or nothing to show a share of.
     /// </summary>
     private static StatisticsTile BuildWindowTile(
-        StatisticsTileKind kind, string label, string value, ModelUsageBreakdown models, Func<ModelUsageRow, double> select)
+        StatisticsTileKind kind, string label, string value, ModelUsageBreakdown models, Func<ModelUsageRow, double> select, double? total)
     {
-        if (models.Status != UsageValueStatus.Real || models.Rows.Count == 0)
-        {
-            return new StatisticsTile(kind, label, value, CanFlip: false, Breakdown: Array.Empty<StatisticsTileSegment>());
-        }
-
-        var amounts = models.Rows.Select(select).ToList();
-        var total = amounts.Sum();
-        if (total <= 0)
+        if (models.Status != UsageValueStatus.Real || models.Rows.Count == 0 || total is not { } windowTotal || windowTotal <= 0)
         {
             return new StatisticsTile(kind, label, value, CanFlip: false, Breakdown: Array.Empty<StatisticsTileSegment>());
         }
 
         var segments = new List<StatisticsTileSegment>(models.Rows.Count);
-        for (var i = 0; i < models.Rows.Count; i++)
+        foreach (var row in models.Rows)
         {
             // A row with nothing to show (e.g. an unpriced model, for the Est. value tile) gets
             // no segment at all — a zero-width slice would read as "recorded, zero spend", a
             // different fact from "could not be priced" (D9a's own unpriced-model distinction).
-            if (amounts[i] > 0)
+            var amount = select(row);
+            if (amount > 0)
             {
-                segments.Add(new StatisticsTileSegment(models.Rows[i].ModelId, Math.Clamp(amounts[i] / total, 0.0, 1.0)));
+                segments.Add(new StatisticsTileSegment(row.ModelId, Math.Clamp(amount / windowTotal, 0.0, 1.0)));
             }
+        }
+
+        if (segments.Count == 0)
+        {
+            return new StatisticsTile(kind, label, value, CanFlip: false, Breakdown: Array.Empty<StatisticsTileSegment>());
         }
 
         return new StatisticsTile(kind, label, value, CanFlip: true, Breakdown: segments);
