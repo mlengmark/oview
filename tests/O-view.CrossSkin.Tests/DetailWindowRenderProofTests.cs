@@ -90,5 +90,73 @@ public sealed class DetailWindowRenderProofTests : IDisposable
         Assert.True(new FileInfo(path).Length > 0, $"[hover/{theme}] wrote an empty file.");
     }
 
+    /// <summary>
+    /// ADR-0008 D11a's render-proof obligation, applied to gate G7 parity slice P10: the
+    /// statistics tiles' flipped state — a 31-day tile's per-model stacked bar — renders in both
+    /// themes, for both skins, reusing <c>UnpricedModelInWindow</c>'s own populated breakdown
+    /// (two rows, one of them unpriced) so the flipped render also exercises the "unpriced model
+    /// excluded from the value tile's breakdown" case.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Themes))]
+    public void TrayRenderProofCapturesTheFlippedStatisticsTilesInBothThemes(ThemePreference theme)
+    {
+        var path = Path.Combine(_directory, $"tray-statistics-tiles-flipped-{theme}.png");
+
+        OView.Tray.Presentation.DetailWindowRenderProof.RenderToFile(
+            DetailWindowFixtures.UnpricedModelInWindow.Detail, theme, path, UtcNow,
+            DetailWindowFixtures.UnpricedModelInWindow.DisplayZone, flipWindowTiles: true);
+
+        Assert.True(File.Exists(path), $"[flipped/{theme}] wrote no file.");
+        Assert.True(new FileInfo(path).Length > 0, $"[flipped/{theme}] wrote an empty file.");
+    }
+
+    [Theory]
+    [MemberData(nameof(Themes))]
+    public void LinuxRenderProofCapturesTheFlippedStatisticsTilesInBothThemes(ThemePreference theme)
+    {
+        var path = Path.Combine(_directory, $"linux-statistics-tiles-flipped-{theme}.png");
+
+        OView.Linux.Presentation.DetailWindowRenderProof.RenderToFile(
+            DetailWindowFixtures.UnpricedModelInWindow.Detail, theme, path, UtcNow,
+            DetailWindowFixtures.UnpricedModelInWindow.DisplayZone, flipWindowTiles: true);
+
+        Assert.True(File.Exists(path), $"[flipped/{theme}] wrote no file.");
+        Assert.True(new FileInfo(path).Length > 0, $"[flipped/{theme}] wrote an empty file.");
+    }
+
+    /// <summary>
+    /// The disabled-tile state: <c>RecordedWindowNoActivity</c>'s breakdown is real but empty,
+    /// so both 31-day tiles have nothing to flip to and <c>flipWindowTiles</c> has no effect —
+    /// the render proof shows the same no-glyph tiles whichever way it is asked to render them.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Themes))]
+    public void TrayRenderProofCapturesDisabledStatisticsTilesInBothThemes(ThemePreference theme)
+    {
+        var path = Path.Combine(_directory, $"tray-statistics-tiles-disabled-{theme}.png");
+
+        OView.Tray.Presentation.DetailWindowRenderProof.RenderToFile(
+            DetailWindowFixtures.RecordedWindowNoActivity.Detail, theme, path, UtcNow,
+            DetailWindowFixtures.RecordedWindowNoActivity.DisplayZone, flipWindowTiles: true);
+
+        Assert.True(File.Exists(path), $"[disabled/{theme}] wrote no file.");
+        Assert.True(new FileInfo(path).Length > 0, $"[disabled/{theme}] wrote an empty file.");
+    }
+
+    [Theory]
+    [MemberData(nameof(Themes))]
+    public void LinuxRenderProofCapturesDisabledStatisticsTilesInBothThemes(ThemePreference theme)
+    {
+        var path = Path.Combine(_directory, $"linux-statistics-tiles-disabled-{theme}.png");
+
+        OView.Linux.Presentation.DetailWindowRenderProof.RenderToFile(
+            DetailWindowFixtures.RecordedWindowNoActivity.Detail, theme, path, UtcNow,
+            DetailWindowFixtures.RecordedWindowNoActivity.DisplayZone, flipWindowTiles: true);
+
+        Assert.True(File.Exists(path), $"[disabled/{theme}] wrote no file.");
+        Assert.True(new FileInfo(path).Length > 0, $"[disabled/{theme}] wrote an empty file.");
+    }
+
     public void Dispose() => Directory.Delete(_directory, recursive: true);
 }
