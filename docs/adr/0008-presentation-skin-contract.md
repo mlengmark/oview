@@ -802,6 +802,32 @@ the bar segments (CONFIRMED, source `docs/ui-spec.md` §2) — and a render cann
 show it. Its Linux half is waiver candidate **W1** in
 [`docs/parity/g7-detail-window-parity.md`](../parity/g7-detail-window-parity.md).
 
+**2026-10-10 built (OVI-622, G7 parity slice P3).** Both skins' `DetailWindow`
+widens `DefaultWidth` from 320 to 400 px, matching the source's own `ui-spec.md`
+§2 ("Roughly 400 px wide") — the 281 px figure is a text-row truncation budget
+*inside* the window, not the window's own width (Adrian's correction, OVI-585).
+`WindowThemeColors` (`O-view.Tray`) and `LinuxWindowThemeColors` (`O-view.Linux`)
+each gain `Accent` (`#BE4E29`) and `AccentHover` (`#B84A27`) — the source's own
+measured values (`ui-spec.md` §5), identical in both themes because the
+measurement already clears both panels; D1 still applies — the two skins'
+records were widened independently and only happen to agree on these bytes
+because both are transcribing the same source measurement. Theme
+re-read-on-open was already in place from ADR-0009 slices 7/10
+(`IThemeSource.Current` re-reads on every access per D6 point 4;
+`ThemeRepaintController`/`LinuxThemeRepaintController` repaint on construction
+and on every live `Changed` event); this slice adds no new repaint mechanism,
+only the two new colours that mechanism now carries.
+`WindowThemePaletteTests`/`LinuxWindowThemePaletteTests` add a WCAG 2.1
+contrast-ratio assertion: `Accent` and `AccentHover` both clear 4.5:1 against a
+white label under both the light and dark theme resolution — the slicing
+table's "contrast assertion on the accent against both surfaces" obligation.
+`Accent`/`AccentHover` do not vary by theme today, so both checks currently
+pass against the same bytes; the assertion still guards against a future
+per-theme value regressing below the floor. This slice does not render the
+header, bars, tiles, or
+graph (P8+ build those on this themed surface) and wires `Accent` into no
+dialog or menu yet — that is P21/P24's own obligation.
+
 ## Alternatives considered
 
 **Build the Linux skin first, since it is the one nobody has ever seen work.**

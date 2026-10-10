@@ -38,8 +38,11 @@ internal sealed class DetailWindow : Window
     /// <summary>This window's fixed size, named so the composition root can feed the same
     /// figures into <see cref="DetailWindowPlacement.Compute"/> without constructing the
     /// window first (the position controller is built before the window is, since the
-    /// window's constructor takes the controller).</summary>
-    public const double DefaultWidth = 320;
+    /// window's constructor takes the controller). ADR-0008 slicing-table slice P3 (OVI-622,
+    /// G7 parity): ~400 px per the source's own <c>ui-spec.md</c> §2 ("Roughly 400 px wide") —
+    /// the 281 px figure Adrian's correction (OVI-585) traced to a text-row truncation budget
+    /// <i>inside</i> the window, not the window's own width.</summary>
+    public const double DefaultWidth = 400;
     public const double DefaultHeight = 360;
 
     private readonly ISkinToShell _skinToShell;

@@ -8,8 +8,13 @@ namespace OView.Tray.Presentation;
 /// it into (ADR-0009 D6 point 2).</summary>
 internal readonly record struct RgbColor(byte R, byte G, byte B);
 
-/// <summary>The three colours an adapter needs to repaint itself on a theme change.</summary>
-internal readonly record struct WindowThemeColors(RgbColor Background, RgbColor Foreground, RgbColor Border);
+/// <summary>The colours an adapter needs to repaint itself on a theme change. <see cref="Accent"/>
+/// and <see cref="AccentHover"/> do not vary with <see cref="ThemePreference"/> (ADR-0008
+/// slicing-table slice P3, OVI-622) — the source's own measurement (<c>ui-spec.md</c> §5) picked
+/// one stepped-down fill that already clears a white label against both panels, so there is
+/// nothing for light/dark to pick between.</summary>
+internal readonly record struct WindowThemeColors(
+    RgbColor Background, RgbColor Foreground, RgbColor Border, RgbColor Accent, RgbColor AccentHover);
 
 /// <summary>
 /// This skin's own theme-to-colour mapping (ADR-0009 slice 7, OVI-489; D6 point 2): nothing here
@@ -26,15 +31,29 @@ internal readonly record struct WindowThemeColors(RgbColor Background, RgbColor 
 /// </summary>
 internal static class WindowThemePalette
 {
+    /// <summary>`#BE4E29` — the source's measured accent fill (<c>ui-spec.md</c> §5): 4.87:1
+    /// against white label text, 4.63:1 against the light panel, 3.34:1 against the dark one.</summary>
+    private static readonly RgbColor Accent = new(0xBE, 0x4E, 0x29);
+
+    /// <summary>`#B84A27` — the source's measured hover step: 5.19:1 against white label text,
+    /// 4.93:1 against the light panel, 3.14:1 against the dark one. The source stops here
+    /// deliberately — the next step down lands on exactly 3.00:1 against the dark panel and
+    /// reads as no longer a button there.</summary>
+    private static readonly RgbColor AccentHover = new(0xB8, 0x4A, 0x27);
+
     private static readonly WindowThemeColors LightColors = new(
         Background: new RgbColor(255, 255, 255),
         Foreground: new RgbColor(0, 0, 0),
-        Border: new RgbColor(128, 128, 128));
+        Border: new RgbColor(128, 128, 128),
+        Accent: Accent,
+        AccentHover: AccentHover);
 
     private static readonly WindowThemeColors DarkColors = new(
         Background: new RgbColor(32, 32, 32),
         Foreground: new RgbColor(240, 240, 240),
-        Border: new RgbColor(90, 90, 90));
+        Border: new RgbColor(90, 90, 90),
+        Accent: Accent,
+        AccentHover: AccentHover);
 
     public static WindowThemeColors Resolve(ThemePreference preference) => preference switch
     {
