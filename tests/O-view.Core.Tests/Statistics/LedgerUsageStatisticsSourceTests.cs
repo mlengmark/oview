@@ -385,6 +385,41 @@ public sealed class LedgerUsageStatisticsSourceTests : IDisposable
             b => Assert.Equal(WeeklyResetBoundaryKind.DerivedFromObserved, b.Kind));
     }
 
+    [Fact]
+    public void GetResetBoundariesStepsTheCorrectWallClockDayAcrossASpringForwardTransition()
+    {
+        var zone = CreateDstZone();
+        var store = new UsageLedgerStore(_directory);
+        var anchorStore = new WeeklyResetAnchorStore(_directory);
+
+        // Anchor is local midnight on 2026-03-14 (daylight time, offset -4), six days after the
+        // 2026-03-08 spring-forward (clocks jump 02:00 -> 03:00). Stepping one cadence (7 days)
+        // back from it crosses that transition: the previous boundary must still land on local
+        // midnight 2026-03-07 (standard time, offset -5) — the StepLocalDays re-resolution this
+        // test exists to pin down — not on a UTC instant shifted by a flat 7 * 24 hours, which
+        // would land on 2026-03-06 23:00 local, the wrong wall-clock day (ADR-0008 D9e).
+        var anchorLocal = new DateTime(2026, 3, 14, 0, 0, 0, DateTimeKind.Unspecified);
+        var anchorInstant = new DateTimeOffset(anchorLocal, zone.GetUtcOffset(anchorLocal));
+        anchorStore.Save(anchorInstant);
+
+        var source = new LedgerUsageStatisticsSource(store, anchorStore);
+        var utcNow = new DateTimeOffset(2026, 3, 20, 12, 0, 0, TimeSpan.Zero);
+
+        var boundaries = source.GetResetBoundaries(utcNow, zone);
+
+        var expectedLocal = new DateTime(2026, 3, 7, 0, 0, 0, DateTimeKind.Unspecified);
+        var expectedInstant = new DateTimeOffset(expectedLocal, zone.GetUtcOffset(expectedLocal));
+        var naiveInstant = anchorInstant - TimeSpan.FromDays(7);
+
+        Assert.Equal(TimeSpan.FromHours(-4), anchorInstant.Offset);
+        Assert.Equal(TimeSpan.FromHours(-5), expectedInstant.Offset);
+        Assert.NotEqual(expectedInstant, naiveInstant);
+        Assert.Contains(
+            boundaries.Boundaries,
+            b => b.Instant == expectedInstant && b.Kind == WeeklyResetBoundaryKind.DerivedFromObserved);
+        Assert.DoesNotContain(boundaries.Boundaries, b => b.Instant == naiveInstant);
+    }
+
     /// <summary>
     /// A synthetic zone with a US-shaped DST rule effective only around 2026, so
     /// <see cref="GetDailySeriesAttributesARequestOnTheTwentyThreeHourSpringForwardDayToThatLocalDay"/>

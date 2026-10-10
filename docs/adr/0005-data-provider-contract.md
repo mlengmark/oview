@@ -618,10 +618,7 @@ them, per that ADR's own rule.
   > pattern) and steps back from its stored anchor by local-calendar days, not
   > a fixed 168-hour duration, so a DST transition inside the 31-day window
   > changes a boundary's UTC instant by the real elapsed time rather than a
-  > wrong one — covered by `LedgerUsageStatisticsSourceTests`' spring-forward
-  > and fall-back fixtures, built against a synthetic `TimeZoneInfo` rather
-  > than a named system zone so the fixtures never depend on the test
-  > runner's own tz database. A day before the ledger's first recorded day is
+  > wrong one. A day before the ledger's first recorded day is
   > `DailyUsagePoint.OutputTokens.Status == Unavailable` (a gap); a recorded,
   > idle day is `Real` with value `0` — proven by a dedicated test, not just
   > asserted in the doc comment. `DetailPushCoordinator.PushDetail` now
@@ -630,6 +627,18 @@ them, per that ADR's own rule.
   > `Models` (ADR-0008 D9g — no new seam member, no second schedule);
   > `Account` (D9e's fifth new member) is out of scope here (slice P7). No
   > skin reads any of the four assembled members yet.
+  >
+  > **2026-10-10 correction (OVI-640, Quinn's review of PR #108).** This note
+  > previously said the DST-safe stepping above was "covered by
+  > `LedgerUsageStatisticsSourceTests`' spring-forward and fall-back
+  > fixtures." That was wrong: those two fixtures exercise `GetDailySeries`
+  > only, built with `TimeZoneInfo.Utc`. All three original
+  > `GetResetBoundaries` tests used `TimeZoneInfo.Utc` and exercised no DST
+  > transition at all. A fourth test,
+  > `GetResetBoundariesStepsTheCorrectWallClockDayAcrossASpringForwardTransition`,
+  > now covers `StepLocalDays`'s DST re-resolution directly, against the same
+  > synthetic zone, by asserting the stepped boundary lands on the correct
+  > local midnight and offset rather than a naive 7 × 24 hour shift.
 
   **Rejected: widening `IUsageProvider` to return both** (a second method, a
   tuple, or a combined record). D1's single method is accepted board contract,
