@@ -71,6 +71,18 @@ internal sealed class DetailWindow : Window
     private readonly TextBlock _today = NewLine();
     private readonly TextBlock _window31d = NewLine();
     private readonly TextBlock _caveat = NewLine();
+    private readonly TextBlock _tokenKindTodayLabel = NewLine();
+    private readonly StackPanel _tokenKindTodayBar = new() { Orientation = Orientation.Horizontal };
+    private readonly TextBlock _tokenKindWindow31dLabel = NewLine();
+    private readonly StackPanel _tokenKindWindow31dBar = new() { Orientation = Orientation.Horizontal };
+    private readonly TextBlock _tokenKindNote = NewLine();
+    private readonly TextBlock _tokenKindToggle = new()
+    {
+        Margin = new Thickness(0, 4, 0, 0),
+        Cursor = new Cursor(StandardCursorType.Hand),
+        TextDecorations = Avalonia.Media.TextDecorations.Underline,
+    };
+    private readonly ItemsControl _tokenKindBreakdownRows = new() { IsVisible = false };
     private readonly TextBlock _modelNote = NewLine();
     private readonly ItemsControl _modelRows = new();
     private LinuxWindowThemeColors _colors;
@@ -78,6 +90,12 @@ internal sealed class DetailWindow : Window
     /// <summary>Whether the weekly row's click currently copies <c>/usage</c> (gate G7 parity
     /// slice P9) — only while <see cref="WeeklyBarState.NotKnown"/>.</summary>
     private bool _weeklyRowCopiesUsageCommand;
+
+    /// <summary>The token-kind breakdown table's view switch (gate G7 parity slice P12): toggles
+    /// <see cref="_tokenKindBreakdownRows"/>' visibility only — the rows themselves are built once
+    /// in <see cref="ShowDetail"/>, never recomputed by this toggle (the same "no I/O on click"
+    /// rule slice P10 established for a flipped statistics tile).</summary>
+    private bool _tokenKindBreakdownVisible;
 
     private bool _dragging;
     private PixelPoint _dragStartPointerScreen;
@@ -116,6 +134,8 @@ internal sealed class DetailWindow : Window
         Deactivated += (_, _) => _skinToShell.RequestWidget(false);
         KeyDown += (_, e) => { if (e.Key == Key.Escape) _skinToShell.RequestWidget(false); };
         _weeklyRow.PointerPressed += OnWeeklyRowPointerPressed;
+        _tokenKindToggle.PointerPressed += OnTokenKindTogglePointerPressed;
+        _tokenKindToggle.Text = ToggleText(_tokenKindBreakdownVisible);
     }
 
     /// <summary>
@@ -183,6 +203,16 @@ internal sealed class DetailWindow : Window
         {
             weeklyTrack.Background = border;
         }
+
+        if (_tokenKindTodayBar.Parent is Border tokenKindTodayTrack)
+        {
+            tokenKindTodayTrack.Background = border;
+        }
+
+        if (_tokenKindWindow31dBar.Parent is Border tokenKindWindow31dTrack)
+        {
+            tokenKindWindow31dTrack.Background = border;
+        }
     }
 
     private static SolidColorBrush ToBrush(LinuxRgbColor color) => new(Color.FromRgb(color.R, color.G, color.B));
@@ -224,6 +254,19 @@ internal sealed class DetailWindow : Window
         _window31d.Text = content.Window31dLine;
         _caveat.Text = content.Caveat;
         _caveat.IsVisible = !string.IsNullOrEmpty(content.Caveat);
+
+        _tokenKindTodayLabel.Text = content.TokenKindBarToday.Label + ": " + content.TokenKindBarToday.Total;
+        FillTokenKindBar(_tokenKindTodayBar, content.TokenKindBarToday);
+        _tokenKindWindow31dLabel.Text = content.TokenKindBarWindow31d.Label + ": " + content.TokenKindBarWindow31d.Total;
+        FillTokenKindBar(_tokenKindWindow31dBar, content.TokenKindBarWindow31d);
+        _tokenKindNote.Text = content.TokenKindSectionNote;
+        _tokenKindNote.IsVisible = !string.IsNullOrEmpty(content.TokenKindSectionNote);
+        _tokenKindBreakdownRows.ItemsSource = content.TokenKindBreakdownRows.Select(TokenKindBreakdownRowText).ToList();
+        _tokenKindBreakdownVisible = false;
+        _tokenKindBreakdownRows.IsVisible = false;
+        _tokenKindToggle.Text = ToggleText(_tokenKindBreakdownVisible);
+        _tokenKindToggle.IsVisible = content.TokenKindBreakdownRows.Count > 0;
+
         _modelNote.Text = content.ModelSectionNote;
         _modelNote.IsVisible = !string.IsNullOrEmpty(content.ModelSectionNote);
         _modelRows.ItemsSource = content.ModelRows.Select(ModelRowText).ToList();
@@ -247,6 +290,54 @@ internal sealed class DetailWindow : Window
         e.Handled = true;
         _ = Clipboard?.SetTextAsync(PanelTextFormatter.RunUsageCommand);
     }
+
+    /// <summary>
+    /// The breakdown table's view switch (gate G7 parity slice P12): toggles visibility only —
+    /// <see cref="_tokenKindBreakdownRows"/> was already built in <see cref="ShowDetail"/>, so
+    /// this click triggers no read. Marks the event handled so the window-level drag handler
+    /// does not also start a drag from the same click.
+    /// </summary>
+    private void OnTokenKindTogglePointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        {
+            return;
+        }
+
+        _tokenKindBreakdownVisible = !_tokenKindBreakdownVisible;
+        _tokenKindBreakdownRows.IsVisible = _tokenKindBreakdownVisible;
+        _tokenKindToggle.Text = ToggleText(_tokenKindBreakdownVisible);
+        e.Handled = true;
+    }
+
+    private static string ToggleText(bool breakdownVisible) => breakdownVisible ? "Hide breakdown ▲" : "Show breakdown ▼";
+
+    /// <summary>
+    /// Rebuilds <paramref name="bar"/>'s segment children from an already-built
+    /// <see cref="TokenKindBar"/> (gate G7 parity slice P12) — the segments themselves were
+    /// computed once in <see cref="DetailWindowContentBuilder.Build"/>; this only turns each one
+    /// into a coloured, hoverable <see cref="Border"/>. A bar with no data renders as a plain
+    /// empty track (no children), never a fabricated full or empty-looking real reading.
+    /// </summary>
+    private void FillTokenKindBar(StackPanel bar, TokenKindBar content)
+    {
+        bar.Children.Clear();
+        foreach (var segment in content.Segments)
+        {
+            var color = ToBrush(LinuxWindowThemePalette.TokenKindColor(segment.Kind));
+            var segmentBorder = new Border
+            {
+                Width = Math.Max(0, BarTrackWidth * segment.Fraction),
+                Height = BarTrackHeight,
+                Background = color,
+            };
+            HoverCard.Figure(segmentBorder, segment.HoverFigure, segment.HoverCaption, _colors, color);
+            bar.Children.Add(segmentBorder);
+        }
+    }
+
+    private static string TokenKindBreakdownRowText(TokenKindBreakdownRow row) =>
+        $"{row.Label} — today {row.TodayTokens} tokens ({row.TodayValue}) · 31 days {row.Window31dTokens} tokens ({row.Window31dValue})";
 
     private static string ModelRowText(DetailWindowModelRow row) =>
         $"{row.ModelId} — {row.Requests} req · in {row.InputTokens} · out {row.OutputTokens} " +
@@ -303,6 +394,7 @@ internal sealed class DetailWindow : Window
         stack.Children.Add(_today);
         stack.Children.Add(_window31d);
         stack.Children.Add(_caveat);
+        stack.Children.Add(BuildTokenKindSection());
         stack.Children.Add(modelSection);
 
         return new ScrollViewer
@@ -312,6 +404,39 @@ internal sealed class DetailWindow : Window
             VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
         };
     }
+
+    /// <summary>
+    /// The token-kind bars section (gate G7 parity slice P12, ADR-0008 D9e), the Linux
+    /// counterpart of <c>O-view.Tray</c>'s own <c>BuildTokenKindSection</c> — independently
+    /// implemented, not shared (D1): two segmented bars (today, 31 days) split by token kind,
+    /// with a breakdown table behind the view switch below them. Presented as its own section —
+    /// a <i>superset</i> of the statistics tiles (slice P10), not a breakdown of them.
+    /// </summary>
+    private Control BuildTokenKindSection()
+    {
+        var section = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
+        section.Children.Add(new TextBlock { Text = "Token usage by kind", FontWeight = FontWeight.Bold });
+        section.Children.Add(_tokenKindNote);
+        section.Children.Add(_tokenKindTodayLabel);
+        section.Children.Add(BuildSegmentedBarTrack(_tokenKindTodayBar));
+        section.Children.Add(_tokenKindWindow31dLabel);
+        section.Children.Add(BuildSegmentedBarTrack(_tokenKindWindow31dBar));
+        section.Children.Add(_tokenKindToggle);
+        section.Children.Add(_tokenKindBreakdownRows);
+        section.Children.Add(new Separator { Margin = new Thickness(0, 8, 0, 8) });
+
+        return section;
+    }
+
+    private static Border BuildSegmentedBarTrack(StackPanel segments) => new()
+    {
+        Width = BarTrackWidth,
+        Height = BarTrackHeight,
+        CornerRadius = new CornerRadius(BarTrackHeight / 2),
+        Margin = new Thickness(0, 4, 0, 2),
+        Child = segments,
+        ClipToBounds = true,
+    };
 
     /// <summary>The bar track (gate G7 parity slice P9): a fixed-width background strip holding
     /// <paramref name="fill"/>, whose width <see cref="ShowDetail"/> sets to the proportional
