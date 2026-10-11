@@ -260,6 +260,8 @@ public static class DetailWindowRenderProof
 
         stack.Children.Add(BuildTokenKindSection(content, colors, showTokenKindBreakdown));
         stack.Children.Add(BuildGraph(content.GraphColumns, content.GraphGridlines, colors));
+        stack.Children.Add(new Separator { Margin = new Thickness(0, 12, 0, 10) });
+        stack.Children.Add(BuildOffPlanUsageSection(content, colors));
 
         var modelSection = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
         modelSection.Children.Add(Line("By model", colors));
@@ -339,6 +341,24 @@ public static class DetailWindowRenderProof
             Background = ToBrush(colors.BannerBackground),
             Child = stack,
         };
+    }
+
+    /// <summary>
+    /// The standing off-plan usage section (gate G7 parity slice P17, OVI-702), mirroring
+    /// <see cref="DetailWindow.BuildOffPlanUsageSection"/> — hand-duplicated, not shared, per this
+    /// class's own remarks: always rendered, unlike <see cref="BuildOffPlanBanner"/>'s live
+    /// banner, which only appears when <see cref="DetailWindowContent.OffPlanBannerTitle"/> is
+    /// non-empty.
+    /// </summary>
+    private static StackPanel BuildOffPlanUsageSection(DetailWindowContent content, LinuxWindowThemeColors colors)
+    {
+        var section = new StackPanel();
+        section.Children.Add(new TextBlock { Text = content.OffPlanUsageTitle, FontWeight = FontWeight.SemiBold, Foreground = ToBrush(colors.Foreground) });
+        section.Children.Add(new TextBlock { Text = content.OffPlanUsageValue, FontSize = 17, FontWeight = FontWeight.SemiBold, Margin = new Thickness(0, 2, 0, 0), Foreground = ToBrush(colors.Foreground) });
+        section.Children.Add(Line(content.OffPlanUsageCaption, colors));
+        section.Children.Add(Line(content.CoverageCaption, colors));
+
+        return section;
     }
 
     /// <summary>The bar track + proportional fill (ADR-0008 D10b, gate G7 parity slice P9):

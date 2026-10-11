@@ -641,6 +641,78 @@ public static class DetailWindowFixtures
             ContentFact.Contains("model-39"),
         });
 
+    /// <summary>
+    /// Gate G7 parity slice P17 (OVI-702): the standing off-plan usage section with credit-billed
+    /// usage recorded in the window — <see cref="UsageStatistics.HasCreditUsage"/> real and
+    /// <c>true</c>. No priced rate card exists yet (OVI-592), so
+    /// <see cref="UsageStatistics.OffPlanUsageAmount"/> stays
+    /// <see cref="UsageValueStatus.Unavailable"/> regardless, and the section renders
+    /// <c>"unknown"</c> rather than a fabricated figure — this fixture proves that even with
+    /// credit usage recorded, no number appears.
+    /// </summary>
+    public static readonly DetailWindowFixture OffPlanUsageStandingSectionCreditUsageRecorded = new(
+        Name: "off-plan-usage-standing-section-credit-usage-recorded",
+        Detail: new UsageDetail(
+            Snapshot: new UsageSnapshot(
+                DataSourceKind.Live,
+                new DateTimeOffset(2026, 9, 8, 20, 45, 0, TimeSpan.Zero),
+                new UsagePercent(40, UsageValueStatus.Real),
+                new UsageInstant(SessionReset, UsageValueStatus.Real),
+                new UsagePercent(15, UsageValueStatus.Real),
+                new UsageInstant(WeeklyReset, UsageValueStatus.Real),
+                UsageLevel.Green),
+            Statistics: UsageStatistics.Unavailable with
+            {
+                HistoryCoverage = new HistoryCoverage(31, 31),
+                HasCreditUsage = new UsageFlag(true, UsageValueStatus.Real),
+            },
+            Models: ModelUsageBreakdown.Unavailable),
+        DisplayZone: TimeZoneInfo.Utc,
+        ContentFacts: new[]
+        {
+            new ContentFact(
+                "never fabricates a dollar figure when no rate card exists, even with credit usage recorded",
+                rendered => !rendered.Contains('$')),
+            new ContentFact(
+                "names the models billed as extra usage and the unreadable-balance clause",
+                rendered => rendered.Contains("published API rates", StringComparison.Ordinal)
+                    && rendered.Contains("billing page", StringComparison.Ordinal)),
+        });
+
+    /// <summary>
+    /// Gate G7 parity slice P17 (OVI-702): the standing off-plan usage section with no
+    /// credit-billed usage recorded — <see cref="UsageStatistics.HasCreditUsage"/> real and
+    /// <c>false</c>, the sibling case to <see cref="OffPlanUsageStandingSectionCreditUsageRecorded"/>:
+    /// the caption's wording must differ, never claiming off-plan spend that was never recorded.
+    /// </summary>
+    public static readonly DetailWindowFixture OffPlanUsageStandingSectionNoCreditUsageRecorded = new(
+        Name: "off-plan-usage-standing-section-no-credit-usage-recorded",
+        Detail: new UsageDetail(
+            Snapshot: new UsageSnapshot(
+                DataSourceKind.Live,
+                new DateTimeOffset(2026, 9, 8, 20, 45, 0, TimeSpan.Zero),
+                new UsagePercent(40, UsageValueStatus.Real),
+                new UsageInstant(SessionReset, UsageValueStatus.Real),
+                new UsagePercent(15, UsageValueStatus.Real),
+                new UsageInstant(WeeklyReset, UsageValueStatus.Real),
+                UsageLevel.Green),
+            Statistics: UsageStatistics.Unavailable with
+            {
+                HasCreditUsage = new UsageFlag(false, UsageValueStatus.Real),
+            },
+            Models: ModelUsageBreakdown.Unavailable),
+        DisplayZone: TimeZoneInfo.Utc,
+        ContentFacts: new[]
+        {
+            new ContentFact(
+                "never fabricates a dollar figure when no rate card exists",
+                rendered => !rendered.Contains('$')),
+            new ContentFact(
+                "states no credit-billed usage was recorded, not a spend claim",
+                rendered => rendered.Contains("No credit-billed usage", StringComparison.Ordinal)
+                    || rendered.Contains("No usage billed to credits", StringComparison.Ordinal)),
+        });
+
     public static IReadOnlyList<DetailWindowFixture> All { get; } = new[]
     {
         OrdinaryLiveReadingExtraUsageOn,
@@ -662,5 +734,7 @@ public static class DetailWindowFixtures
         GraphWithPartialCoverageAndBlankDays,
         GraphAcrossADstSpringForwardDay,
         GraphGridlinesMondayFallbackAndPlanDefined,
+        OffPlanUsageStandingSectionCreditUsageRecorded,
+        OffPlanUsageStandingSectionNoCreditUsageRecorded,
     };
 }

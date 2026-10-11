@@ -485,4 +485,66 @@ public sealed class DetailWindowContentBuilderTests
 
         Assert.Equal("12 of 31 days recorded", content.CoverageCaption);
     }
+
+    /// <summary>
+    /// Gate G7 parity slice P17 (OVI-702): the standing off-plan usage section's heading is
+    /// fixed, not a formatted value, and always present — it does not depend on
+    /// <see cref="UsageStatistics.Divergence"/> the way <see cref="DetailWindowContent.OffPlanBannerTitle"/>
+    /// does.
+    /// </summary>
+    [Fact]
+    public void Off_plan_usage_section_title_is_always_present()
+    {
+        var content = DetailWindowContentBuilder.Build(UsageDetail.Unavailable, UtcNow, TimeZoneInfo.Utc);
+
+        Assert.Equal("Off-plan usage — last 31 days", content.OffPlanUsageTitle);
+    }
+
+    /// <summary>
+    /// Gate G7 parity slice P17 (OVI-702): no priced rate card exists yet (OVI-592), so
+    /// <see cref="UsageStatistics.OffPlanUsageAmount"/> is always
+    /// <see cref="UsageValueStatus.Unavailable"/> today. Proves the section renders the existing
+    /// "n/a" sentinel rather than a fabricated dollar figure, whether or not credit-billed usage
+    /// was recorded.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    [InlineData(null)]
+    public void Off_plan_usage_value_never_fabricates_a_dollar_figure_without_a_rate_card(bool? hasCreditUsage)
+    {
+        var stats = UsageStatistics.Unavailable with
+        {
+            HasCreditUsage = new UsageFlag(hasCreditUsage, hasCreditUsage is null ? UsageValueStatus.Unavailable : UsageValueStatus.Real),
+        };
+        var detail = new UsageDetail(UsageSnapshot.Unavailable, stats, ModelUsageBreakdown.Unavailable);
+
+        var content = DetailWindowContentBuilder.Build(detail, UtcNow, TimeZoneInfo.Utc);
+
+        Assert.Equal("n/a", content.OffPlanUsageValue);
+        Assert.DoesNotContain('$', content.OffPlanUsageValue);
+    }
+
+    /// <summary>
+    /// Gate G7 parity slice P17 (OVI-702): the two-clause caption's wording tracks
+    /// <see cref="UsageStatistics.HasCreditUsage"/> — the "estimated at published API rates"
+    /// clause names the credit-billed models only once usage against them was actually recorded;
+    /// otherwise the caption says so plainly rather than describing a spend that never happened.
+    /// </summary>
+    [Fact]
+    public void Off_plan_usage_caption_differs_by_whether_credit_usage_was_recorded()
+    {
+        var withUsage = UsageStatistics.Unavailable with { HasCreditUsage = new UsageFlag(true, UsageValueStatus.Real) };
+        var withoutUsage = UsageStatistics.Unavailable with { HasCreditUsage = new UsageFlag(false, UsageValueStatus.Real) };
+
+        var contentWithUsage = DetailWindowContentBuilder.Build(
+            new UsageDetail(UsageSnapshot.Unavailable, withUsage, ModelUsageBreakdown.Unavailable), UtcNow, TimeZoneInfo.Utc);
+        var contentWithoutUsage = DetailWindowContentBuilder.Build(
+            new UsageDetail(UsageSnapshot.Unavailable, withoutUsage, ModelUsageBreakdown.Unavailable), UtcNow, TimeZoneInfo.Utc);
+
+        Assert.Contains("published API rates", contentWithUsage.OffPlanUsageCaption);
+        Assert.Contains("check your billing page", contentWithUsage.OffPlanUsageCaption);
+        Assert.Contains("No usage billed to credits", contentWithoutUsage.OffPlanUsageCaption);
+        Assert.NotEqual(contentWithUsage.OffPlanUsageCaption, contentWithoutUsage.OffPlanUsageCaption);
+    }
 }
