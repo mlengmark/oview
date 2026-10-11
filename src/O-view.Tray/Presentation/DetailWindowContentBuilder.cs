@@ -116,7 +116,8 @@ public sealed record DetailWindowContent(
     string TokenKindSectionNote,
     IReadOnlyList<DetailWindowModelRow> ModelRows,
     string ModelSectionNote,
-    IReadOnlyList<UsageGraphColumn> GraphColumns);
+    IReadOnlyList<UsageGraphColumn> GraphColumns,
+    IReadOnlyList<UsageGraphGridline> GraphGridlines);
 
 /// <summary>
 /// Builds the detail window's content from a pushed <see cref="UsageDetail"/> (ADR-0008 slice
@@ -136,6 +137,7 @@ public static class DetailWindowContentBuilder
         var snapshot = detail.Snapshot;
         var stats = detail.Statistics;
         var weeklyState = ResolveWeeklyState(snapshot);
+        var graphColumns = UsageGraphContentBuilder.Build(detail.History, detail.ResetBoundaries, displayZone);
 
         return new DetailWindowContent(
             Freshness: PanelTextFormatter.Freshness(snapshot, utcNow, displayZone),
@@ -161,7 +163,8 @@ public static class DetailWindowContentBuilder
             TokenKindSectionNote: TokenKindSectionNote(detail.TokensToday, detail.Tokens31d),
             ModelRows: BuildModelRows(detail.Models),
             ModelSectionNote: ModelSectionNote(detail.Models, stats.UnpricedModels),
-            GraphColumns: UsageGraphContentBuilder.Build(detail.History, detail.ResetBoundaries, displayZone));
+            GraphColumns: graphColumns,
+            GraphGridlines: UsageGraphGridlineBuilder.Build(graphColumns, detail.ResetBoundaries, displayZone));
     }
 
     /// <summary>

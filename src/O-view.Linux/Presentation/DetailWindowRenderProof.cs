@@ -91,10 +91,17 @@ public static class DetailWindowRenderProof
         var colors = LinuxWindowThemePalette.Resolve(theme);
         var visual = BuildVisual(content, colors, showTokenKindBreakdown, flipWindowTiles);
 
-        visual.Measure(new Size(Width, Height));
-        visual.Arrange(new Rect(0, 0, Width, Height));
+        // The live window scrolls past its own fixed Height (DetailWindow wraps its content in a
+        // ScrollViewer) — measuring this proof at that same fixed Height silently clipped every
+        // section below the scroll fold (the graph, gridlines, the model list) out of the PNG
+        // while still reporting a non-empty file (OVI-686: discovered while proving this slice's
+        // own gridlines, which the fixed-height render never showed at all). Height grows to fit
+        // the real content instead, so the proof actually proves what later slices attach it for.
+        visual.Measure(new Size(Width, double.PositiveInfinity));
+        var height = Math.Max(Height, visual.DesiredSize.Height);
+        visual.Arrange(new Rect(0, 0, Width, height));
 
-        using var bitmap = new RenderTargetBitmap(new PixelSize((int)Width, (int)Height));
+        using var bitmap = new RenderTargetBitmap(new PixelSize((int)Width, (int)height));
         bitmap.Render(visual);
 
         using var stream = new MemoryStream();
@@ -145,13 +152,13 @@ public static class DetailWindowRenderProof
     private const double GraphHeight = GraphBarAreaHeight + GraphLabelAreaHeight;
 
     /// <summary>
-    /// Renders the 31-day graph (ADR-0008 D10b, gate G7 parity slice P13), mirroring
+    /// Renders the 31-day graph (ADR-0008 D10b, gate G7 parity slices P13/P14), mirroring
     /// <see cref="DetailWindow.BuildGraph"/> — hand-duplicated, not shared, per this class's own
     /// remarks: one bar per <see cref="UsageGraphColumn"/>, coloured by its own
     /// <see cref="UsageGraphColumn.Intensity"/>, a measured, centred vertical date label under
-    /// every column (blank or not), and no gridlines (slice P14's own addition).
+    /// every column (blank or not), and the amber dotted gridlines drawn last, on top.
     /// </summary>
-    private static Canvas BuildGraph(IReadOnlyList<UsageGraphColumn> columns, LinuxWindowThemeColors colors)
+    private static Canvas BuildGraph(IReadOnlyList<UsageGraphColumn> columns, IReadOnlyList<UsageGraphGridline> gridlines, LinuxWindowThemeColors colors)
     {
         var canvas = new Canvas { Width = GraphWidth, Height = GraphHeight };
 
@@ -202,6 +209,21 @@ public static class DetailWindowRenderProof
             Canvas.SetTop(label, UsageGraphLabelGeometry.Top(GraphBarAreaHeight + 6, inkTop));
         }
 
+        var gridlineBrush = ToBrush(LinuxWindowThemePalette.BandColor(UsageBarBand.Amber));
+        foreach (var gridline in gridlines)
+        {
+            var x = gridline.ColumnIndex * col + gridline.FractionWithinColumn * col;
+            var line = new Avalonia.Controls.Shapes.Line
+            {
+                StartPoint = new Point(x, 0),
+                EndPoint = new Point(x, GraphBarAreaHeight),
+                Stroke = gridlineBrush,
+                StrokeThickness = 1,
+                StrokeDashArray = new Avalonia.Collections.AvaloniaList<double> { 2, 2 },
+            };
+            canvas.Children.Add(line);
+        }
+
         return canvas;
     }
 
@@ -232,7 +254,7 @@ public static class DetailWindowRenderProof
         }
 
         stack.Children.Add(BuildTokenKindSection(content, colors, showTokenKindBreakdown));
-        stack.Children.Add(BuildGraph(content.GraphColumns, colors));
+        stack.Children.Add(BuildGraph(content.GraphColumns, content.GraphGridlines, colors));
 
         var modelSection = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
         modelSection.Children.Add(Line("By model", colors));
@@ -251,7 +273,10 @@ public static class DetailWindowRenderProof
         return new Border
         {
             Width = Width,
-            Height = Height,
+            // No explicit Height: an explicit Height on this root always wins Measure over its
+            // content's natural size, which is exactly what silently clipped every section below
+            // the window's own nominal height (see Render's own remarks).
+            MinHeight = Height,
             Background = ToBrush(colors.Background),
             BorderBrush = ToBrush(colors.Border),
             BorderThickness = new Thickness(1),

@@ -121,7 +121,7 @@ anything touching `UsageDetail`, `ISkinToShell`/`IShellToSkin` or an ADR is a
 | **P11** | Model colour: Core-ranked order, three chromatic slots, the "Other" fold, legend names-only, unpriced relief | D | agent | `ModelColourOrderFixture` — same slot on all four tiles at 1/2/3/4/5 models | P10 |
 | **P12** | **Built 2026-10-10 (OVI-667).** Token-kind bars for today and 31 days, per-segment hover cards, breakdown table behind the view switch | E | agent | `TokenKindFixture`; share text against carried `Total` | P6, P2 |
 | **P13** | **Built (OVI-668).** The 31-day graph: one column per local day, per-week intensity ramp, vertical centred date labels, blank columns | F | agent | `DailySeriesFixture`; label centring from measured transform bounds, not a constant | P6 |
-| **P14** | Reset gridlines: amber dotted, drawn **last**, true fractional position in the day, kind on hover | F | agent | `ResetBoundaryFixture`; a Monday-fallback line lands on a column edge, a plan line inside one | P13 |
+| **P14** | **Built (OVI-686).** Reset gridlines: amber dotted, drawn **last**, true fractional position in the day, kind on hover | F | agent | `UsageGraphGridlineBuilderTests`; a Monday-fallback line lands on a column edge, a plan line inside one | P13 |
 | **P15** | Off-plan live banner: three wordings, provenance clause, link to Claude's usage settings | G | agent | `OffPlanBannerFixture` | P3 |
 | **P16** | Notify once per onset, via ADR-0009's existing event decider; no Est. figure where nothing can be billed | G | agent | one notification per onset, not per poll | P15 |
 | **P17** | Standing `Off-plan usage · last 31 days` section, two-clause caption, coverage caveat | G | agent | renders the unavailable state until the rate card exists (§1) | P15 |
