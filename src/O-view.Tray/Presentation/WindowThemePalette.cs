@@ -12,9 +12,13 @@ internal readonly record struct RgbColor(byte R, byte G, byte B);
 /// and <see cref="AccentHover"/> do not vary with <see cref="ThemePreference"/> (ADR-0008
 /// slicing-table slice P3, OVI-622) — the source's own measurement (<c>ui-spec.md</c> §5) picked
 /// one stepped-down fill that already clears a white label against both panels, so there is
-/// nothing for light/dark to pick between.</summary>
+/// nothing for light/dark to pick between. <see cref="BannerBackground"/> (gate G7 parity slice
+/// P15) is the opposite case: a pale amber tint reads fine on the light panel and washes out
+/// against the dark one, so this one field is picked per theme while the amber border/accent it
+/// sits inside (<see cref="UsageBarBandColors.Amber"/>) stays fixed.</summary>
 internal readonly record struct WindowThemeColors(
-    RgbColor Background, RgbColor Foreground, RgbColor Border, RgbColor Accent, RgbColor AccentHover);
+    RgbColor Background, RgbColor Foreground, RgbColor Border, RgbColor Accent, RgbColor AccentHover,
+    RgbColor BannerBackground);
 
 /// <summary>The three usage-bar bands (ADR-0008 D10b, gate G7 parity slice P9), reusing this
 /// skin's own existing tray-icon hues (<see cref="StatusIconGlyphRenderer.ColorFor"/>) for visual
@@ -53,14 +57,16 @@ internal static class WindowThemePalette
         Foreground: new RgbColor(0, 0, 0),
         Border: new RgbColor(128, 128, 128),
         Accent: Accent,
-        AccentHover: AccentHover);
+        AccentHover: AccentHover,
+        BannerBackground: new RgbColor(0xFC, 0xF1, 0xDA));
 
     private static readonly WindowThemeColors DarkColors = new(
         Background: new RgbColor(32, 32, 32),
         Foreground: new RgbColor(240, 240, 240),
         Border: new RgbColor(90, 90, 90),
         Accent: Accent,
-        AccentHover: AccentHover);
+        AccentHover: AccentHover,
+        BannerBackground: new RgbColor(0x4A, 0x3B, 0x14));
 
     public static WindowThemeColors Resolve(ThemePreference preference) => preference switch
     {

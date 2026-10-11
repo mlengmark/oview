@@ -93,6 +93,13 @@ public sealed record StatisticsTile(
 /// nothing else (ADR-0008 D9c) — the window draws this record and reads no other source, so it
 /// can never pair a percent from one poll with statistics from an earlier one.
 /// </summary>
+/// <param name="OffPlanBannerTitle">The off-plan banner's heading (gate G7 parity slice P15,
+/// <see cref="PanelTextFormatter.OffPlanTitle"/>) — empty whenever
+/// <see cref="UsageStatistics.Divergence"/> is <see langword="null"/> or not off-plan, which is
+/// this window's own signal to hide the banner above the usage bars entirely.</param>
+/// <param name="OffPlanBannerDetail">The banner's body (<see cref="PanelTextFormatter.OffPlanDetail"/>):
+/// the observation, the account's extra-usage setting if Claude Code's cache said, and the
+/// provenance stamp. Empty exactly when <see cref="OffPlanBannerTitle"/> is.</param>
 public sealed record DetailWindowContent(
     string Freshness,
     string AccountDisplayName,
@@ -107,6 +114,8 @@ public sealed record DetailWindowContent(
     UsageBarBand WeeklyBarBand,
     string WeeklyUnknownHint,
     string ExtraUsageLine,
+    string OffPlanBannerTitle,
+    string OffPlanBannerDetail,
     IReadOnlyList<StatisticsTile> StatisticsTiles,
     string CoverageCaption,
     string Caveat,
@@ -138,6 +147,11 @@ public static class DetailWindowContentBuilder
         var stats = detail.Statistics;
         var weeklyState = ResolveWeeklyState(snapshot);
         var graphColumns = UsageGraphContentBuilder.Build(detail.History, detail.ResetBoundaries, displayZone);
+        var divergence = stats.Divergence;
+        var offPlanTitle = divergence is { } reading ? PanelTextFormatter.OffPlanTitle(reading, snapshot.ExtraUsage) : "";
+        var offPlanDetail = divergence is { } reading2
+            ? PanelTextFormatter.OffPlanDetail(reading2, snapshot.ExtraUsage, utcNow, displayZone)
+            : "";
 
         return new DetailWindowContent(
             Freshness: PanelTextFormatter.Freshness(snapshot, utcNow, displayZone),
@@ -154,6 +168,8 @@ public static class DetailWindowContentBuilder
             WeeklyBarBand: Band(snapshot.WeeklyUtilizationPercent),
             WeeklyUnknownHint: weeklyState == WeeklyBarState.NotKnown ? WeeklyUnknownHintCardText : "",
             ExtraUsageLine: ExtraUsageLine(snapshot.ExtraUsage, utcNow, displayZone),
+            OffPlanBannerTitle: offPlanTitle,
+            OffPlanBannerDetail: offPlanDetail,
             StatisticsTiles: BuildStatisticsTiles(stats, detail.Models),
             CoverageCaption: PanelStatisticsFormatter.CoverageCaption(stats.HistoryCoverage),
             Caveat: PanelTextFormatter.Caveat(stats),

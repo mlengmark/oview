@@ -247,5 +247,45 @@ public sealed class DetailWindowRenderProofTests : IDisposable
         return (bytes[20] << 24) | (bytes[21] << 16) | (bytes[22] << 8) | bytes[23];
     }
 
+    public static IEnumerable<object[]> OffPlanBannerFixturesByTheme()
+    {
+        foreach (var fixture in OffPlanBannerFixtures.All)
+        {
+            yield return new object[] { fixture, ThemePreference.Light };
+            yield return new object[] { fixture, ThemePreference.Dark };
+        }
+    }
+
+    /// <summary>
+    /// ADR-0008 D11a's render-proof obligation, applied to gate G7 parity slice P15 (OVI-691):
+    /// the off-plan live banner's no-banner state and its three extra-usage wordings each render
+    /// in both themes, for both skins.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(OffPlanBannerFixturesByTheme))]
+    public void TrayRenderProofCapturesTheOffPlanBannerStatesInBothThemes(OffPlanBannerFixture fixture, ThemePreference theme)
+    {
+        var path = Path.Combine(_directory, $"tray-off-plan-banner-{fixture.Name}-{theme}.png");
+
+        OView.Tray.Presentation.DetailWindowRenderProof.RenderToFile(
+            fixture.Detail, theme, path, OffPlanBannerFixtures.UtcNow, fixture.DisplayZone);
+
+        Assert.True(File.Exists(path), $"[off-plan-banner/{fixture.Name}/{theme}] wrote no file.");
+        Assert.True(new FileInfo(path).Length > 0, $"[off-plan-banner/{fixture.Name}/{theme}] wrote an empty file.");
+    }
+
+    [Theory]
+    [MemberData(nameof(OffPlanBannerFixturesByTheme))]
+    public void LinuxRenderProofCapturesTheOffPlanBannerStatesInBothThemes(OffPlanBannerFixture fixture, ThemePreference theme)
+    {
+        var path = Path.Combine(_directory, $"linux-off-plan-banner-{fixture.Name}-{theme}.png");
+
+        OView.Linux.Presentation.DetailWindowRenderProof.RenderToFile(
+            fixture.Detail, theme, path, OffPlanBannerFixtures.UtcNow, fixture.DisplayZone);
+
+        Assert.True(File.Exists(path), $"[off-plan-banner/{fixture.Name}/{theme}] wrote no file.");
+        Assert.True(new FileInfo(path).Length > 0, $"[off-plan-banner/{fixture.Name}/{theme}] wrote an empty file.");
+    }
+
     public void Dispose() => Directory.Delete(_directory, recursive: true);
 }

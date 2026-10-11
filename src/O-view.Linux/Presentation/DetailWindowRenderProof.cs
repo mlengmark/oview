@@ -232,6 +232,11 @@ public static class DetailWindowRenderProof
         var stack = new StackPanel { Margin = new Thickness(12) };
         stack.Children.Add(BuildHeader(content, colors));
         stack.Children.Add(new Separator { Margin = new Thickness(0, 8, 0, 8), Background = ToBrush(colors.Border) });
+        if (!string.IsNullOrEmpty(content.OffPlanBannerTitle))
+        {
+            stack.Children.Add(BuildOffPlanBanner(content, colors));
+        }
+
         stack.Children.Add(Line(content.SessionLine, colors));
         stack.Children.Add(BuildBar(content.SessionBarFraction, content.SessionBarBand, colors));
         if (content.WeeklyState != WeeklyBarState.Hidden)
@@ -280,6 +285,58 @@ public static class DetailWindowRenderProof
             Background = ToBrush(colors.Background),
             BorderBrush = ToBrush(colors.Border),
             BorderThickness = new Thickness(1),
+            Child = stack,
+        };
+    }
+
+    /// <summary>
+    /// The off-plan banner (gate G7 parity slice P15), mirroring <see cref="DetailWindow"/>'s own
+    /// live banner — independently implemented, not shared (D1): an amber-bordered, amber-tinted
+    /// box above the usage bars carrying the heading, the relayed detail, and the link to
+    /// Claude's own usage settings. Only ever built when
+    /// <see cref="DetailWindowContent.OffPlanBannerTitle"/> is non-empty, same as the live
+    /// window's visibility rule.
+    /// </summary>
+    private static Border BuildOffPlanBanner(DetailWindowContent content, LinuxWindowThemeColors colors)
+    {
+        var stack = new StackPanel();
+        stack.Children.Add(new TextBlock
+        {
+            Text = content.OffPlanBannerTitle,
+            FontWeight = FontWeight.Bold,
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = ToBrush(colors.Foreground),
+        });
+
+        if (!string.IsNullOrEmpty(content.OffPlanBannerDetail))
+        {
+            stack.Children.Add(new TextBlock
+            {
+                Text = content.OffPlanBannerDetail,
+                FontSize = 11,
+                Margin = new Thickness(0, 2, 0, 0),
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = ToBrush(colors.Foreground),
+            });
+        }
+
+        stack.Children.Add(new TextBlock
+        {
+            Text = PanelTextFormatter.UsageSettingsLinkLabel,
+            FontSize = 11,
+            Margin = new Thickness(0, 4, 0, 0),
+            TextDecorations = Avalonia.Media.TextDecorations.Underline,
+            Foreground = ToBrush(colors.Accent),
+        });
+
+        return new Border
+        {
+            BorderThickness = new Thickness(1),
+            BorderBrush = ToBrush(LinuxWindowThemePalette.BandColors.Amber),
+            CornerRadius = new CornerRadius(4),
+            Padding = new Thickness(8),
+            Margin = new Thickness(0, 0, 0, 8),
+            Background = ToBrush(colors.BannerBackground),
             Child = stack,
         };
     }

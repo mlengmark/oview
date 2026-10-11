@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
@@ -78,6 +79,26 @@ internal sealed class DetailWindow : Window
     private readonly TextBlock _weekly = NewLine();
     private readonly Border _weeklyBarFill = NewBarFill();
     private readonly TextBlock _extraUsage = NewLine();
+    private readonly TextBlock _offPlanBannerTitle = new()
+    {
+        TextWrapping = TextWrapping.Wrap,
+        FontWeight = FontWeight.Bold,
+    };
+    private readonly TextBlock _offPlanBannerDetail = new()
+    {
+        TextWrapping = TextWrapping.Wrap,
+        FontSize = 11,
+        Margin = new Thickness(0, 2, 0, 0),
+    };
+    private readonly TextBlock _offPlanBannerLink = new()
+    {
+        Text = PanelTextFormatter.UsageSettingsLinkLabel,
+        FontSize = 11,
+        Margin = new Thickness(0, 4, 0, 0),
+        TextDecorations = Avalonia.Media.TextDecorations.Underline,
+        Cursor = new Cursor(StandardCursorType.Hand),
+    };
+    private readonly Border _offPlanBanner;
     private readonly StatisticsTileView[] _tiles = { new(), new(), new(), new() };
     private readonly TextBlock _coverageCaption = NewLine();
     private readonly TextBlock _caveat = NewLine();
@@ -129,6 +150,20 @@ internal sealed class DetailWindow : Window
             Child = _accountTierBadgeText,
         };
 
+        var bannerStack = new StackPanel();
+        bannerStack.Children.Add(_offPlanBannerTitle);
+        bannerStack.Children.Add(_offPlanBannerDetail);
+        bannerStack.Children.Add(_offPlanBannerLink);
+        _offPlanBanner = new Border
+        {
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(4),
+            Padding = new Thickness(8),
+            Margin = new Thickness(0, 0, 0, 8),
+            IsVisible = false,
+            Child = bannerStack,
+        };
+
         Title = "O-view";
         Width = DefaultWidth;
         Height = DefaultHeight;
@@ -145,6 +180,7 @@ internal sealed class DetailWindow : Window
         Deactivated += (_, _) => _skinToShell.RequestWidget(false);
         KeyDown += (_, e) => { if (e.Key == Key.Escape) _skinToShell.RequestWidget(false); };
         _weeklyRow.PointerPressed += OnWeeklyRowPointerPressed;
+        _offPlanBannerLink.PointerPressed += OnOffPlanBannerLinkPointerPressed;
         _tokenKindToggle.PointerPressed += OnTokenKindTogglePointerPressed;
         _tokenKindToggle.Text = ToggleText(_tokenKindBreakdownVisible);
     }
@@ -193,6 +229,10 @@ internal sealed class DetailWindow : Window
         Foreground = ToBrush(colors.Foreground);
         var border = ToBrush(colors.Border);
         _accountTierBadge.Background = ToBrush(colors.Accent);
+
+        _offPlanBanner.Background = ToBrush(colors.BannerBackground);
+        _offPlanBanner.BorderBrush = ToBrush(LinuxWindowThemePalette.BandColors.Amber);
+        _offPlanBannerLink.Foreground = ToBrush(colors.Accent);
 
         if (Content is ScrollViewer { Content: StackPanel outer })
         {
@@ -266,6 +306,12 @@ internal sealed class DetailWindow : Window
 
         _extraUsage.Text = content.ExtraUsageLine;
         _extraUsage.IsVisible = !string.IsNullOrEmpty(content.ExtraUsageLine);
+
+        _offPlanBannerTitle.Text = content.OffPlanBannerTitle;
+        _offPlanBannerDetail.Text = content.OffPlanBannerDetail;
+        _offPlanBannerDetail.IsVisible = !string.IsNullOrEmpty(content.OffPlanBannerDetail);
+        _offPlanBanner.IsVisible = !string.IsNullOrEmpty(content.OffPlanBannerTitle);
+
         for (var i = 0; i < _tiles.Length && i < content.StatisticsTiles.Count; i++)
         {
             _tiles[i].Populate(content.StatisticsTiles[i], _colors);
@@ -393,6 +439,39 @@ internal sealed class DetailWindow : Window
     }
 
     /// <summary>
+    /// Opens the off-plan banner's link in the user's default browser (gate G7 parity slice
+    /// P15, source <c>ui-spec.md</c> §"Off-plan usage"). <c>UseShellExecute</c> because the
+    /// target is a URL, not an executable — the only form that hands it to the desktop's own
+    /// default handler (<c>xdg-open</c> or equivalent) rather than trying to run it as one.
+    /// Swallows its failures deliberately: a machine with no registered handler throws here, and
+    /// the banner losing its link is a smaller cost than the detail window closing with an
+    /// unhandled exception while the reader is looking at a warning. Marks the event handled so
+    /// the window-level drag handler does not also start a drag from the same click.
+    /// </summary>
+    private void OnOffPlanBannerLinkPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        {
+            return;
+        }
+
+        e.Handled = true;
+
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = PanelTextFormatter.UsageSettingsUrl,
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception)
+        {
+            // No handler for https, or the shell refused. Nothing useful to say from a banner.
+        }
+    }
+
+    /// <summary>
     /// The breakdown table's view switch (gate G7 parity slice P12): toggles visibility only —
     /// <see cref="_tokenKindBreakdownRows"/> was already built in <see cref="ShowDetail"/>, so
     /// this click triggers no read. Marks the event handled so the window-level drag handler
@@ -501,6 +580,7 @@ internal sealed class DetailWindow : Window
         var stack = new StackPanel { Margin = new Thickness(12) };
         stack.Children.Add(BuildHeader());
         stack.Children.Add(new Separator { Margin = new Thickness(0, 8, 0, 8) });
+        stack.Children.Add(_offPlanBanner);
         stack.Children.Add(sessionRow);
         stack.Children.Add(_weeklyRow);
         stack.Children.Add(_extraUsage);

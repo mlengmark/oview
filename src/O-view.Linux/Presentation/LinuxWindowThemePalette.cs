@@ -11,9 +11,12 @@ internal readonly record struct LinuxRgbColor(byte R, byte G, byte B);
 /// and <see cref="AccentHover"/> do not vary with <see cref="ThemePreference"/> (ADR-0008
 /// slicing-table slice P3, OVI-622) — the source's own measurement (<c>ui-spec.md</c> §5) picked
 /// one stepped-down fill that already clears a white label against both panels, so there is
-/// nothing for light/dark to pick between.</summary>
+/// nothing for light/dark to pick between. <see cref="BannerBackground"/> (gate G7 parity slice
+/// P15) is the opposite case: independently picked from <c>O-view.Tray</c>'s own tint (D1) and
+/// varies by theme, same reasoning as <see cref="Background"/> itself.</summary>
 internal readonly record struct LinuxWindowThemeColors(
-    LinuxRgbColor Background, LinuxRgbColor Foreground, LinuxRgbColor Border, LinuxRgbColor Accent, LinuxRgbColor AccentHover);
+    LinuxRgbColor Background, LinuxRgbColor Foreground, LinuxRgbColor Border, LinuxRgbColor Accent, LinuxRgbColor AccentHover,
+    LinuxRgbColor BannerBackground);
 
 /// <summary>The three usage-bar bands (ADR-0008 D10b, gate G7 parity slice P9), reusing this
 /// skin's own existing tray-icon hues (<see cref="StatusIconGlyphRenderer.ColorFor"/>, converted
@@ -52,14 +55,16 @@ internal static class LinuxWindowThemePalette
         Foreground: new LinuxRgbColor(20, 20, 20),
         Border: new LinuxRgbColor(160, 160, 160),
         Accent: Accent,
-        AccentHover: AccentHover);
+        AccentHover: AccentHover,
+        BannerBackground: new LinuxRgbColor(0xFB, 0xEE, 0xD6));
 
     private static readonly LinuxWindowThemeColors DarkColors = new(
         Background: new LinuxRgbColor(45, 45, 48),
         Foreground: new LinuxRgbColor(225, 225, 225),
         Border: new LinuxRgbColor(80, 80, 85),
         Accent: Accent,
-        AccentHover: AccentHover);
+        AccentHover: AccentHover,
+        BannerBackground: new LinuxRgbColor(0x4D, 0x3E, 0x18));
 
     public static LinuxWindowThemeColors Resolve(ThemePreference preference) => preference switch
     {
