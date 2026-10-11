@@ -1,3 +1,4 @@
+using System.Linq;
 using OView.Core.Models;
 
 namespace OView.CrossSkin.Tests.Fixtures;
@@ -596,6 +597,48 @@ public static class DetailWindowFixtures
         ContentFacts: new[]
         {
             ContentFact.Contains("63%"),
+        });
+
+    /// <summary>
+    /// OVI-688: a model window with enough rows that the rendered content provably exceeds the
+    /// window's own nominal <see cref="DetailWindow.DefaultHeight"/> (360px) — exists so a
+    /// render-proof test can assert the output PNG actually grew past that figure (OVI-686's own
+    /// fix), rather than merely existing. Not in <see cref="All"/>: this fixture exists only to
+    /// prove the height behaviour, not to add another case to every fixture/theme/skin matrix.
+    /// </summary>
+    public static readonly DetailWindowFixture ManyModelRowsOverflowNominalHeight = new(
+        Name: "many-model-rows-overflow-nominal-height",
+        Detail: new UsageDetail(
+            Snapshot: new UsageSnapshot(
+                DataSourceKind.Live,
+                new DateTimeOffset(2026, 9, 8, 20, 45, 0, TimeSpan.Zero),
+                new UsagePercent(55, UsageValueStatus.Real),
+                new UsageInstant(SessionReset, UsageValueStatus.Real),
+                new UsagePercent(18, UsageValueStatus.Real),
+                new UsageInstant(WeeklyReset, UsageValueStatus.Real),
+                UsageLevel.Amber),
+            Statistics: UsageStatistics.Unavailable,
+            Models: new ModelUsageBreakdown(
+                FromLocalDate: new DateOnly(2026, 8, 9),
+                ToLocalDate: new DateOnly(2026, 9, 8),
+                Rows: Enumerable.Range(0, 40)
+                    .Select(i => new ModelUsageRow(
+                        ModelId: $"model-{i:D2}",
+                        RequestCount: i + 1,
+                        InputTokens: new TokenCount(1_000 * (i + 1), UsageValueStatus.Real),
+                        OutputTokens: new TokenCount(500 * (i + 1), UsageValueStatus.Real),
+                        CacheCreationTokens: new TokenCount(0, UsageValueStatus.Real),
+                        CacheReadTokens: new TokenCount(0, UsageValueStatus.Real),
+                        EstimatedSpend: new EstimatedUsd(0.10m * (i + 1), UsageValueStatus.Estimated)))
+                    .ToArray(),
+                Coverage: new HistoryCoverage(31, 31),
+                Rates: new RateCardStamp(RateCardSource.Bundled, new DateOnly(2026, 9, 8), isStale: false),
+                Status: UsageValueStatus.Real)),
+        DisplayZone: TimeZoneInfo.Utc,
+        ContentFacts: new[]
+        {
+            ContentFact.Contains("model-00"),
+            ContentFact.Contains("model-39"),
         });
 
     public static IReadOnlyList<DetailWindowFixture> All { get; } = new[]

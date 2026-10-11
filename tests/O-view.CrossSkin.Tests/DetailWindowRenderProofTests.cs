@@ -192,5 +192,60 @@ public sealed class DetailWindowRenderProofTests : IDisposable
         Assert.True(new FileInfo(path).Length > 0, $"[disabled/{theme}] wrote an empty file.");
     }
 
+    /// <summary>
+    /// OVI-688: proves OVI-686's height fix actually works, not just that a file exists —
+    /// decodes the PNG's own IHDR height for <see cref="DetailWindowFixtures.ManyModelRowsOverflowNominalHeight"/>,
+    /// whose 40 model rows provably push the rendered content past the window's nominal
+    /// <see cref="OView.Tray.Presentation.DetailWindowRenderProof.Height"/> (360px), and asserts
+    /// the PNG actually grew taller than that. Before OVI-686, the root <c>Border</c> carried an
+    /// explicit <c>Height</c> that always won <c>Measure</c> over content, so this would have
+    /// stayed pinned at exactly 360px regardless of how many rows the fixture added.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Themes))]
+    public void TrayRenderProofGrowsTallerThanTheNominalHeightForOverflowingContent(ThemePreference theme)
+    {
+        var path = Path.Combine(_directory, $"tray-many-model-rows-{theme}.png");
+        var fixture = DetailWindowFixtures.ManyModelRowsOverflowNominalHeight;
+
+        OView.Tray.Presentation.DetailWindowRenderProof.RenderToFile(
+            fixture.Detail, theme, path, UtcNow, fixture.DisplayZone);
+
+        var height = PngHeight(path);
+        Assert.True(
+            height > (int)OView.Tray.Presentation.DetailWindowRenderProof.Height,
+            $"[many-model-rows/{theme}] rendered at {height}px, not taller than the nominal " +
+            $"{OView.Tray.Presentation.DetailWindowRenderProof.Height}px — the overflow fix regressed.");
+    }
+
+    [Theory]
+    [MemberData(nameof(Themes))]
+    public void LinuxRenderProofGrowsTallerThanTheNominalHeightForOverflowingContent(ThemePreference theme)
+    {
+        var path = Path.Combine(_directory, $"linux-many-model-rows-{theme}.png");
+        var fixture = DetailWindowFixtures.ManyModelRowsOverflowNominalHeight;
+
+        OView.Linux.Presentation.DetailWindowRenderProof.RenderToFile(
+            fixture.Detail, theme, path, UtcNow, fixture.DisplayZone);
+
+        var height = PngHeight(path);
+        Assert.True(
+            height > (int)OView.Linux.Presentation.DetailWindowRenderProof.Height,
+            $"[many-model-rows/{theme}] rendered at {height}px, not taller than the nominal " +
+            $"{OView.Linux.Presentation.DetailWindowRenderProof.Height}px — the overflow fix regressed.");
+    }
+
+    /// <summary>
+    /// Reads the pixel height straight out of a PNG's own IHDR chunk (always the first chunk,
+    /// always 13 bytes, per the PNG spec) rather than trusting anything the encoder claims —
+    /// the same reason this is worth asserting on at all: <c>File.Exists</c> cannot tell a
+    /// correctly sized render from one silently clipped to the window's nominal height.
+    /// </summary>
+    private static int PngHeight(string path)
+    {
+        var bytes = File.ReadAllBytes(path);
+        return (bytes[20] << 24) | (bytes[21] << 16) | (bytes[22] << 8) | bytes[23];
+    }
+
     public void Dispose() => Directory.Delete(_directory, recursive: true);
 }
