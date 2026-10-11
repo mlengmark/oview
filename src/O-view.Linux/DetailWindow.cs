@@ -290,19 +290,19 @@ internal sealed class DetailWindow : Window
         _modelNote.Text = content.ModelSectionNote;
         _modelNote.IsVisible = !string.IsNullOrEmpty(content.ModelSectionNote);
         _modelRows.ItemsSource = content.ModelRows.Select(ModelRowText).ToList();
-        BuildGraph(content.GraphColumns);
+        BuildGraph(content.GraphColumns, content.GraphGridlines);
     }
 
     /// <summary>
-    /// Draws the 31-day graph (ADR-0008 D10b, gate G7 parity slice P13), the Linux counterpart
-    /// of <c>O-view.Tray</c>'s own <c>BuildGraph</c> — independently implemented, not shared (D1):
-    /// one bar per <see cref="UsageGraphColumn"/>, coloured by <see cref="UsageGraphColumn.Intensity"/>,
-    /// a vertical date label under every column (blank or not), and no gridlines — those are
-    /// slice P14's own addition over the same reset boundaries. The label is measured for real,
-    /// then placed from <see cref="UsageGraphLabelGeometry"/>'s pure rotation math, never a
-    /// constant offset.
+    /// Draws the 31-day graph (ADR-0008 D10b, gate G7 parity slices P13/P14), the Linux
+    /// counterpart of <c>O-view.Tray</c>'s own <c>BuildGraph</c> — independently implemented, not
+    /// shared (D1): one bar per <see cref="UsageGraphColumn"/>, coloured by
+    /// <see cref="UsageGraphColumn.Intensity"/>, a vertical date label under every column (blank
+    /// or not), and finally — on top of every bar, per the task's "drawn last" rule — the amber
+    /// dotted weekly-reset gridlines. The label is measured for real, then placed from
+    /// <see cref="UsageGraphLabelGeometry"/>'s pure rotation math, never a constant offset.
     /// </summary>
-    private void BuildGraph(IReadOnlyList<UsageGraphColumn> columns)
+    private void BuildGraph(IReadOnlyList<UsageGraphColumn> columns, IReadOnlyList<UsageGraphGridline> gridlines)
     {
         _graphCanvas.Children.Clear();
 
@@ -352,6 +352,24 @@ internal sealed class DetailWindow : Window
                 label.DesiredSize.Width, label.DesiredSize.Height);
             Canvas.SetLeft(label, UsageGraphLabelGeometry.CentredLeft(centreX, inkLeft, inkWidth));
             Canvas.SetTop(label, UsageGraphLabelGeometry.Top(GraphBarAreaHeight + 6, inkTop));
+        }
+
+        // Drawn last, in their own pass over the already-built canvas, so every gridline sits on
+        // top of every bar regardless of draw order within the loop above (the task's own rule).
+        var gridlineBrush = ToBrush(LinuxWindowThemePalette.BandColor(UsageBarBand.Amber));
+        foreach (var gridline in gridlines)
+        {
+            var x = gridline.ColumnIndex * col + gridline.FractionWithinColumn * col;
+            var line = new Line
+            {
+                StartPoint = new Point(x, 0),
+                EndPoint = new Point(x, GraphBarAreaHeight),
+                Stroke = gridlineBrush,
+                StrokeThickness = 1,
+                StrokeDashArray = new Avalonia.Collections.AvaloniaList<double> { 2, 2 },
+            };
+            HoverCard.Text(line, gridline.HoverCaption, _colors);
+            _graphCanvas.Children.Add(line);
         }
     }
 

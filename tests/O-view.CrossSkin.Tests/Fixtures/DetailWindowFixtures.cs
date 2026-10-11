@@ -557,6 +557,47 @@ public static class DetailWindowFixtures
             ContentFact.Contains("40%"),
         });
 
+    /// <summary>
+    /// Gate G7 parity slice P14 (OVI-686): the gridline render proof itself, carrying both kinds
+    /// the task's own "Done when" names — a <see cref="WeeklyResetBoundaryKind.MondayFallback"/>
+    /// boundary at local midnight (lands exactly on a column edge) and a
+    /// <see cref="WeeklyResetBoundaryKind.Observed"/> one at 14:00 local (lands inside its own
+    /// column, away from any edge) — so the attached PNG visibly shows one dotted line snapped to
+    /// a bar's left edge and another cutting through the middle of its own bar.
+    /// </summary>
+    public static readonly DetailWindowFixture GraphGridlinesMondayFallbackAndPlanDefined = new(
+        Name: "graph-gridlines-monday-fallback-and-plan-defined",
+        Detail: new UsageDetail(
+            Snapshot: new UsageSnapshot(
+                DataSourceKind.Live,
+                new DateTimeOffset(2026, 9, 8, 20, 45, 0, TimeSpan.Zero),
+                new UsagePercent(63, UsageValueStatus.Real),
+                new UsageInstant(SessionReset, UsageValueStatus.Real),
+                new UsagePercent(22, UsageValueStatus.Real),
+                new UsageInstant(WeeklyReset, UsageValueStatus.Real),
+                UsageLevel.Amber),
+            Statistics: UsageStatistics.Unavailable,
+            Models: ModelUsageBreakdown.Unavailable)
+        {
+            History = BuildDailySeries(new DateOnly(2026, 9, 8), day => (long)(100 + 50 * (day.DayOfYear % 5))),
+            ResetBoundaries = new WeeklyResetBoundaries(
+                new DateOnly(2026, 8, 9),
+                new DateOnly(2026, 9, 8),
+                new[]
+                {
+                    // Local midnight -> FractionWithinColumn 0, exactly on this column's left edge.
+                    new WeeklyResetBoundary(new DateTimeOffset(2026, 8, 17, 0, 0, 0, TimeSpan.Zero), WeeklyResetBoundaryKind.MondayFallback),
+                    // 14:00 local -> FractionWithinColumn 14/24, inside this column, nowhere near an edge.
+                    new WeeklyResetBoundary(new DateTimeOffset(2026, 8, 31, 14, 0, 0, TimeSpan.Zero), WeeklyResetBoundaryKind.Observed),
+                },
+                UsageValueStatus.Real),
+        },
+        DisplayZone: TimeZoneInfo.Utc,
+        ContentFacts: new[]
+        {
+            ContentFact.Contains("63%"),
+        });
+
     public static IReadOnlyList<DetailWindowFixture> All { get; } = new[]
     {
         OrdinaryLiveReadingExtraUsageOn,
@@ -577,5 +618,6 @@ public static class DetailWindowFixtures
         UnavailableAccountIdentity,
         GraphWithPartialCoverageAndBlankDays,
         GraphAcrossADstSpringForwardDay,
+        GraphGridlinesMondayFallbackAndPlanDefined,
     };
 }

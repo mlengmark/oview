@@ -40,8 +40,10 @@ public sealed record UsageGraphColumn(
 /// Linux counterpart of <c>O-view.Tray</c>'s own builder — independently implemented, not shared
 /// (D1): bar heights, the per-week intensity ramp, and the blank-column rule are this skin's own
 /// presentation decision over the one output-token figure per day Core already handed over —
-/// nothing here sums, averages, or re-buckets a vendor-derived row (D9c). No gridlines: those are
-/// slice P14's own, separate, presentation decision over the same <see cref="WeeklyResetBoundaries"/>.
+/// nothing here sums, averages, or re-buckets a vendor-derived row (D9c). Gridlines over the same
+/// <see cref="WeeklyResetBoundaries"/> are <see cref="UsageGraphGridlineBuilder"/>'s own, separate
+/// slice P14 presentation decision — this builder's columns are drawn first and the gridlines on
+/// top, but neither builder reads the other's output.
 /// </summary>
 public static class UsageGraphContentBuilder
 {
@@ -104,7 +106,9 @@ public static class UsageGraphContentBuilder
         return boundaries.Count(b => b.Instant <= midpoint);
     }
 
-    private static DateTimeOffset LocalDayStartUtc(DateOnly date, TimeZoneInfo zone)
+    /// <summary>Shared with <see cref="UsageGraphGridlineBuilder"/> (slice P14) — both need the
+    /// same real local-day span, not an assumed 24 hours, for the same DST reason.</summary>
+    internal static DateTimeOffset LocalDayStartUtc(DateOnly date, TimeZoneInfo zone)
     {
         var local = date.ToDateTime(TimeOnly.MinValue);
         return new DateTimeOffset(local, zone.GetUtcOffset(local));

@@ -280,19 +280,19 @@ internal sealed class DetailWindow : Window
         _modelNote.Text = content.ModelSectionNote;
         _modelNote.Visibility = string.IsNullOrEmpty(content.ModelSectionNote) ? Visibility.Collapsed : Visibility.Visible;
         _modelRows.ItemsSource = content.ModelRows.Select(ModelRowText).ToList();
-        BuildGraph(content.GraphColumns);
+        BuildGraph(content.GraphColumns, content.GraphGridlines);
     }
 
     /// <summary>
-    /// Draws the 31-day graph (ADR-0008 D10b, gate G7 parity slice P13): one bar per
+    /// Draws the 31-day graph (ADR-0008 D10b, gate G7 parity slices P13/P14): one bar per
     /// <see cref="UsageGraphColumn"/>, coloured by <see cref="UsageGraphColumn.Intensity"/>, a
-    /// vertical date label under every column (blank or not), and no gridlines — those are slice
-    /// P14's own addition over the same reset boundaries. Ported from the source's own
-    /// <c>BuildGraph</c>, including its label-centring fix: the label is measured for real, then
-    /// placed from <see cref="UsageGraphLabelGeometry"/>'s pure rotation math, never a constant
-    /// offset.
+    /// vertical date label under every column (blank or not), and finally — on top of every bar,
+    /// per the task's "drawn last" rule — the amber dotted weekly-reset gridlines. Ported from the
+    /// source's own <c>BuildGraph</c>, including its label-centring fix: the label is measured for
+    /// real, then placed from <see cref="UsageGraphLabelGeometry"/>'s pure rotation math, never a
+    /// constant offset.
     /// </summary>
-    private void BuildGraph(IReadOnlyList<UsageGraphColumn> columns)
+    private void BuildGraph(IReadOnlyList<UsageGraphColumn> columns, IReadOnlyList<UsageGraphGridline> gridlines)
     {
         _graphCanvas.Children.Clear();
 
@@ -346,6 +346,27 @@ internal sealed class DetailWindow : Window
                 label.DesiredSize.Width, label.DesiredSize.Height);
             Canvas.SetLeft(label, UsageGraphLabelGeometry.CentredLeft(centreX, inkLeft, inkWidth));
             Canvas.SetTop(label, UsageGraphLabelGeometry.Top(GraphBarAreaHeight + 6, inkTop));
+        }
+
+        // Drawn last, in their own pass over the already-built canvas, so every gridline sits on
+        // top of every bar regardless of draw order within the loop above (the task's own rule).
+        var gridlineBrush = ToBrush(WindowThemePalette.BandColor(UsageBarBand.Amber));
+        foreach (var gridline in gridlines)
+        {
+            var x = gridline.ColumnIndex * col + gridline.FractionWithinColumn * col;
+            var line = new System.Windows.Shapes.Line
+            {
+                X1 = x,
+                X2 = x,
+                Y1 = 0,
+                Y2 = GraphBarAreaHeight,
+                Stroke = gridlineBrush,
+                StrokeThickness = 1,
+                StrokeDashArray = new DoubleCollection { 2, 2 },
+                ToolTip = HoverCard.Text(gridline.HoverCaption, _colors),
+            };
+            HoverCard.ApplyTiming(line);
+            _graphCanvas.Children.Add(line);
         }
     }
 
