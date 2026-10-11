@@ -1,0 +1,120 @@
+namespace OView.Core.Providers.Jsonl;
+
+/// <summary>
+/// Recursive file search that survives an unreadable directory instead of abandoning the
+/// whole walk — ported from the source repository's <c>TranscriptFileScan</c> (read-only
+/// reference, on-disk format only; GitHub issue #44) because Cowork's session tree is
+/// confirmed to contain exactly the hazard this exists to survive: a broken directory
+/// junction inside a session's sandboxed <c>.claude\projects</c> directory.
+///
+/// <para><see cref="Directory.GetFiles(string, string, SearchOption)"/> with
+/// <see cref="SearchOption.AllDirectories"/> aborts the entire enumeration on the first node
+/// it cannot read, and <see cref="DirectoryNotFoundException"/> derives from
+/// <see cref="IOException"/> — so a naive <c>catch (IOException) → return []</c> around it
+/// would zero every Cowork token the moment one broken link was hit, rather than skipping
+/// just that directory. Walking directory by directory keeps a bad node local to itself.</para>
+/// </summary>
+public static class TranscriptFileScan
+{
+    /// <summary>
+    /// Depth ceiling, kept as a backstop even though links are resolved before they are
+    /// walked. Resolution can fail — a permission error, a racing rename — and when it does
+    /// this is the only thing standing between a link loop and an unbounded walk. Real
+    /// layouts here are 3-5 levels, so it only ever trips on something pathological.
+    /// </summary>
+    private const int MaxDepth = 32;
+
+    /// <summary>
+    /// Every file matching <paramref name="searchPattern"/> under <paramref name="root"/>.
+    /// Empty if the root does not exist. Never throws.
+    /// </summary>
+    public static IReadOnlyList<string> Find(string root, string searchPattern)
+    {
+        var results = new List<string>();
+
+        // Directory.Exists swallows its own errors and returns false, so it needs no guard
+        // here; the per-directory try blocks below are what make the walk safe.
+        if (!Directory.Exists(root))
+        {
+            return results;
+        }
+
+        // Guards against a link that leads back to a directory already walked. Keyed by
+        // platform path identity, not OrdinalIgnoreCase everywhere, because Linux treats
+        // Alpha/ and alpha/ as two directories and folding them together would skip the
+        // second silently.
+        //
+        // It only works because links are resolved BEFORE being pushed (see Canonical), so
+        // every path in here is already canonical. Comparing paths as walked would not catch
+        // a symlink loop at all — a/link -> ../.. generates a/link/a/link/... textually
+        // distinct every time — and only MaxDepth would stop it, after a very large walk.
+        var visited = new HashSet<string>(PathIdentity.Comparer);
+        var pending = new Stack<(string Path, int Depth)>();
+        pending.Push((Canonical(root), 0));
+
+        while (pending.Count > 0)
+        {
+            var (dir, depth) = pending.Pop();
+
+            if (!visited.Add(dir))
+            {
+                continue;
+            }
+
+            // Files and subdirectories are read in separate try blocks on purpose: a
+            // directory whose children cannot be listed may still yield its own files.
+            try
+            {
+                results.AddRange(Directory.EnumerateFiles(dir, searchPattern));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // Unreadable node (broken junction, permissions) — skip just this one.
+            }
+
+            if (depth >= MaxDepth)
+            {
+                continue;
+            }
+
+            try
+            {
+                foreach (var child in Directory.EnumerateDirectories(dir))
+                {
+                    pending.Push((Canonical(child), depth + 1));
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+            }
+        }
+
+        return results;
+    }
+
+    /// <summary>
+    /// The directory a path actually refers to, following a symlink or junction to its final
+    /// target. Resolving here — at the moment a directory is queued, rather than when it is
+    /// compared — is what keeps the whole walk in canonical space: a link back to an ancestor
+    /// is recognised on the very next pop, instead of generating an ever-longer chain of
+    /// distinct-looking paths the visited set can never match.
+    ///
+    /// <para>Falls back to the path as given whenever resolution says nothing useful:
+    /// <see cref="Directory.ResolveLinkTarget"/> returns <see langword="null"/> for an
+    /// ordinary directory, and throws for a dangling link whose target is gone. Neither is an
+    /// error here — a dangling link simply fails to enumerate a moment later, which the
+    /// per-directory catch above already handles.</para>
+    /// </summary>
+    private static string Canonical(string directory)
+    {
+        try
+        {
+            return Directory.ResolveLinkTarget(directory, returnFinalTarget: true)?.FullName
+                   ?? directory;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return directory;
+        }
+    }
+}
