@@ -24,13 +24,38 @@ public static class TranscriptParser
     private const string SyntheticModel = "<synthetic>";
 
     /// <summary>
-    /// Parses one transcript line into a <see cref="TranscriptRecord"/>. Returns
+    /// Claude Code's spelling of the request-id field on an assistant record.
+    /// </summary>
+    private const string ClaudeCodeRequestIdProperty = "requestId";
+
+    /// <summary>
+    /// Cowork's spelling of the same field on an otherwise identical record — an
+    /// on-disk difference, not a schema difference (source CLAUDE.md rule 4: "the id has
+    /// two spellings").
+    /// </summary>
+    private const string CoworkRequestIdProperty = "request_id";
+
+    /// <summary>
+    /// Parses one Claude Code transcript line into a <see cref="TranscriptRecord"/>. Returns
     /// <see langword="false"/> — never throws — for malformed JSON, a record that is not an
     /// assistant record, a missing or empty <c>requestId</c>, a missing or unparseable
     /// <c>timestamp</c>, a missing <c>message.usage</c> block, and a record whose model is
     /// the synthetic marker.
     /// </summary>
-    public static bool TryParseAssistantRecord(string line, [NotNullWhen(true)] out TranscriptRecord? record)
+    public static bool TryParseAssistantRecord(string line, [NotNullWhen(true)] out TranscriptRecord? record) =>
+        TryParseAssistantRecord(line, ClaudeCodeRequestIdProperty, out record);
+
+    /// <summary>
+    /// Parses one Cowork audit-log line into a <see cref="TranscriptRecord"/>. Identical rule
+    /// set to <see cref="TryParseAssistantRecord(string, out TranscriptRecord?)"/>, reading the
+    /// request id under Cowork's own spelling, <c>request_id</c>, rather than Claude Code's
+    /// <c>requestId</c> (ADR-0005 D2's 2026-10-09 amendment).
+    /// </summary>
+    public static bool TryParseCoworkAssistantRecord(string line, [NotNullWhen(true)] out TranscriptRecord? record) =>
+        TryParseAssistantRecord(line, CoworkRequestIdProperty, out record);
+
+    private static bool TryParseAssistantRecord(
+        string line, string requestIdProperty, [NotNullWhen(true)] out TranscriptRecord? record)
     {
         record = null;
 
@@ -50,7 +75,7 @@ public static class TranscriptParser
                 return false;
             }
 
-            if (!root.TryGetProperty("requestId", out var requestIdElement) ||
+            if (!root.TryGetProperty(requestIdProperty, out var requestIdElement) ||
                 requestIdElement.ValueKind != JsonValueKind.String ||
                 requestIdElement.GetString() is not { Length: > 0 } requestId)
             {

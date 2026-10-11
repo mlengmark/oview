@@ -10,7 +10,8 @@
   2026-10-09 (**gate G7 parity** — D2 Cowork ingest source, two more D6c ledger
   queries, new D7 account-identity reader; OVI-585, accepted by the board on
   OVI-591, card `4e515cef`, transcribed into this record by OVI-607);
-  2026-10-10 (D6c's "built" note for gate G7 parity slice P6, OVI-635)
+  2026-10-10 (D6c's "built" note for gate G7 parity slice P6, OVI-635);
+  2026-10-11 (D2's "built" note for gate G7 parity slice P20, OVI-745)
 - **Deciders:** proposed by Adrian II the Architect; accepted by the Oview board 2026-09-28
 - **Formalizes:** the approved PDR (rev. 2, `oview-pdr-reissued`), §3 and
   §3.3 — the *input* half of the Core boundary, which Phase 1 did not touch
@@ -651,6 +652,57 @@ them, per that ADR's own rule.
   > now covers `StepLocalDays`'s DST re-resolution directly, against the same
   > synthetic zone, by asserting the stepped boundary lands on the correct
   > local midnight and offset rather than a naive 7 × 24 hour shift.
+
+  > **2026-10-11 — slice P20 landed (Kit the Builder, OVI-745).** The D2
+  > amendment above is implemented: `CoworkAuditLocator`
+  > (`src/O-view.Core/Providers/Jsonl/`) finds Cowork's session tree under
+  > `<claude-data-root>/local-agent-mode-sessions`, in either on-disk shape
+  > the source repository's CLAUDE.md rule 9 documents (`audit.jsonl` at the
+  > session root, or `.claude/projects/**/*.jsonl` inside the sandbox's own
+  > Claude Code home) — a flat recursive `*.jsonl` walk finds both without
+  > caring which shape a given build wrote. `TranscriptFileScan` (ported,
+  > trimmed, from the source repository's identically-named file) keeps that
+  > walk from aborting on the broken directory junction the source documents
+  > inside that tree, and `PathIdentity` (also ported) supplies its
+  > per-platform path comparer. `TranscriptParser.TryParseCoworkAssistantRecord`
+  > reads the same assistant-record shape as `TryParseAssistantRecord`, under
+  > Cowork's own `request_id` spelling rather than Claude Code's `requestId`
+  > (rule 4's "the id has two spellings"), sharing one private implementation
+  > so the two never drift. `CoworkLedgerIngestSource.Ingest` locates, parses,
+  > de-duplicates by request id, and `UpsertRange`s the result straight into
+  > `UsageLedgerStore` — **not** an `IUsageProvider`, not registered in
+  > `CompositeUsageProvider`'s composition, and never on the tooltip's path.
+  > Idempotency needs no watermark: the ledger's own `ON CONFLICT DO UPDATE`
+  > (D1 above) makes a repeated ingest of the same file a no-op rewrite.
+  > `CoworkLedgerIngestSourceTests` proves all three of OVI-745's "done when"
+  > conditions directly against `LedgerUsageStatisticsSource`: a machine with
+  > no Cowork logs leaves `GetStatistics` byte-identical; re-ingesting the
+  > same audit log does not double-count; and synthetic Cowork records are
+  > visible in both `GetDailySeries` and `GetTokenKindTotals`. **Not wired to
+  > a poll loop in this slice** — no general Claude Code transcript-to-ledger
+  > ingest exists in `src/` yet either (confirmed: nothing in `O-view.App`
+  > calls `UsageLedgerStore.Upsert`/`UpsertRange` before this slice), so
+  > wiring either source into `AppShell`'s poll loop is a later slice's scope,
+  > not a gap this one introduced. `CoworkSessionIndex`/`CoworkSessionRegistry`
+  > (per-source attribution for the support-bundle breakdown) are out of scope
+  > per this slice's own "done when" list, which asks only for the ledger's
+  > totals to include Cowork tokens, not for them to be labelled as such.
+  >
+  > **2026-10-11 correction (Quinn's review of PR #131).** The paragraph above
+  > said `CoworkAuditLocator`'s flat `*.jsonl` walk finds both on-disk shapes
+  > "without caring which shape a given build wrote" and implied
+  > `TryParseCoworkAssistantRecord` alone covered both. That was wrong: the
+  > nested `.claude/projects/**/*.jsonl` shape is a genuine Claude Code
+  > transcript (source CLAUDE.md rule 9) and spells the id `requestId` (rule
+  > 4), not Cowork's own `request_id` — so every nested-shape file silently
+  > parsed to zero records, reproducing the exact undercount this slice exists
+  > to fix, one shape over. `CoworkLedgerIngestSource.ReadTranscript` now tries
+  > `TryParseCoworkAssistantRecord` first and falls back to
+  > `TryParseAssistantRecord` per line; a line only ever matches one spelling,
+  > so trying both is never ambiguous. `CoworkLedgerIngestSourceTests
+  > .RecordsFromBothOnDiskShapesAreIngested` now feeds the nested-shape file
+  > real `requestId`-spelled content instead of `request_id`, so the test can
+  > no longer pass without the fallback.
 
   **Rejected: widening `IUsageProvider` to return both** (a second method, a
   tuple, or a combined record). D1's single method is accepted board contract,

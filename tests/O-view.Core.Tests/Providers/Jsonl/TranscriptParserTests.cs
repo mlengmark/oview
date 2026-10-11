@@ -144,6 +144,50 @@ public class TranscriptParserTests
         Assert.Equal(20, req12.Tokens.OutputTokens); // last of 2 occurrences: (1 + 1) * 10
     }
 
+    [Fact]
+    public void CoworkSpellingParsesUnderTryParseCoworkAssistantRecord()
+    {
+        var line = """{"type":"assistant","request_id":"req_cowork","timestamp":"2026-10-09T12:00:00.000Z","message":{"model":"claude-opus-4-8","usage":{"input_tokens":3,"output_tokens":9,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}""";
+
+        var parsed = TranscriptParser.TryParseCoworkAssistantRecord(line, out var record);
+
+        Assert.True(parsed);
+        Assert.Equal("req_cowork", record!.RequestId);
+        Assert.Equal(3, record.Tokens.InputTokens);
+        Assert.Equal(9, record.Tokens.OutputTokens);
+    }
+
+    [Fact]
+    public void ClaudeCodeSpellingIsNotReadByTheCoworkParser()
+    {
+        var line = AssistantLine(
+            requestId: "req_claude_code",
+            timestamp: "2026-10-09T12:00:00.000Z",
+            model: "claude-opus-4-8",
+            inputTokens: 1,
+            outputTokens: 1,
+            cacheCreationInputTokens: 0,
+            cacheReadInputTokens: 0,
+            ephemeral5m: null,
+            ephemeral1h: null);
+
+        var parsed = TranscriptParser.TryParseCoworkAssistantRecord(line, out var record);
+
+        Assert.False(parsed);
+        Assert.Null(record);
+    }
+
+    [Fact]
+    public void CoworkSpellingIsNotReadByTheClaudeCodeParser()
+    {
+        var line = """{"type":"assistant","request_id":"req_cowork_only","timestamp":"2026-10-09T12:00:00.000Z","message":{"model":"claude-opus-4-8","usage":{"input_tokens":1,"output_tokens":1}}}""";
+
+        var parsed = TranscriptParser.TryParseAssistantRecord(line, out var record);
+
+        Assert.False(parsed);
+        Assert.Null(record);
+    }
+
     private static string AssistantLine(
         string requestId,
         string timestamp,
