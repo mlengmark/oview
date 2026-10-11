@@ -379,6 +379,27 @@ Linux.Tests), with the harness left unrestructured?*
   only the shipped artefact. That gap is now closed by a direct reply;
   the rest of the 2026-09-27 amendment's content is unchanged.
 
+- **2026-10-11 amendment (OVI-724/OVI-725) — the Linux job now starts a
+  virtual X display (Xvfb) before its Test step.** This is the trigger
+  point 4 and "When this conclusion must be revisited" above both named in
+  advance: "that changes once the code gains behaviour that really does
+  differ by operating system... the Avalonia head. At that point the
+  Linux job starts to earn its keep." OVI-718 (P24 branded dialogs) added
+  `O-view.Linux.Tests`'s first `AppBuilder.SetupWithoutStarting()` call
+  (render-proof tests), and `ubuntu-latest` has no X server at all, so
+  every attempt to initialize the X11 backend threw `XOpenDisplay failed`
+  (CONFIRMED by grep over CI runs 38114932457 and 38115821972). The board
+  decided (OVI-725, option A over adding `Avalonia.Headless`) that the
+  fix is a virtual display, not a different rendering backend: these
+  tests exist to prove real on-screen rendering, and headless mode would
+  weaken exactly that proof. `.github/workflows/ci.yml`'s Linux job
+  installs `xvfb`, starts it on `:99`, and exports `DISPLAY=:99` for the
+  Test step; nothing about job scope (still the four `net10.0` projects)
+  or the Windows job changes. This does not reopen R1, R2 or R3 above —
+  the harness itself is unaffected — it only answers the narrower
+  question those routes left for later: once the Linux skin needs a real
+  display, give the CI runner one.
+
 ## Alternatives considered
 
 The alternatives are options (a), (b) and (c) and routes R1 to R3 above,
