@@ -232,6 +232,11 @@ public static class DetailWindowRenderProof
         var stack = new StackPanel { Margin = new Thickness(12) };
         stack.Children.Add(BuildHeader(content, colors));
         stack.Children.Add(new Separator { Margin = new Thickness(0, 8, 0, 8), Background = ToBrush(colors.Border) });
+        if (!string.IsNullOrEmpty(content.NoUsageDataBannerTitle))
+        {
+            stack.Children.Add(BuildNoUsageDataBanner(content, colors));
+        }
+
         if (!string.IsNullOrEmpty(content.OffPlanBannerTitle))
         {
             stack.Children.Add(BuildOffPlanBanner(content, colors));
@@ -287,6 +292,48 @@ public static class DetailWindowRenderProof
             Background = ToBrush(colors.Background),
             BorderBrush = ToBrush(colors.Border),
             BorderThickness = new Thickness(1),
+            Child = stack,
+        };
+    }
+
+    /// <summary>
+    /// The "no usage data" banner (gate G7 parity slice P18), mirroring <see cref="DetailWindow"/>'s
+    /// own live banner — independently implemented, not shared (D1): a neutral, bordered box above
+    /// everything else carrying the heading and the detail. Only ever built when
+    /// <see cref="DetailWindowContent.NoUsageDataBannerTitle"/> is non-empty, same as the live
+    /// window's visibility rule.
+    /// </summary>
+    private static Border BuildNoUsageDataBanner(DetailWindowContent content, LinuxWindowThemeColors colors)
+    {
+        var stack = new StackPanel();
+        stack.Children.Add(new TextBlock
+        {
+            Text = content.NoUsageDataBannerTitle,
+            FontWeight = FontWeight.Bold,
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = ToBrush(colors.Foreground),
+        });
+
+        if (!string.IsNullOrEmpty(content.NoUsageDataBannerDetail))
+        {
+            stack.Children.Add(new TextBlock
+            {
+                Text = content.NoUsageDataBannerDetail,
+                FontSize = 11,
+                Margin = new Thickness(0, 2, 0, 0),
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = ToBrush(colors.Foreground),
+            });
+        }
+
+        return new Border
+        {
+            BorderThickness = new Thickness(1),
+            BorderBrush = ToBrush(colors.Border),
+            CornerRadius = new CornerRadius(4),
+            Padding = new Thickness(8),
+            Margin = new Thickness(0, 0, 0, 8),
+            Background = ToBrush(colors.BannerBackground),
             Child = stack,
         };
     }

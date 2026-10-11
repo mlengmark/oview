@@ -99,6 +99,18 @@ internal sealed class DetailWindow : Window
         Cursor = new Cursor(StandardCursorType.Hand),
     };
     private readonly Border _offPlanBanner;
+    private readonly TextBlock _noUsageDataBannerTitle = new()
+    {
+        TextWrapping = TextWrapping.Wrap,
+        FontWeight = FontWeight.Bold,
+    };
+    private readonly TextBlock _noUsageDataBannerDetail = new()
+    {
+        TextWrapping = TextWrapping.Wrap,
+        FontSize = 11,
+        Margin = new Thickness(0, 2, 0, 0),
+    };
+    private readonly Border _noUsageDataBanner;
     private readonly StatisticsTileView[] _tiles = { new(), new(), new(), new() };
     private readonly TextBlock _coverageCaption = NewLine();
     private readonly TextBlock _caveat = NewLine();
@@ -166,6 +178,19 @@ internal sealed class DetailWindow : Window
             Margin = new Thickness(0, 0, 0, 8),
             IsVisible = false,
             Child = bannerStack,
+        };
+
+        var noUsageDataStack = new StackPanel();
+        noUsageDataStack.Children.Add(_noUsageDataBannerTitle);
+        noUsageDataStack.Children.Add(_noUsageDataBannerDetail);
+        _noUsageDataBanner = new Border
+        {
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(4),
+            Padding = new Thickness(8),
+            Margin = new Thickness(0, 0, 0, 8),
+            IsVisible = false,
+            Child = noUsageDataStack,
         };
 
         Title = "O-view";
@@ -237,6 +262,9 @@ internal sealed class DetailWindow : Window
         _offPlanBanner.Background = ToBrush(colors.BannerBackground);
         _offPlanBanner.BorderBrush = ToBrush(LinuxWindowThemePalette.BandColors.Amber);
         _offPlanBannerLink.Foreground = ToBrush(colors.Accent);
+
+        _noUsageDataBanner.Background = ToBrush(colors.BannerBackground);
+        _noUsageDataBanner.BorderBrush = border;
 
         if (Content is ScrollViewer { Content: StackPanel outer })
         {
@@ -346,6 +374,11 @@ internal sealed class DetailWindow : Window
         _offPlanUsageValue.Text = content.OffPlanUsageValue;
         _offPlanUsageCaption.Text = content.OffPlanUsageCaption;
         _offPlanUsageCoverage.Text = content.CoverageCaption;
+
+        _noUsageDataBannerTitle.Text = content.NoUsageDataBannerTitle;
+        _noUsageDataBannerDetail.Text = content.NoUsageDataBannerDetail;
+        _noUsageDataBannerDetail.IsVisible = !string.IsNullOrEmpty(content.NoUsageDataBannerDetail);
+        _noUsageDataBanner.IsVisible = !string.IsNullOrEmpty(content.NoUsageDataBannerTitle);
     }
 
     /// <summary>
@@ -589,6 +622,7 @@ internal sealed class DetailWindow : Window
         var stack = new StackPanel { Margin = new Thickness(12) };
         stack.Children.Add(BuildHeader());
         stack.Children.Add(new Separator { Margin = new Thickness(0, 8, 0, 8) });
+        stack.Children.Add(_noUsageDataBanner);
         stack.Children.Add(_offPlanBanner);
         stack.Children.Add(sessionRow);
         stack.Children.Add(_weeklyRow);

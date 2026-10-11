@@ -742,4 +742,55 @@ public sealed class DetailWindowContentBuilderTests
         Assert.Equal("model-third-alone", leftover.LegendLabel);
         Assert.Equal("excl. 1 unpriced", valueTile.Note);
     }
+
+    /// <summary>
+    /// Gate G7 parity slice P18 (OVI-716): the "no usage data" banner appears exactly when
+    /// <see cref="UsageSnapshot.DataSourceKind"/> is <see cref="DataSourceKind.Unavailable"/> —
+    /// absent for every other reading, same as <see cref="DetailWindowContent.OffPlanBannerTitle"/>'s
+    /// own empty-means-hidden convention.
+    /// </summary>
+    [Fact]
+    public void No_usage_data_banner_is_present_only_when_the_data_source_is_unavailable()
+    {
+        var unavailable = DetailWindowContentBuilder.Build(UsageDetail.Unavailable, UtcNow, TimeZoneInfo.Utc);
+
+        Assert.NotEmpty(unavailable.NoUsageDataBannerTitle);
+        Assert.NotEmpty(unavailable.NoUsageDataBannerDetail);
+
+        var live = new UsageDetail(
+            new UsageSnapshot(
+                DataSourceKind.Live,
+                UtcNow,
+                new UsagePercent(10, UsageValueStatus.Real),
+                new UsageInstant(UtcNow.AddHours(5), UsageValueStatus.Real),
+                new UsagePercent(5, UsageValueStatus.Real),
+                new UsageInstant(UtcNow.AddDays(1), UsageValueStatus.Real),
+                UsageLevel.Green),
+            UsageStatistics.Unavailable,
+            ModelUsageBreakdown.Unavailable);
+        var withData = DetailWindowContentBuilder.Build(live, UtcNow, TimeZoneInfo.Utc);
+
+        Assert.Equal("", withData.NoUsageDataBannerTitle);
+        Assert.Equal("", withData.NoUsageDataBannerDetail);
+    }
+
+    /// <summary>
+    /// Gate G7 parity slice P18 (OVI-716, source README: "it will state which path it checked
+    /// and what it found there — what it observed, never an assertion about your machine it
+    /// hasn't verified"). Pins that the banner names the local sources O-view actually checks and
+    /// never asserts anything about the account or the user's own activity beyond that. Worded
+    /// independently from the Windows skin (ADR-0003) — different sentences, same two facts.
+    /// </summary>
+    [Fact]
+    public void No_usage_data_banner_states_what_was_checked_and_makes_no_machine_claim()
+    {
+        var content = DetailWindowContentBuilder.Build(UsageDetail.Unavailable, UtcNow, TimeZoneInfo.Utc);
+        var banner = content.NoUsageDataBannerTitle + " " + content.NoUsageDataBannerDetail;
+
+        Assert.Contains("Claude Code", banner);
+        Assert.Contains("Claude Desktop", banner);
+        Assert.DoesNotContain("you have", banner, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("your account", banner, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("never used", banner, StringComparison.OrdinalIgnoreCase);
+    }
 }
