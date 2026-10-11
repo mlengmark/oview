@@ -78,9 +78,11 @@ jobs:
             src/O-view.Core/O-view.Core.csproj \
             src/O-view.App/O-view.App.csproj \
             src/O-view.Linux/O-view.Linux.csproj \
+            tools/release/ReleaseManifestTool/ReleaseManifestTool.csproj \
             tests/O-view.Core.Tests/O-view.Core.Tests.csproj \
             tests/O-view.App.Tests/O-view.App.Tests.csproj \
-            tests/O-view.Linux.Tests/O-view.Linux.Tests.csproj
+            tests/O-view.Linux.Tests/O-view.Linux.Tests.csproj \
+            tests/ReleaseManifestTool.Tests/ReleaseManifestTool.Tests.csproj
           do
             dotnet build "$p" --configuration Release
           done
@@ -107,7 +109,8 @@ jobs:
           for p in \
             tests/O-view.Core.Tests/O-view.Core.Tests.csproj \
             tests/O-view.App.Tests/O-view.App.Tests.csproj \
-            tests/O-view.Linux.Tests/O-view.Linux.Tests.csproj
+            tests/O-view.Linux.Tests/O-view.Linux.Tests.csproj \
+            tests/ReleaseManifestTool.Tests/ReleaseManifestTool.Tests.csproj
           do
             dotnet test "$p" --no-build --configuration Release --verbosity normal
           done

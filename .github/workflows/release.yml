@@ -1,0 +1,191 @@
+# Release workflow for the O-view rebuild (ADR-0010 D5, slicing table row 9).
+#
+# Triggered by a version tag. Builds every asset ReleaseAssets
+# (src/O-view.Core/Updates/ReleaseAssets.cs) already named, generates SHA256SUMS in this
+# job (never staged by hand), verifies every staged asset against that manifest using the
+# same ChecksumFile parsing logic Core uses against a downloaded release
+# (tools/release/ReleaseManifestTool), then publishes everything to a GitHub Release for
+# the tag.
+#
+# No asset name is restated by hand anywhere in this file: every name that identifies a
+# ReleaseAssets artefact comes from ReleaseManifestTool, which asks ReleaseAssets directly.
+# The .deb and tarball names are the literal filenames packaging/linux/build.sh (slice 8)
+# already produced and printed; this workflow never reconstructs that pattern either.
+#
+# Not built here (ADR-0010 D8, slicing table row 10): provenance attestation
+# (`id-token: write` / `attestations: write`) — a separate board decision.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  version:
+    name: Parse version from tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.parse.outputs.version }}
+    steps:
+      - name: Strip the leading "v"
+        id: parse
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+  windows-assets:
+    name: Windows installer + portable exe
+    needs: version
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      # The installer's own [Files] entry takes a whole published directory
+      # (installer/O-view.iss), so this publish is framework-complete but not single-file.
+      - name: Publish the Tray skin (installer source)
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet publish src/O-view.Tray/O-view.Tray.csproj \
+            --configuration Release --runtime win-x64 --self-contained true \
+            -p:Version="$VERSION" -p:DebugType=none \
+            --output artifacts/installer-src
+
+      # ReleaseAssets.WindowsPortableName (ADR-0010 D5): "a first-class manual download,
+      # not a fallback", so it ships self-contained like the installer above — no dotnet
+      # runtime required either way.
+      - name: Publish the Tray skin (portable single-file)
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet publish src/O-view.Tray/O-view.Tray.csproj \
+            --configuration Release --runtime win-x64 --self-contained true \
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
+            -p:Version="$VERSION" -p:DebugType=none \
+            --output artifacts/portable
+
+      # Already part of the default windows-latest runner image (Chocolatey), so this adds
+      # no new runner image or permission — just a package already available to it.
+      - name: Install Inno Setup
+        shell: bash
+        run: choco install innosetup --no-progress -y
+
+      # installer/O-view.iss defines no OutputDir, so /O below is the only thing fixing
+      # where ISCC writes its result — it does not touch the script's own naming logic.
+      - name: Build the Windows installer
+        shell: bash
+        run: |
+          set -euo pipefail
+          iscc "/DSourceDir=artifacts/installer-src" "/DMyAppVersion=$VERSION" \
+            "/Oartifacts/installer-out" installer/O-view.iss
+
+      # Every destination filename below comes from ReleaseManifestTool asking
+      # ReleaseAssets directly (src/O-view.Core/Updates/ReleaseAssets.cs) — never restated.
+      - name: Stage the Windows assets under their ReleaseAssets names
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/stage
+          installer_name="$(dotnet run --project tools/release/ReleaseManifestTool \
+            --configuration Release -- name windows-installer | tr -d '\r')"
+          portable_name="$(dotnet run --project tools/release/ReleaseManifestTool \
+            --configuration Release -- name windows-portable | tr -d '\r')"
+          cp "artifacts/installer-out/$installer_name" "artifacts/stage/$installer_name"
+          cp "artifacts/portable/$portable_name" "artifacts/stage/$portable_name"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-assets-windows
+          path: artifacts/stage/*
+          if-no-files-found: error
+
+  linux-assets:
+    name: Linux .deb + tarball (${{ matrix.rid }})
+    needs: version
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        rid: [linux-x64, linux-arm64]
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      # packaging/linux/build.sh (slice 8) owns both the .deb and tarball naming and
+      # already asserts its own output against ReleaseAssets' predicates before exiting
+      # successfully — this step only runs it, it does not restate anything from it.
+      - name: Build the .deb and tarball
+        run: ./packaging/linux/build.sh "$VERSION" "${{ matrix.rid }}" dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-assets-linux-${{ matrix.rid }}
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    name: Verify and publish the release
+    needs: [version, windows-assets, linux-assets]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      # The one permission this workflow needs beyond ci.yml's read-only default, and only
+      # on this job: creating the GitHub Release and uploading assets to it.
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-assets-*
+          merge-multiple: true
+          path: stage
+
+      # Generated in this job, from the bytes actually staged above — never staged by hand
+      # (ADR-0010 D5).
+      - name: Generate SHA256SUMS
+        run: dotnet run --project tools/release/ReleaseManifestTool --configuration Release -- generate-manifest stage
+
+      # Asserts one entry per ReleaseAssets artefact, no unrecognised stray file, and that
+      # ChecksumFile.DigestFor/Matches — the same parsing Core runs against a downloaded
+      # release — accept every staged file's real bytes against the manifest just written.
+      - name: Verify every staged asset against the generated manifest
+        run: dotnet run --project tools/release/ReleaseManifestTool --configuration Release -- verify stage
+
+      - name: Publish the GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release create "${{ github.ref_name }}" stage/* \
+            --title "O-view ${{ github.ref_name }}" \
+            --generate-notes \
+            --repo "${{ github.repository }}"

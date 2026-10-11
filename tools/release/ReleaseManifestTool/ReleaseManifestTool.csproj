@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Release-engineering tool, not a shipped skin: it has no window, no tray icon and no
+         user-facing wording, so it does not answer to ADR-0001's skin-ownership rule the way
+         src/* does. It exists so the release workflow (ADR-0010 D5, slicing table row 9)
+         never restates a name ReleaseAssets (src/O-view.Core/Updates/) already owns, and so
+         manifest generation/verification runs the same ChecksumFile parsing logic Core uses
+         instead of a second, driftable implementation in bash. -->
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>OView.Tools.ReleaseManifest</RootNamespace>
+    <OutputType>Exe</OutputType>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ReleaseManifestTool.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\O-view.Core\O-view.Core.csproj" />
+  </ItemGroup>
+
+</Project>
