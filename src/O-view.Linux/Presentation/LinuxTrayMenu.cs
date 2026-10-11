@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using OView.App;
 using OView.Core.Updates;
 
 namespace OView.Linux.Presentation;
@@ -15,23 +16,44 @@ namespace OView.Linux.Presentation;
 /// <para>Independently structured from <c>O-view.Tray.Presentation.TrayMenu</c> (ADR-0008 D1):
 /// this adapter owns an Avalonia <see cref="NativeMenu"/> rather than a WinForms
 /// <c>ContextMenuStrip</c>, and its own item wording.</para>
+///
+/// <para>G7 parity slice P23 (OVI-744) completes the row set: "Update automatically" is hidden
+/// for a non-package build (<see cref="LinuxMenuSnapshot.AutoUpdateRowVisible"/>,
+/// <c>UpdatePolicy.IsInstalledBuild</c>); "Weekly reset…" opens the branded dialog P24
+/// (OVI-718) built but never wired, via <see cref="MenuOwnerWindow"/>; "Quit" is renamed "Exit"
+/// to match the source's own wording. The ui-spec's "toggles leave the flyout open" rule is
+/// this surface's one unmet row requirement — <see cref="NativeMenu"/> wraps the host desktop's
+/// own native menu widget, which closes on every item activation by its own design with no
+/// property this type can set to change that (INFERRED: no Avalonia API exposes one); it is the
+/// same already-documented boundary as this adapter's theme (above) and its "not unit-tested"
+/// note, not a regression this slice introduces.</para>
 /// </summary>
 internal sealed class LinuxTrayMenu
 {
     private readonly LinuxMenuController _controller;
     private readonly Action<string, string> _showNotification;
+    private readonly MenuOwnerWindow _ownerWindow;
+    private readonly Func<ThemePreference> _currentTheme;
     private readonly NativeMenu _menu = new();
     private readonly NativeMenuItem _runAtStartupItem;
     private readonly NativeMenuItem _autoUpdateItem;
     private readonly (int Percent, NativeMenuItem Item)[] _thresholdItems;
 
-    public LinuxTrayMenu(LinuxMenuController controller, Action<string, string> showNotification)
+    public LinuxTrayMenu(
+        LinuxMenuController controller,
+        Action<string, string> showNotification,
+        MenuOwnerWindow ownerWindow,
+        Func<ThemePreference> currentTheme)
     {
         ArgumentNullException.ThrowIfNull(controller);
         ArgumentNullException.ThrowIfNull(showNotification);
+        ArgumentNullException.ThrowIfNull(ownerWindow);
+        ArgumentNullException.ThrowIfNull(currentTheme);
 
         _controller = controller;
         _showNotification = showNotification;
+        _ownerWindow = ownerWindow;
+        _currentTheme = currentTheme;
 
         var refreshNow = new NativeMenuItem("Refresh now");
         refreshNow.Click += (_, _) => _controller.RefreshNow();
@@ -54,27 +76,31 @@ internal sealed class LinuxTrayMenu
         _runAtStartupItem = new NativeMenuItem("Run at startup") { ToggleType = MenuItemToggleType.CheckBox };
         _runAtStartupItem.Click += (_, _) => OnRunAtStartupClicked();
 
-        _autoUpdateItem = new NativeMenuItem("Check for updates automatically") { ToggleType = MenuItemToggleType.CheckBox };
+        _autoUpdateItem = new NativeMenuItem("Update automatically") { ToggleType = MenuItemToggleType.CheckBox };
         _autoUpdateItem.Click += (_, _) => OnAutoUpdateClicked();
 
         var checkForUpdatesNow = new NativeMenuItem("Check for updates now");
         checkForUpdatesNow.Click += (_, _) => OnCheckForUpdatesNowClicked();
 
+        var weeklyReset = new NativeMenuItem("Weekly reset…");
+        weeklyReset.Click += (_, _) => OnWeeklyResetClicked();
+
         var copyDiagnostics = new NativeMenuItem("Copy diagnostics");
         copyDiagnostics.Click += (_, _) => _controller.CopyDiagnostics();
 
-        var quit = new NativeMenuItem("Quit");
-        quit.Click += (_, _) => _controller.Quit();
+        var exit = new NativeMenuItem("Exit");
+        exit.Click += (_, _) => _controller.Quit();
 
         _menu.Add(refreshNow);
         _menu.Add(showUsageDetails);
         _menu.Add(thresholdItem);
+        _menu.Add(weeklyReset);
         _menu.Add(_runAtStartupItem);
         _menu.Add(_autoUpdateItem);
         _menu.Add(checkForUpdatesNow);
         _menu.Add(new NativeMenuItemSeparator());
         _menu.Add(copyDiagnostics);
-        _menu.Add(quit);
+        _menu.Add(exit);
 
         _menu.Opening += (_, _) => Refresh();
     }
@@ -94,6 +120,7 @@ internal sealed class LinuxTrayMenu
 
         _runAtStartupItem.IsChecked = snapshot.StartupEnabled;
         _autoUpdateItem.IsChecked = snapshot.AutoUpdateEnabled;
+        _autoUpdateItem.IsVisible = snapshot.AutoUpdateRowVisible;
     }
 
     /// <summary>Toggles run-at-startup and renders <see cref="StartupToggleOutcome.Enabled"/> —
@@ -117,11 +144,30 @@ internal sealed class LinuxTrayMenu
         }
     }
 
+    /// <summary>Ticks the row to the setting's actual post-write value (G7 parity slice P23,
+    /// OVI-744), read back from <see cref="LinuxMenuController.SetAutoUpdate"/> rather than the
+    /// requested value — the same reasoning <see cref="OnRunAtStartupClicked"/> already applies
+    /// to its own toggle.</summary>
     private void OnAutoUpdateClicked()
     {
-        var enabled = !_autoUpdateItem.IsChecked;
-        _controller.SetAutoUpdate(enabled);
-        _autoUpdateItem.IsChecked = enabled;
+        var requested = !_autoUpdateItem.IsChecked;
+        var actual = _controller.SetAutoUpdate(requested);
+        _autoUpdateItem.IsChecked = actual;
+    }
+
+    /// <summary>Opens the branded weekly-reset entry dialog built in gate G7 parity slice P24
+    /// (OVI-718) — this slice's only job for that dialog is wiring this action row to
+    /// <see cref="WeeklyResetEntryDialog.ShowAsync"/>; nothing here persists its result (P24's
+    /// own remarks: no Core type exists yet for a manually entered reset to live in). No-op if
+    /// <see cref="MenuOwnerWindow.Current"/> is still unset — only possible in the instant
+    /// between this menu's construction and <c>App.OnFrameworkInitializationCompleted</c>
+    /// building the detail window, before Avalonia's message loop is even pumping input.</summary>
+    private async void OnWeeklyResetClicked()
+    {
+        if (_ownerWindow.Current is { } owner)
+        {
+            await WeeklyResetEntryDialog.ShowAsync(owner, current: null, _currentTheme());
+        }
     }
 
     /// <summary>Runs the interactive check and reports whatever it finds via the same

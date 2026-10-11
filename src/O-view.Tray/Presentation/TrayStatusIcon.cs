@@ -64,7 +64,7 @@ internal sealed class TrayStatusIcon : IDisposable
         _tooltip = new TooltipTextController(text => _notifyIcon.Text = text);
 
         var menuController = new TrayMenuController(skinToShell, currentSettings, startupRegistration, updateCadence);
-        _menu = new TrayMenu(menuController, ShowToast);
+        _menu = new TrayMenu(menuController, ShowToast, () => themeSource.Current);
         _notifyIcon.ContextMenuStrip = _menu.Strip;
         _menuTheme = new ThemeRepaintController(themeSource, _menu.ApplyTheme);
 

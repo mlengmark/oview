@@ -38,6 +38,28 @@ public class TrayMenuControllerTests
     }
 
     [Fact]
+    public void BuildSnapshotShowsTheAutoUpdateRowForAnInstalledBuild()
+    {
+        // The default FakeInstallKindSource below reports WindowsInstaller.
+        var controller = new TrayMenuController(
+            new FakeSkinToShell(), () => ShellSettings.Default, new FakeStartupRegistration(enabled: false), CreateUpdateCadence());
+
+        Assert.True(controller.BuildSnapshot().AutoUpdateRowVisible);
+    }
+
+    [Fact]
+    public void BuildSnapshotHidesTheAutoUpdateRowForAPortableBuild()
+    {
+        var controller = new TrayMenuController(
+            new FakeSkinToShell(),
+            () => ShellSettings.Default,
+            new FakeStartupRegistration(enabled: false),
+            CreateUpdateCadence(new FakeInstallKindSource(InstallKind.WindowsPortable)));
+
+        Assert.False(controller.BuildSnapshot().AutoUpdateRowVisible);
+    }
+
+    [Fact]
     public void OnSetThresholdPercentCallsTheShellWithTheRequestedPercent()
     {
         var skin = new FakeSkinToShell();
@@ -59,6 +81,31 @@ public class TrayMenuControllerTests
         controller.OnSetAutoUpdate(true);
 
         Assert.Equal(new[] { true }, skin.AutoUpdateCalls);
+    }
+
+    [Fact]
+    public void OnSetAutoUpdateReturnsTheRequestedValueWhenItPersisted()
+    {
+        var settings = ShellSettings.Default with { AutoUpdateEnabled = true };
+        var controller = new TrayMenuController(
+            new FakeSkinToShell(), () => settings, new FakeStartupRegistration(enabled: false), CreateUpdateCadence());
+
+        Assert.True(controller.OnSetAutoUpdate(true));
+    }
+
+    [Fact]
+    public void OnSetAutoUpdateReturnsThePersistedValueNotTheRequestWhenTheWriteDidNotTakeEffect()
+    {
+        // The settings store's write silently failed (disk full, a locked file): the shell
+        // still reports AutoUpdateEnabled as false no matter what the user just requested. The
+        // menu row's tick must reflect that, not the click.
+        var settings = ShellSettings.Default with { AutoUpdateEnabled = false };
+        var controller = new TrayMenuController(
+            new FakeSkinToShell(), () => settings, new FakeStartupRegistration(enabled: false), CreateUpdateCadence());
+
+        var actual = controller.OnSetAutoUpdate(true);
+
+        Assert.False(actual);
     }
 
     [Fact]
@@ -129,9 +176,9 @@ public class TrayMenuControllerTests
     /// <summary>A real <see cref="UpdateCadence"/> over fakes only — no real HTTP, no real
     /// timer tick — just enough for <see cref="TrayMenuController"/>'s own constructor and
     /// <see cref="TrayMenuController.OnCheckForUpdatesNow"/> to have something to call.</summary>
-    private static UpdateCadence CreateUpdateCadence() => new(
+    private static UpdateCadence CreateUpdateCadence(IInstallKindSource? installKindSource = null) => new(
         new ReleaseFeed(new FakeReleaseFeedTransport(), new FakeClock(DateTimeOffset.UnixEpoch)),
-        new FakeInstallKindSource(),
+        installKindSource ?? new FakeInstallKindSource(),
         "1.0.0",
         () => ShellSettings.Default,
         _ => { },
@@ -202,7 +249,9 @@ public class TrayMenuControllerTests
 
     private sealed class FakeInstallKindSource : IInstallKindSource
     {
-        public InstallKind Current => InstallKind.WindowsInstaller;
+        public FakeInstallKindSource(InstallKind current = InstallKind.WindowsInstaller) => Current = current;
+
+        public InstallKind Current { get; }
     }
 
     private sealed class FakeClock : IClock

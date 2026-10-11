@@ -39,6 +39,28 @@ public class LinuxMenuControllerTests
     }
 
     [Fact]
+    public void SnapshotShowsTheAutoUpdateRowForAPackageBuild()
+    {
+        var controller = new LinuxMenuController(
+            new FakeSkinToShell(),
+            () => ShellSettings.Default,
+            new FakeStartupRegistration(enabled: false),
+            CreateUpdateCadence(new FakeInstallKindSource(InstallKind.LinuxPackage)));
+
+        Assert.True(controller.Snapshot().AutoUpdateRowVisible);
+    }
+
+    [Fact]
+    public void SnapshotHidesTheAutoUpdateRowForATarballBuild()
+    {
+        // The default FakeInstallKindSource below reports LinuxTarball.
+        var controller = new LinuxMenuController(
+            new FakeSkinToShell(), () => ShellSettings.Default, new FakeStartupRegistration(enabled: false), CreateUpdateCadence());
+
+        Assert.False(controller.Snapshot().AutoUpdateRowVisible);
+    }
+
+    [Fact]
     public void SetThresholdPercentCallsTheShellWithTheRequestedPercent()
     {
         var shell = new FakeSkinToShell();
@@ -60,6 +82,21 @@ public class LinuxMenuControllerTests
         controller.SetAutoUpdate(true);
 
         Assert.Equal(new[] { true }, shell.AutoUpdateCalls);
+    }
+
+    [Fact]
+    public void SetAutoUpdateReturnsThePersistedValueNotTheRequestWhenTheWriteDidNotTakeEffect()
+    {
+        // The settings write silently failed: the shell still reports AutoUpdateEnabled as
+        // false no matter what the user just requested. The menu row's tick must reflect that,
+        // not the click.
+        var settings = ShellSettings.Default with { AutoUpdateEnabled = false };
+        var controller = new LinuxMenuController(
+            new FakeSkinToShell(), () => settings, new FakeStartupRegistration(enabled: false), CreateUpdateCadence());
+
+        var actual = controller.SetAutoUpdate(true);
+
+        Assert.False(actual);
     }
 
     [Fact]
@@ -130,9 +167,9 @@ public class LinuxMenuControllerTests
     /// <summary>A real <see cref="UpdateCadence"/> over fakes only — no real HTTP, no real
     /// timer tick — just enough for <see cref="LinuxMenuController"/>'s own constructor and
     /// <see cref="LinuxMenuController.CheckForUpdatesNow"/> to have something to call.</summary>
-    private static UpdateCadence CreateUpdateCadence() => new(
+    private static UpdateCadence CreateUpdateCadence(IInstallKindSource? installKindSource = null) => new(
         new ReleaseFeed(new FakeReleaseFeedTransport(), new FakeClock(DateTimeOffset.UnixEpoch)),
-        new FakeInstallKindSource(),
+        installKindSource ?? new FakeInstallKindSource(),
         "1.0.0",
         () => ShellSettings.Default,
         _ => { },
@@ -202,7 +239,9 @@ public class LinuxMenuControllerTests
 
     private sealed class FakeInstallKindSource : IInstallKindSource
     {
-        public InstallKind Current => InstallKind.LinuxTarball;
+        public FakeInstallKindSource(InstallKind current = InstallKind.LinuxTarball) => Current = current;
+
+        public InstallKind Current { get; }
     }
 
     private sealed class FakeClock : IClock

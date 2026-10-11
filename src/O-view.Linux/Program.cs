@@ -127,17 +127,25 @@ internal static class Program
             // GitHub endpoint at the same rate.
             TimeSpan.FromHours(24));
 
+        var themeSource = new LinuxThemeSource(new DBusDesktopThemePortal());
+        _ = themeSource.StartAsync(CancellationToken.None);
+
+        // G7 parity slice P23 (OVI-744): the menu's "Weekly reset…" row needs an owner Window
+        // for its modal dialog, and the real one (the detail window) does not exist until
+        // App.OnFrameworkInitializationCompleted builds it, after this status icon and its menu
+        // already do — see MenuOwnerWindow's own remarks.
+        var menuOwnerWindow = new MenuOwnerWindow();
+
         var statusIcon = new LinuxStatusIcon(
             skinToShell,
             () => skinToShell.Settings,
             new XdgAutostartRegistration(),
             (summary, body) => { _ = notificationSender.SendAsync(summary, body); },
-            updateCadence);
+            updateCadence,
+            menuOwnerWindow,
+            () => themeSource.Current);
         statusIcon.OnSnapshotUpdated(pollLoop.CurrentSnapshot);
         pollLoop.SnapshotUpdated += (_, snapshot) => statusIcon.OnSnapshotUpdated(snapshot);
-
-        var themeSource = new LinuxThemeSource(new DBusDesktopThemePortal());
-        _ = themeSource.StartAsync(CancellationToken.None);
 
         var monitor = new NotificationHostMonitor(new DBusSessionBusNameWatcher(NotificationHostWellKnownName));
         monitor.ProbeCompleted += observed =>
@@ -180,7 +188,7 @@ internal static class Program
         using (pollLoop)
         using (statusIcon)
         {
-            BuildAvaloniaApp(statusIcon, skin, skinToShell, preferenceStore, themeSource)
+            BuildAvaloniaApp(statusIcon, skin, skinToShell, preferenceStore, themeSource, menuOwnerWindow)
                 .StartWithClassicDesktopLifetime(args, ShutdownMode.OnExplicitShutdown);
         }
     }
@@ -196,8 +204,8 @@ internal static class Program
     /// </summary>
     private static AppBuilder BuildAvaloniaApp(
         LinuxStatusIcon statusIcon, LinuxShellToSkin skin, ISkinToShell skinToShell, DetailWindowPreferenceStore preferenceStore,
-        IThemeSource themeSource) =>
-        AppBuilder.Configure(() => new App(statusIcon, skin, skinToShell, preferenceStore, themeSource))
+        IThemeSource themeSource, MenuOwnerWindow menuOwnerWindow) =>
+        AppBuilder.Configure(() => new App(statusIcon, skin, skinToShell, preferenceStore, themeSource, menuOwnerWindow))
             .UsePlatformDetect()
             .LogToTrace();
 

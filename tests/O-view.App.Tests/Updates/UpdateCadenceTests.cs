@@ -220,6 +220,21 @@ public class UpdateCadenceTests
             name.Contains("Launcher", StringComparison.Ordinal));
     }
 
+    /// <summary>G7 parity slice P23 (OVI-744): a skin's menu controller reads this to decide
+    /// whether to show its "Update automatically" row, without a second
+    /// <see cref="IInstallKindSource"/> of its own.</summary>
+    [Theory]
+    [InlineData(InstallKind.WindowsInstaller)]
+    [InlineData(InstallKind.WindowsPortable)]
+    [InlineData(InstallKind.LinuxPackage)]
+    [InlineData(InstallKind.LinuxTarball)]
+    public void InstallKind_exposes_the_source_it_was_constructed_with(InstallKind kind)
+    {
+        var cadence = CreateCadence(new FakeTransport(UpToDateJson()), out _, out _, out _, installKind: kind);
+
+        Assert.Equal(kind, cadence.InstallKind);
+    }
+
     [Fact]
     public void ConstructorRejectsNullDependencies()
     {

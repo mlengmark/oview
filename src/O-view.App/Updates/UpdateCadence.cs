@@ -55,6 +55,13 @@ public sealed class UpdateCadence : IDisposable
     /// by this guard.</summary>
     private int _backgroundCheckInFlight;
 
+    /// <summary>How this running build arrived on the machine (ADR-0010 D1) — exposed so a
+    /// skin's menu controller can decide whether its "Update automatically" row makes sense to
+    /// show (<see cref="UpdatePolicy.IsInstalledBuild"/>, G7 parity slice P23) without taking a
+    /// second <see cref="IInstallKindSource"/> dependency alongside the one already injected
+    /// here.</summary>
+    public InstallKind InstallKind => _installKindSource.Current;
+
     /// <param name="currentVersion">This running build's own version, compared against the
     /// feed's latest tag. Each skin's composition root sources this (e.g. its own assembly
     /// version) — not a decision this shared type makes.</param>
