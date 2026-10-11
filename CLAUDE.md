@@ -11,7 +11,9 @@ desktop notification-area app that reports Claude AI token usage. Gate G0
 passed board review; see [`README.md`](README.md) and
 [`docs/adr/`](docs/adr/) for what that approved.
 
-**Implementation has begun, one reviewed slice at a time.** As of Phase 1
+**Implementation has begun, one reviewed slice at a time.** *(For the current
+state of the build, read the 2026-10-11 entry below — the paragraph that
+follows describes the first slice only and is long superseded.)* As of Phase 1
 slice 1 (OVI-10), `O-view.Core` and `O-view.Tray` exist here with exactly
 the surface `TooltipFormatter`'s extraction needed — the Core-to-skin
 contract's tooltip-relevant fields ([ADR-0001](docs/adr/0001-core-to-skin-data-contract.md))
@@ -155,7 +157,9 @@ it is now a reversal of an accepted gate rather than an open design call.
 need either.**
 
 **2026-10-09 — Phase 3 is complete, Phase 4A is complete, Phase 4B is six of
-ten slices in.** All eleven ADR-0008 slices are built (last: PR #75,
+ten slices in.** *(Superseded on the state of the build by the 2026-10-11
+entry below; its rules and gate statements still hold.)* All eleven ADR-0008
+slices are built (last: PR #75,
 2026-10-04), so the status icon, tooltip, detail window and alerts exist in
 both skins. **ADR-0009 (Phase 4A) is Accepted** — the board merged PR #76 on
 2026-10-05 (card `6c233a56`, merge `3172e63`) — **and all ten of its slices are
@@ -172,6 +176,25 @@ building it. **Nothing in this repository has been run on real hardware** —
 ADR-0002's never-observed cells are unchanged, and a merged slice is evidence
 of tests passing, never of a working desktop. Gates **G3** (macOS) and **G5**
 (second AI source) remain open and nothing in Phase 4 needs either.
+
+**2026-10-11 — Phase 4B is nine of ten slices in, and all 26 G7 parity slices
+are built.** ADR-0010's slices 7, 8 and 9 landed: the Inno Setup Windows
+installer (`installer/O-view.iss`), `packaging/linux/build.sh` producing the
+`.deb` and tarball, and `.github/workflows/release.yml`, triggered on a `v*`
+tag, which builds every asset, generates `SHA256SUMS` inside the job and
+publishes (PR #133). **Slice 10 — provenance attestation — stays unbuilt on
+purpose:** ADR-0010 makes it conditional on the board asking, because it
+widens a CI permission. No `v*` tag has been pushed, so no release exists.
+Separately, every slice of
+[`docs/parity/g7-detail-window-parity.md`](docs/parity/g7-detail-window-parity.md)'s
+table (**P0–P25**) is built — the 31-day graph and its gridlines, the
+statistics tiles, the token-kind and model breakdowns, the off-plan surfaces,
+the branded dialogs, menu flyout and installer. **This does not close gate
+G7**, whose closing condition is a real-desktop observation per platform
+(OVI-761). **Nothing in this repository has been run on real hardware** —
+ADR-0002's never-observed cells are unchanged, and a merged slice is evidence
+of tests passing, never of a working desktop. Gates **G3** (macOS) and **G5**
+(second AI source) remain open and nothing built so far needed either.
 
 **Do not assume this repository contains working code.** If you are looking
 for the current, running implementation, that is
@@ -260,6 +283,7 @@ not assumed from a design document alone:
 | G4 | UI unification (keep two native windows, or unify) — **answered 2026-10-02: A, keep two native windows.** No shared UI layer; adding one is a reversal of a board decision. See [ADR-0008](docs/adr/0008-presentation-skin-contract.md) |
 | G5 | Any second AI usage source — requires its own dedicated audit first |
 | G6 | Invoking a vendor's own command to make the vendor refresh its own cache — **opened 2026-09-28**, under the three limits in [ADR-0005](docs/adr/0005-data-provider-contract.md) |
+| G7 | Design parity of the detail window and the adjacent surfaces with [`mlengmark/O-view`](https://github.com/mlengmark/O-view) — **opened 2026-10-09** (OVI-584). **Code complete, gate still open**: all 26 parity slices (P0–P25) in [`docs/parity/g7-detail-window-parity.md`](docs/parity/g7-detail-window-parity.md) are built as of 2026-10-11, but the board's closing condition is at least one real-desktop observation per platform (OVI-761), which no agent can perform. Until it is answered, do not describe this repository as a complete rebuild or a replacement for the original |
 
 Do not scope or begin work that a still-open gate would authorize. If
 you're unsure whether a gate has passed, check the current PDR and ADR
