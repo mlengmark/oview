@@ -594,7 +594,7 @@ and touch no credential. No escalation required.
 > Gate G7 is that amendment. D9a–D9c are unchanged; D9d's four closures are
 > **narrowed, not lifted** — see D9h below.
 >
-> **D9e — `UsageDetail` widens once, by four optional members, and
+> **D9e — `UsageDetail` widens once, by five optional members, and
 > `UsageSnapshot` by two.** Every new member defaults to its own `Unavailable`
 > sentinel, so a shell that has not assembled it yet pushes an honest gap
 > rather than a zero:
@@ -738,7 +738,7 @@ and touch no credential. No escalation required.
 > `History`/`ResetBoundaries`/`TokensToday`/`Tokens31d` yet (a later slice,
 > [ADR-0005](0005-data-provider-contract.md)'s D6c amendment), no account
 > reader backs `Account` yet (also a later slice), and no skin reads any of
-> the six new members yet. Every new member therefore reads as `Unavailable`
+> the seven new members yet. Every new member therefore reads as `Unavailable`
 > (or `null`, for the two boost members) on every existing `UsageDetail`/
 > `UsageSnapshot` construction in this repository — a pure, additive contract
 > widening with no behaviour change.
