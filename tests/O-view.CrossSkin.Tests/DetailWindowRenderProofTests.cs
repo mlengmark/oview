@@ -90,6 +90,45 @@ public sealed class DetailWindowRenderProofTests : IDisposable
         Assert.True(new FileInfo(path).Length > 0, $"[hover/{theme}] wrote an empty file.");
     }
 
+    public static IEnumerable<object[]> ExpandedStatesByTheme()
+    {
+        foreach (var theme in new[] { ThemePreference.Light, ThemePreference.Dark })
+        {
+            yield return new object[] { theme, false };
+            yield return new object[] { theme, true };
+        }
+    }
+
+    /// <summary>
+    /// Gate G7 parity slice P19 (OVI-717): the render-proof hook must capture the "Why so large?"
+    /// disclosure fold's expanded and collapsed states in both themes, for both skins — the one
+    /// surface a plain content render never shows, since <c>ShowDetail</c> always resets the fold
+    /// to collapsed (same reason the hover-card tests above exist).
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(ExpandedStatesByTheme))]
+    public void TrayRenderProofCapturesTheDisclosureFoldInBothStatesAndThemes(ThemePreference theme, bool expanded)
+    {
+        var path = Path.Combine(_directory, $"tray-disclosure-fold-{(expanded ? "expanded" : "collapsed")}-{theme}.png");
+
+        OView.Tray.Presentation.DetailWindowRenderProof.RenderDisclosureFoldToFile(theme, expanded, path);
+
+        Assert.True(File.Exists(path), $"[fold/{expanded}/{theme}] wrote no file.");
+        Assert.True(new FileInfo(path).Length > 0, $"[fold/{expanded}/{theme}] wrote an empty file.");
+    }
+
+    [Theory]
+    [MemberData(nameof(ExpandedStatesByTheme))]
+    public void LinuxRenderProofCapturesTheDisclosureFoldInBothStatesAndThemes(ThemePreference theme, bool expanded)
+    {
+        var path = Path.Combine(_directory, $"linux-disclosure-fold-{(expanded ? "expanded" : "collapsed")}-{theme}.png");
+
+        OView.Linux.Presentation.DetailWindowRenderProof.RenderDisclosureFoldToFile(theme, expanded, path);
+
+        Assert.True(File.Exists(path), $"[fold/{expanded}/{theme}] wrote no file.");
+        Assert.True(new FileInfo(path).Length > 0, $"[fold/{expanded}/{theme}] wrote an empty file.");
+    }
+
     /// <summary>
     /// ADR-0008 D11a's render-proof obligation, applied to gate G7 parity slice P12: the
     /// token-kind breakdown table's view-switch state renders in both themes, for both skins,

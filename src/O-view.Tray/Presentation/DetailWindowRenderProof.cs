@@ -108,6 +108,108 @@ public static class DetailWindowRenderProof
     }
 
     /// <summary>
+    /// Gate G7 parity slice P19 (OVI-717): captures the "Why so large?" disclosure fold's
+    /// expanded and collapsed states in a given theme — the one surface a plain content render
+    /// never shows, since <see cref="DetailWindow.ShowDetail"/> always resets the fold to
+    /// collapsed (same reason <see cref="RenderHoverCardsToFile"/> exists for the hover card).
+    /// Renders the toggle row and the body at the chevron angle/height that state's own
+    /// <see cref="DisclosureFoldTiming.ExpandedChevronAngleDegrees"/> settles at — a still, not a
+    /// frame from mid-animation.
+    /// </summary>
+    public static void RenderDisclosureFoldToFile(ThemePreference theme, bool expanded, string filePath)
+    {
+        File.WriteAllBytes(filePath, RenderDisclosureFold(theme, expanded));
+    }
+
+    public static byte[] RenderDisclosureFold(ThemePreference theme, bool expanded)
+    {
+        byte[]? result = null;
+        Exception? error = null;
+
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                result = RenderDisclosureFoldOnStaThread(theme, expanded);
+            }
+            catch (Exception ex)
+            {
+                error = ex;
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+
+        if (error is not null)
+        {
+            throw error;
+        }
+
+        return result!;
+    }
+
+    private static byte[] RenderDisclosureFoldOnStaThread(ThemePreference theme, bool expanded)
+    {
+        var colors = WindowThemePalette.Resolve(theme);
+
+        var chevron = new TextBlock
+        {
+            Text = "⌄",
+            FontSize = 11,
+            Margin = new Thickness(4, 0, 0, 0),
+            Foreground = ToBrush(colors.Foreground),
+            RenderTransformOrigin = new System.Windows.Point(0.5, 0.5),
+            RenderTransform = new RotateTransform(expanded ? DisclosureFoldTiming.ExpandedChevronAngleDegrees : 0),
+        };
+
+        var toggleRow = new StackPanel { Orientation = Orientation.Horizontal };
+        toggleRow.Children.Add(new TextBlock
+        {
+            Text = "Why so large?",
+            FontSize = 11,
+            Foreground = ToBrush(colors.Foreground),
+            TextDecorations = System.Windows.TextDecorations.Underline,
+        });
+        toggleRow.Children.Add(chevron);
+
+        var stack = new StackPanel { Margin = new Thickness(16), Width = DetailWindow.DefaultWidth - 32 };
+        stack.Children.Add(toggleRow);
+        if (expanded)
+        {
+            stack.Children.Add(new TextBlock
+            {
+                Text = "Totals include every Claude Code session on this machine, including sub-agent runs and " +
+                       "Cowork sessions that write the same files — not just the window currently open.",
+                FontSize = 11,
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = ToBrush(colors.Foreground),
+                Margin = new Thickness(0, 4, 0, 0),
+            });
+        }
+
+        var root = new Border
+        {
+            Background = ToBrush(colors.Background),
+            Child = stack,
+        };
+
+        root.Measure(new System.Windows.Size(double.PositiveInfinity, double.PositiveInfinity));
+        root.Arrange(new Rect(0, 0, root.DesiredSize.Width, root.DesiredSize.Height));
+
+        var bitmap = new RenderTargetBitmap(
+            Math.Max(1, (int)root.DesiredSize.Width), Math.Max(1, (int)root.DesiredSize.Height), 96, 96, PixelFormats.Pbgra32);
+        bitmap.Render(root);
+
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+
+        using var stream = new MemoryStream();
+        encoder.Save(stream);
+        return stream.ToArray();
+    }
+
+    /// <summary>
     /// Every WPF type below <see cref="FrameworkElement"/> asserts it was created on an STA
     /// thread (not just <see cref="Window"/>) — xUnit does not run tests on one, so this spins up
     /// a dedicated STA thread for the whole build-measure-arrange-render sequence and joins it,

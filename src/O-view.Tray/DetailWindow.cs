@@ -130,6 +130,50 @@ internal sealed class DetailWindow : Window
     private readonly TextBlock _offPlanUsageValue = new() { FontSize = 17, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 2, 0, 0) };
     private readonly TextBlock _offPlanUsageCaption = NewLine();
     private readonly TextBlock _offPlanUsageCoverage = NewLine();
+
+    /// <summary>The "Why so large?" disclosure fold (gate G7 parity slice P19, OVI-717) — the
+    /// chevron's rotation, the toggle row that owns it, and the clipped body it discloses. The
+    /// label text is static UI chrome (same convention as "By model"/"Token usage by kind"
+    /// below), not routed through <see cref="DetailWindowContentBuilder"/>, since it names no
+    /// figure and depends on no pushed <see cref="UsageDetail"/>.</summary>
+    private readonly RotateTransform _whySoLargeChevronRotation = new();
+    private readonly TextBlock _whySoLargeChevron = new()
+    {
+        Text = "⌄",
+        FontSize = 11,
+        Margin = new Thickness(4, 0, 0, 0),
+        RenderTransformOrigin = new System.Windows.Point(0.5, 0.5),
+    };
+    private readonly TextBlock _whySoLargeLabel = new()
+    {
+        Text = "Why so large?",
+        FontSize = 11,
+        TextDecorations = System.Windows.TextDecorations.Underline,
+    };
+    private readonly StackPanel _whySoLargeToggleRow = new()
+    {
+        Orientation = System.Windows.Controls.Orientation.Horizontal,
+        Cursor = System.Windows.Input.Cursors.Hand,
+        Margin = new Thickness(0, 4, 0, 0),
+    };
+    private readonly TextBlock _whySoLargeBodyText = new()
+    {
+        Text = WhySoLargeExplanation,
+        TextWrapping = TextWrapping.Wrap,
+        FontSize = 11,
+        Margin = new Thickness(0, 4, 0, 0),
+    };
+    private readonly Border _whySoLargeBody;
+    private DisclosureFold? _whySoLargeFold;
+
+    /// <summary>The disclosure's body, worded independently from the Linux skin (ADR-0003):
+    /// never a claim about why any one total is large, only what every total already includes —
+    /// the one fact CLAUDE.md's rule 9 and this window's own render-proof fixtures already treat
+    /// as confirmed.</summary>
+    private const string WhySoLargeExplanation =
+        "Totals include every Claude Code session on this machine, including sub-agent runs and " +
+        "Cowork sessions that write the same files — not just the window currently open.";
+
     private WindowThemeColors _colors;
 
     /// <summary>Whether the weekly row's click currently copies <c>/usage</c> (gate G7 parity
@@ -191,6 +235,17 @@ internal sealed class DetailWindow : Window
             Child = noUsageDataStack,
         };
 
+        _whySoLargeChevron.RenderTransform = _whySoLargeChevronRotation;
+        _whySoLargeToggleRow.Children.Add(_whySoLargeLabel);
+        _whySoLargeToggleRow.Children.Add(_whySoLargeChevron);
+        _whySoLargeBody = new Border
+        {
+            ClipToBounds = true,
+            Height = 0,
+            Visibility = Visibility.Collapsed,
+            Child = _whySoLargeBodyText,
+        };
+
         Title = "O-view";
         Width = DefaultWidth;
         Height = DefaultHeight;
@@ -210,6 +265,9 @@ internal sealed class DetailWindow : Window
         _offPlanBannerLink.MouseLeftButtonDown += OnOffPlanBannerLinkClicked;
         _tokenKindToggle.MouseLeftButtonDown += OnTokenKindToggleClicked;
         _tokenKindToggle.Text = ToggleText(_tokenKindBreakdownVisible);
+        _whySoLargeToggleRow.MouseLeftButtonDown += OnWhySoLargeToggleClicked;
+        _whySoLargeFold = new DisclosureFold(
+            this, _whySoLargeBody, _whySoLargeChevronRotation, () => SystemParameters.WorkArea.Bottom);
 
         _theme = new ThemeRepaintController(themeSource, ApplyTheme);
     }
@@ -369,6 +427,11 @@ internal sealed class DetailWindow : Window
         _noUsageDataBannerDetail.Text = content.NoUsageDataBannerDetail;
         _noUsageDataBannerDetail.Visibility = string.IsNullOrEmpty(content.NoUsageDataBannerDetail) ? Visibility.Collapsed : Visibility.Visible;
         _noUsageDataBanner.Visibility = string.IsNullOrEmpty(content.NoUsageDataBannerTitle) ? Visibility.Collapsed : Visibility.Visible;
+
+        // Every open starts collapsed, same convention as the token-kind breakdown toggle above
+        // — a push while the fold happens to be running cancels it rather than leaving the
+        // window mid-fold with content that no longer matches what is on screen.
+        _whySoLargeFold?.Apply(false);
     }
 
     /// <summary>
@@ -521,6 +584,21 @@ internal sealed class DetailWindow : Window
     private static string ToggleText(bool breakdownVisible) => breakdownVisible ? "Hide breakdown ▲" : "Show breakdown ▼";
 
     /// <summary>
+    /// Toggles the "Why so large?" fold (gate G7 parity slice P19). Measures the body's natural
+    /// height with a real <see cref="UIElement.Measure"/> pass rather than any constant — the
+    /// explanation's wrap depends on the window's current width, which <see cref="DisclosureFold"/>
+    /// itself has no way to know. Marks the event handled so the window-level drag handler does
+    /// not also start a drag from the same click.
+    /// </summary>
+    private void OnWhySoLargeToggleClicked(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+
+        _whySoLargeBodyText.Measure(new System.Windows.Size(BarTrackWidth, double.PositiveInfinity));
+        _whySoLargeFold?.Toggle(_whySoLargeBodyText.DesiredSize.Height);
+    }
+
+    /// <summary>
     /// Rebuilds <paramref name="bar"/>'s segment children from an already-built
     /// <see cref="TokenKindBar"/> (gate G7 parity slice P12) — the segments themselves were
     /// computed once in <see cref="DetailWindowContentBuilder.Build"/>; this only turns each one
@@ -619,6 +697,8 @@ internal sealed class DetailWindow : Window
         stack.Children.Add(statisticsGrid);
         stack.Children.Add(_coverageCaption);
         stack.Children.Add(_caveat);
+        stack.Children.Add(_whySoLargeToggleRow);
+        stack.Children.Add(_whySoLargeBody);
         stack.Children.Add(BuildTokenKindSection());
         stack.Children.Add(_graphCanvas);
         stack.Children.Add(new Separator { Margin = new Thickness(0, 12, 0, 10) });
