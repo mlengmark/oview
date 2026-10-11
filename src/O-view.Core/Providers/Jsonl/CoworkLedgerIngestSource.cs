@@ -59,6 +59,13 @@ public static class CoworkLedgerIngestSource
     /// transcript read: <see cref="File.ReadLines(string)"/> is lazy and can throw mid-
     /// enumeration (a file truncated or removed between the scan and the read), not only on
     /// the initial call.
+    ///
+    /// <para>Tries Cowork's own <c>request_id</c> spelling first, then falls back to Claude
+    /// Code's <c>requestId</c>. <see cref="CoworkAuditLocator"/> finds both of Cowork's
+    /// on-disk shapes with one pattern without knowing which a given file is — the older
+    /// <c>audit.jsonl</c> at the session root, and the newer <c>.claude\projects\*.jsonl</c>
+    /// written by the genuine Claude Code transcript inside a sandboxed session. A file can
+    /// only match one spelling, so trying both per line is never ambiguous.</para>
     /// </summary>
     private static IReadOnlyList<TranscriptRecord> ReadTranscript(string path)
     {
@@ -68,7 +75,8 @@ public static class CoworkLedgerIngestSource
         {
             foreach (var line in File.ReadLines(path))
             {
-                if (TranscriptParser.TryParseCoworkAssistantRecord(line, out var record))
+                if (TranscriptParser.TryParseCoworkAssistantRecord(line, out var record) ||
+                    TranscriptParser.TryParseAssistantRecord(line, out record))
                 {
                     records.Add(record);
                 }

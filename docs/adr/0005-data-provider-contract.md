@@ -687,6 +687,22 @@ them, per that ADR's own rule.
   > (per-source attribution for the support-bundle breakdown) are out of scope
   > per this slice's own "done when" list, which asks only for the ledger's
   > totals to include Cowork tokens, not for them to be labelled as such.
+  >
+  > **2026-10-11 correction (Quinn's review of PR #131).** The paragraph above
+  > said `CoworkAuditLocator`'s flat `*.jsonl` walk finds both on-disk shapes
+  > "without caring which shape a given build wrote" and implied
+  > `TryParseCoworkAssistantRecord` alone covered both. That was wrong: the
+  > nested `.claude/projects/**/*.jsonl` shape is a genuine Claude Code
+  > transcript (source CLAUDE.md rule 9) and spells the id `requestId` (rule
+  > 4), not Cowork's own `request_id` — so every nested-shape file silently
+  > parsed to zero records, reproducing the exact undercount this slice exists
+  > to fix, one shape over. `CoworkLedgerIngestSource.ReadTranscript` now tries
+  > `TryParseCoworkAssistantRecord` first and falls back to
+  > `TryParseAssistantRecord` per line; a line only ever matches one spelling,
+  > so trying both is never ambiguous. `CoworkLedgerIngestSourceTests
+  > .RecordsFromBothOnDiskShapesAreIngested` now feeds the nested-shape file
+  > real `requestId`-spelled content instead of `request_id`, so the test can
+  > no longer pass without the fallback.
 
   **Rejected: widening `IUsageProvider` to return both** (a second method, a
   tuple, or a combined record). D1's single method is accepted board contract,

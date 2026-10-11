@@ -42,6 +42,16 @@ public sealed class CoworkLedgerIngestSourceTests : IDisposable
         "\"input_tokens\":" + inputTokens + ",\"output_tokens\":" + outputTokens + "," +
         "\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0}}}";
 
+    /// <summary>
+    /// What the genuine Claude Code transcript inside a sandboxed Cowork session actually
+    /// writes (source CLAUDE.md rule 4): <c>requestId</c>, not Cowork's own <c>request_id</c>.
+    /// </summary>
+    private static string ClaudeCodeTranscriptLine(string requestId, string timestamp, string model, long inputTokens, long outputTokens) =>
+        "{\"type\":\"assistant\",\"requestId\":\"" + requestId + "\",\"timestamp\":\"" + timestamp + "\"," +
+        "\"message\":{\"model\":\"" + model + "\",\"usage\":{" +
+        "\"input_tokens\":" + inputTokens + ",\"output_tokens\":" + outputTokens + "," +
+        "\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0}}}";
+
     [Fact]
     public void NoCoworkLogsPresentLeavesTheLedgerFiguresByteIdenticalToBeforeIngest()
     {
@@ -113,12 +123,15 @@ public sealed class CoworkLedgerIngestSourceTests : IDisposable
         File.WriteAllLines(Path.Combine(olderBuildSession, "audit.jsonl"),
             [CoworkAuditLine("req-old", "2026-10-11T09:00:00.000Z", "claude-sonnet-5", 10, 5)]);
 
+        // The nested ".claude/projects" shape is a genuine Claude Code transcript (source
+        // CLAUDE.md rule 9) and spells the request id "requestId", not Cowork's "request_id"
+        // (rule 4) — this must be parseable without being told which shape the file is.
         var currentBuildSession = Path.Combine(
             _claudeRoot, "local-agent-mode-sessions", "org", "user", "session-new",
             ".claude", "projects", "encoded-cwd");
         Directory.CreateDirectory(currentBuildSession);
         File.WriteAllLines(Path.Combine(currentBuildSession, "abc123.jsonl"),
-            [CoworkAuditLine("req-new", "2026-10-11T09:05:00.000Z", "claude-sonnet-5", 20, 8)]);
+            [ClaudeCodeTranscriptLine("req-new", "2026-10-11T09:05:00.000Z", "claude-sonnet-5", 20, 8)]);
 
         var store = new UsageLedgerStore(_storeDirectory);
         CoworkLedgerIngestSource.Ingest([_claudeRoot], store);
