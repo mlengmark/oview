@@ -131,7 +131,7 @@ anything touching `UsageDetail`, `ISkinToShell`/`IShellToSkin` or an ADR is a
 | **P21** | Windows branded menu flyout: ~272 px card, 34 px rows, header with mark and version; **docked to the work-area corner**, four taskbar positions, auto-hide, cursor picks the monitor only | K | board (ADR-0009) | never placed at the pointer; all four taskbar edges; toggle via P4's 400 ms rule | P4 |
 | **P22** | Windows menu rise: clip reveal + last 20 px of slide, 230/150 ms, same keyspline, downward with a top taskbar, reopen cancels close | K | agent | close completes before hide; reopen mid-close cancels | P21 |
 | **P23** | Menu row set on both skins — Run at startup, Update automatically (installed builds only), notify-at 70/80/90 %, Copy diagnostics, **Weekly reset…**, Check for updates…, Exit; toggles keep it open, actions close first, ticks show the state **after** the write | K | agent | tick reflects the post-write state, not the request; Linux keeps the host's native menu | P21 |
-| **P24** | Branded dialogs replacing `MessageBox`, including the weekly-reset entry dialog | K | agent | Esc/Enter; primary names the action; foreground handling | P3 |
+| **P24** | **Built 2026-10-11 (OVI-718).** Branded dialogs replacing `MessageBox`, including the weekly-reset entry dialog | K | agent | Esc/Enter; primary names the action; foreground handling | P3 |
 | **P25** | Branded installer: `brand/` wizard images, Welcome page enabled, own copy | K | **board** (packaging) | installer builds; images present | — |
 | *(not a parity slice)* | Correct the README's "31-day usage graph" claim and the board digest's "done" wording | OVI-584 item 5 | agent | — | — |
 
