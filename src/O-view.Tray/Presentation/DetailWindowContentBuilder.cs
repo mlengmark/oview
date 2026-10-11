@@ -140,6 +140,16 @@ public sealed record StatisticsTile(
 /// <param name="OffPlanUsageCaption">The two-clause caveat (<see cref="PanelTextFormatter.OffPlanHint"/>):
 /// published API rates, an unreadable credit balance, and where to check for the exact figure —
 /// the clauses that stop this figure being read as money charged.</param>
+/// <param name="NoUsageDataBannerTitle">The "no usage data" banner's heading (gate G7 parity
+/// slice P18, source <c>ui-spec.md</c> §"No usage data" banner, README: "the panel states
+/// <i>what</i> O-view checked and <i>what it observed</i>, rather than asserting anything about
+/// your machine it hasn't verified"). Empty whenever <see cref="UsageSnapshot.DataSourceKind"/>
+/// is not <see cref="DataSourceKind.Unavailable"/> — this window's own signal to hide the banner
+/// entirely, the same convention <see cref="OffPlanBannerTitle"/> uses.</param>
+/// <param name="NoUsageDataBannerDetail">The banner's body: which local sources O-view checked
+/// (Claude Code's transcripts, Claude Desktop's cache) and that neither produced a reading — never
+/// a claim about the account or the machine beyond that observation. Empty exactly when
+/// <see cref="NoUsageDataBannerTitle"/> is.</param>
 public sealed record DetailWindowContent(
     string Freshness,
     string AccountDisplayName,
@@ -166,6 +176,8 @@ public sealed record DetailWindowContent(
     string OffPlanUsageTitle,
     string OffPlanUsageValue,
     string OffPlanUsageCaption,
+    string NoUsageDataBannerTitle,
+    string NoUsageDataBannerDetail,
     IReadOnlyList<DetailWindowModelRow> ModelRows,
     string ModelSectionNote,
     IReadOnlyList<UsageGraphColumn> GraphColumns,
@@ -223,6 +235,8 @@ public static class DetailWindowContentBuilder
             OffPlanUsageTitle: OffPlanUsageSectionTitle,
             OffPlanUsageValue: UsageFormatter.Usd(stats.OffPlanUsageAmount),
             OffPlanUsageCaption: PanelTextFormatter.OffPlanHint(stats.HasCreditUsage),
+            NoUsageDataBannerTitle: snapshot.DataSourceKind == DataSourceKind.Unavailable ? NoUsageDataTitleText : "",
+            NoUsageDataBannerDetail: snapshot.DataSourceKind == DataSourceKind.Unavailable ? NoUsageDataDetailText : "",
             ModelRows: BuildModelRows(detail.Models),
             ModelSectionNote: ModelSectionNote(detail.Models, stats.UnpricedModels),
             GraphColumns: graphColumns,
@@ -267,6 +281,20 @@ public static class DetailWindowContentBuilder
     /// source <c>ui-spec.md</c> §"Off-plan usage"). A fixed label, not a formatted value — it
     /// names what the section below it is, same convention as "By model".</summary>
     private const string OffPlanUsageSectionTitle = "Off-plan usage · last 31 days";
+
+    /// <summary>The "no usage data" banner's heading (gate G7 parity slice P18), worded
+    /// independently from the Linux skin (ADR-0003).</summary>
+    private const string NoUsageDataTitleText = "No usage data";
+
+    /// <summary>
+    /// The banner's body: states which local sources O-view checked and that neither produced a
+    /// reading — never a claim about the account or what the user has or hasn't done on this
+    /// machine, only what O-view itself looked for and did not find (README: "it will state
+    /// which path it checked and what it found there — what it observed, never an assertion
+    /// about your machine it hasn't verified").
+    /// </summary>
+    private const string NoUsageDataDetailText =
+        "O-view checked for local Claude Code and Claude Desktop usage data on this machine and found none.";
 
     private static string WeeklyLine(WeeklyBarState state, UsageSnapshot snapshot, DateTimeOffset utcNow, TimeZoneInfo zone) => state switch
     {

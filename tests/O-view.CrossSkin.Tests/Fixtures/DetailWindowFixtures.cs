@@ -395,7 +395,10 @@ public static class DetailWindowFixtures
 
     /// <summary>
     /// The fully unavailable detail — the "no data" explanation D2 requires. Never a
-    /// fabricated zero, same rule as <see cref="UsageStatisticsFixtures.Unavailable"/>.
+    /// fabricated zero, same rule as <see cref="UsageStatisticsFixtures.Unavailable"/>. Also the
+    /// gate G7 parity slice P18 (OVI-716) fixture for the "no usage data" banner: this is the one
+    /// state that triggers it (<see cref="UsageSnapshot.DataSourceKind"/> is
+    /// <see cref="DataSourceKind.Unavailable"/>).
     /// </summary>
     public static readonly DetailWindowFixture UnavailableNoDataExplanation = new(
         Name: "unavailable-no-data-explanation",
@@ -410,6 +413,14 @@ public static class DetailWindowFixtures
                 "never claims extra usage is on or off when there is no data at all",
                 rendered => !rendered.Contains("Enabled", StringComparison.Ordinal)
                     && !rendered.Contains("Disabled", StringComparison.Ordinal)),
+            new ContentFact(
+                "names the local sources checked rather than asserting anything about the account",
+                rendered => rendered.Contains("Claude Code", StringComparison.Ordinal)
+                    && rendered.Contains("Claude Desktop", StringComparison.Ordinal)),
+            new ContentFact(
+                "never claims the user has no usage, only that none was found to read",
+                rendered => !rendered.Contains("you have", StringComparison.OrdinalIgnoreCase)
+                    && !rendered.Contains("your account", StringComparison.OrdinalIgnoreCase)),
         });
 
     /// <summary>
