@@ -89,10 +89,8 @@ public static class DetailWindowRenderProof
         File.WriteAllBytes(filePath, RenderDisclosureFold(theme, expanded));
     }
 
-    public static byte[] RenderDisclosureFold(ThemePreference theme, bool expanded)
+    public static byte[] RenderDisclosureFold(ThemePreference theme, bool expanded) => AvaloniaWorkerThread.Invoke(() =>
     {
-        EnsurePlatformInitialized();
-
         var colors = LinuxWindowThemePalette.Resolve(theme);
 
         var chevron = new TextBlock
@@ -146,7 +144,7 @@ public static class DetailWindowRenderProof
         using var stream = new MemoryStream();
         bitmap.Save(stream, new PngBitmapEncoderOptions());
         return stream.ToArray();
-    }
+    });
 
     public static byte[] Render(
         UsageDetail detail, ThemePreference theme, DateTimeOffset utcNow, TimeZoneInfo displayZone,
