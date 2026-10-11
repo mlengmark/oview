@@ -101,6 +101,19 @@ public sealed record StatisticsTile(
 /// <param name="OffPlanBannerDetail">The banner's body (<see cref="PanelTextFormatter.OffPlanDetail"/>):
 /// the observation, the account's extra-usage setting if Claude Code's cache said, and the
 /// provenance stamp. Empty exactly when <see cref="OffPlanBannerTitle"/> is.</param>
+/// <param name="OffPlanUsageTitle">The standing section's heading (gate G7 parity slice P17,
+/// OVI-702, source <c>ui-spec.md</c> §"Off-plan usage"). Always shown — unlike
+/// <see cref="OffPlanBannerTitle"/>'s live banner, this section stands regardless of whether the
+/// current session is off-plan (ui-spec: "the 31-day figure shows even when the current session
+/// is on-plan").</param>
+/// <param name="OffPlanUsageValue">Estimated credit spend over the 31-day window
+/// (<see cref="UsageStatistics.OffPlanUsageAmount"/>), through the existing
+/// <see cref="UsageFormatter.Usd"/>. No priced rate card exists yet (OVI-592), so Core's own
+/// value is always <see cref="UsageValueStatus.Unavailable"/> today and this renders
+/// <c>"unknown"</c> — never a guessed dollar figure.</param>
+/// <param name="OffPlanUsageCaption">The two-clause caveat (<see cref="PanelTextFormatter.OffPlanHint"/>):
+/// published API rates, an unreadable credit balance, and where to check for the exact figure —
+/// the clauses that stop this figure being read as money charged.</param>
 public sealed record DetailWindowContent(
     string Freshness,
     string AccountDisplayName,
@@ -124,6 +137,9 @@ public sealed record DetailWindowContent(
     TokenKindBar TokenKindBarWindow31d,
     IReadOnlyList<TokenKindBreakdownRow> TokenKindBreakdownRows,
     string TokenKindSectionNote,
+    string OffPlanUsageTitle,
+    string OffPlanUsageValue,
+    string OffPlanUsageCaption,
     IReadOnlyList<DetailWindowModelRow> ModelRows,
     string ModelSectionNote,
     IReadOnlyList<UsageGraphColumn> GraphColumns,
@@ -180,6 +196,9 @@ public static class DetailWindowContentBuilder
             TokenKindBarWindow31d: TokenKindBarFormatter.BuildBar("31 days", detail.Tokens31d),
             TokenKindBreakdownRows: TokenKindBarFormatter.BuildBreakdownRows(detail.TokensToday, detail.Tokens31d),
             TokenKindSectionNote: TokenKindSectionNote(detail.TokensToday, detail.Tokens31d),
+            OffPlanUsageTitle: OffPlanUsageSectionTitle,
+            OffPlanUsageValue: UsageFormatter.Usd(stats.OffPlanUsageAmount),
+            OffPlanUsageCaption: PanelTextFormatter.OffPlanHint(stats.HasCreditUsage),
             ModelRows: BuildModelRows(detail.Models),
             ModelSectionNote: ModelSectionNote(detail.Models, stats.UnpricedModels),
             GraphColumns: graphColumns,
@@ -222,6 +241,11 @@ public static class DetailWindowContentBuilder
     /// </summary>
     private const string WeeklyUnknownHintCardText =
         "Not reported yet. Run /usage in Claude Code to learn it, or click to copy /usage.";
+
+    /// <summary>The standing off-plan usage section's heading (gate G7 parity slice P17, OVI-702,
+    /// source <c>ui-spec.md</c> §"Off-plan usage"). A fixed label, not a formatted value — it
+    /// names what the section below it is, same convention as "By model".</summary>
+    private const string OffPlanUsageSectionTitle = "Off-plan usage — last 31 days";
 
     private static string WeeklyLine(WeeklyBarState state, UsageSnapshot snapshot, DateTimeOffset utcNow, TimeZoneInfo zone) => state switch
     {

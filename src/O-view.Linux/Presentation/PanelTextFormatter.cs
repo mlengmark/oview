@@ -415,12 +415,22 @@ public static class PanelTextFormatter
     /// <summary>
     /// What the off-plan section means, shown on hover. Worded independently from the Windows
     /// skin, but carries the same caveat: the figure is not what was actually charged.
+    /// <paramref name="hasCreditUsage"/>'s <see cref="UsageValueStatus.Unavailable"/> status
+    /// ("Core could not look") gets its own wording — collapsing it into the
+    /// <see langword="false"/> branch would state a checked negative when the truth is
+    /// "unknown" (OVI-702 review).
     /// </summary>
-    public static string OffPlanHint(bool hasCreditUsage)
+    public static string OffPlanHint(UsageFlag hasCreditUsage)
     {
         var models = string.Join(", ", CreditBilledModelIds.All);
 
-        return hasCreditUsage
+        if (hasCreditUsage.Status == UsageValueStatus.Unavailable)
+        {
+            return $"O-view could not tell whether any usage was billed to credits ({models}) "
+                + "in the last 31 days. Off-plan usage while O-view was not running is not captured.";
+        }
+
+        return hasCreditUsage.Value is true
             ? $"Estimated at published API rates for extra-usage-billed models ({models}). O-view "
               + "cannot read your credit balance — check your billing page for exact figures."
             : $"No usage billed to credits ({models}) in the last 31 days. Off-plan usage while "

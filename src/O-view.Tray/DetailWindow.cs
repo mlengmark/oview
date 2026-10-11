@@ -114,6 +114,10 @@ internal sealed class DetailWindow : Window
     private readonly TextBlock _modelNote = NewLine();
     private readonly ItemsControl _modelRows = new();
     private readonly Canvas _graphCanvas = new() { Width = GraphWidth, Height = GraphHeight };
+    private readonly TextBlock _offPlanUsageTitle = new() { FontWeight = FontWeights.SemiBold };
+    private readonly TextBlock _offPlanUsageValue = new() { FontSize = 17, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 2, 0, 0) };
+    private readonly TextBlock _offPlanUsageCaption = NewLine();
+    private readonly TextBlock _offPlanUsageCoverage = NewLine();
     private WindowThemeColors _colors;
 
     /// <summary>Whether the weekly row's click currently copies <c>/usage</c> (gate G7 parity
@@ -327,6 +331,11 @@ internal sealed class DetailWindow : Window
         _modelNote.Visibility = string.IsNullOrEmpty(content.ModelSectionNote) ? Visibility.Collapsed : Visibility.Visible;
         _modelRows.ItemsSource = content.ModelRows.Select(ModelRowText).ToList();
         BuildGraph(content.GraphColumns, content.GraphGridlines);
+
+        _offPlanUsageTitle.Text = content.OffPlanUsageTitle;
+        _offPlanUsageValue.Text = content.OffPlanUsageValue;
+        _offPlanUsageCaption.Text = content.OffPlanUsageCaption;
+        _offPlanUsageCoverage.Text = content.CoverageCaption;
     }
 
     /// <summary>
@@ -578,6 +587,8 @@ internal sealed class DetailWindow : Window
         stack.Children.Add(_caveat);
         stack.Children.Add(BuildTokenKindSection());
         stack.Children.Add(_graphCanvas);
+        stack.Children.Add(new Separator { Margin = new Thickness(0, 12, 0, 10) });
+        stack.Children.Add(BuildOffPlanUsageSection());
         stack.Children.Add(modelSection);
 
         return new ScrollViewer { Content = stack, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
@@ -603,6 +614,26 @@ internal sealed class DetailWindow : Window
         section.Children.Add(_tokenKindToggle);
         section.Children.Add(_tokenKindBreakdownRows);
         section.Children.Add(new Separator { Margin = new Thickness(0, 8, 0, 8) });
+
+        return section;
+    }
+
+    /// <summary>
+    /// The standing off-plan usage section (gate G7 parity slice P17, OVI-702, source
+    /// <c>ui-spec.md</c> §"Off-plan usage"): unlike <see cref="_offPlanBanner"/>'s live banner
+    /// above the bars, this section always renders — the heading, the estimated 31-day figure,
+    /// the two-clause caveat, and the same coverage caveat wording the statistics tiles already
+    /// carry. No priced rate card exists yet (OVI-592), so <see cref="_offPlanUsageValue"/>
+    /// always reads <c>"unknown"</c> today; the figure lights up only once <c>Build</c> stops
+    /// handing this section an unavailable <see cref="UsageStatistics.OffPlanUsageAmount"/>.
+    /// </summary>
+    private UIElement BuildOffPlanUsageSection()
+    {
+        var section = new StackPanel();
+        section.Children.Add(_offPlanUsageTitle);
+        section.Children.Add(_offPlanUsageValue);
+        section.Children.Add(_offPlanUsageCaption);
+        section.Children.Add(_offPlanUsageCoverage);
 
         return section;
     }
