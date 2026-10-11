@@ -673,6 +673,11 @@ public sealed class DetailWindowContentBuilderTests
         var other = valueTile.Breakdown.Single(s => s.ModelId == "Other");
         Assert.Equal(-1, other.ColourSlot);
 
+        // Three models are in the global "rest" group (model-third, model-fourth and the
+        // unpriced weird-vendor-id-07), but the unpriced one has nothing to show on this tile —
+        // the caption counts what is actually folded in here, not the group's raw size.
+        Assert.Equal("2 more models", other.HoverCaption);
+
         Assert.Contains(content.ModelRows, r => r.ModelId == "weird-vendor-id-07");
     }
 

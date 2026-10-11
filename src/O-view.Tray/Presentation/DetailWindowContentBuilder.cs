@@ -442,7 +442,7 @@ public static class DetailWindowContentBuilder
             {
                 var restSum = visibleRest.Sum(x => x.Amount!.Value);
                 segments.Add(new StatisticsTileSegment(
-                    "Other", Math.Clamp(restSum / windowTotal, 0.0, 1.0), -1, "Other", formatOther(restRows), restRows.Count + " more models"));
+                    "Other", Math.Clamp(restSum / windowTotal, 0.0, 1.0), -1, "Other", formatOther(restRows), visibleRest.Count + " more models"));
             }
         }
 
