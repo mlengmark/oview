@@ -64,7 +64,11 @@ internal sealed class LinuxMenuController
     public LinuxMenuSnapshot Snapshot()
     {
         var settings = _loadCurrentSettings();
-        return new LinuxMenuSnapshot(settings.AlertThresholdPercent, settings.AutoUpdateEnabled, _startup.IsEnabled());
+        return new LinuxMenuSnapshot(
+            settings.AlertThresholdPercent,
+            settings.AutoUpdateEnabled,
+            _startup.IsEnabled(),
+            UpdatePolicy.IsInstalledBuild(_updateCadence.InstallKind));
     }
 
     public void RefreshNow() => _shell.RefreshNow();
@@ -73,7 +77,18 @@ internal sealed class LinuxMenuController
 
     public void SetThresholdPercent(int percent) => _shell.SetThresholdPercent(percent);
 
-    public void SetAutoUpdate(bool enabled) => _shell.SetAutoUpdate(enabled);
+    /// <summary>
+    /// Persists the requested auto-update setting and reads it back (G7 parity slice P23,
+    /// OVI-744) — the same "render what the write actually left behind, not the click" rule
+    /// <see cref="ToggleRunAtStartup"/> already applies, extended to this toggle so a settings
+    /// write that silently fails to persist does not leave the menu showing a tick for a
+    /// setting that never actually changed.
+    /// </summary>
+    public bool SetAutoUpdate(bool enabled)
+    {
+        _shell.SetAutoUpdate(enabled);
+        return _loadCurrentSettings().AutoUpdateEnabled;
+    }
 
     /// <summary>
     /// Runs the same check the background cadence runs, interactively, and always returns a
@@ -104,7 +119,7 @@ internal sealed class LinuxMenuController
 }
 
 /// <summary>The menu's rendered state as of its last <see cref="LinuxMenuController.Snapshot"/> call.</summary>
-internal sealed record LinuxMenuSnapshot(int ThresholdPercent, bool AutoUpdateEnabled, bool StartupEnabled);
+internal sealed record LinuxMenuSnapshot(int ThresholdPercent, bool AutoUpdateEnabled, bool StartupEnabled, bool AutoUpdateRowVisible);
 
 /// <summary>The result of one run-at-startup toggle (ADR-0009 D3).</summary>
 internal sealed record StartupToggleOutcome(bool Enabled, bool Failed);

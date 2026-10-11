@@ -25,6 +25,7 @@ internal sealed class App : Application
     private readonly ISkinToShell? _skinToShell;
     private readonly DetailWindowPreferenceStore? _preferenceStore;
     private readonly IThemeSource? _themeSource;
+    private readonly MenuOwnerWindow? _menuOwnerWindow;
     private LinuxThemeRepaintController? _themeRepaint;
 
     public App()
@@ -36,13 +37,15 @@ internal sealed class App : Application
         LinuxShellToSkin skin,
         ISkinToShell skinToShell,
         DetailWindowPreferenceStore preferenceStore,
-        IThemeSource? themeSource = null)
+        IThemeSource? themeSource = null,
+        MenuOwnerWindow? menuOwnerWindow = null)
     {
         _statusIcon = statusIcon;
         _skin = skin;
         _skinToShell = skinToShell;
         _preferenceStore = preferenceStore;
         _themeSource = themeSource;
+        _menuOwnerWindow = menuOwnerWindow;
     }
 
     public override void OnFrameworkInitializationCompleted()
@@ -75,6 +78,13 @@ internal sealed class App : Application
 
         _skin.DetailShown += detailWindow.ShowDetail;
         _skin.VisibilityChanged += detailWindow.SetVisible;
+
+        // G7 parity slice P23 (OVI-744): the menu's "Weekly reset…" row now has a real Window
+        // to own its modal dialog.
+        if (_menuOwnerWindow is not null)
+        {
+            _menuOwnerWindow.Current = detailWindow;
+        }
 
         if (_themeSource is not null)
         {

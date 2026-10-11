@@ -59,6 +59,22 @@ public class UpdatePolicyTests
         Assert.False(UpdatePolicy.MayDownloadAndRun(InstallKind.LinuxPackage));
     }
 
+    /// <summary>G7 parity slice P23 (OVI-744): exactly the two kinds the OS/package manager
+    /// put in a fixed location count as "installed" for the tray menu's "Update automatically"
+    /// row — the portable exe and the tarball do not, same as
+    /// <see cref="MayDownloadAndRunIsTrueForExactlyWindowsInstaller"/>'s "pin the whole truth
+    /// table" reasoning above.</summary>
+    [Fact]
+    public void IsInstalledBuildIsTrueForExactlyWindowsInstallerAndLinuxPackage()
+    {
+        foreach (var kind in Enum.GetValues<InstallKind>())
+        {
+            Assert.Equal(
+                kind is InstallKind.WindowsInstaller or InstallKind.LinuxPackage,
+                UpdatePolicy.IsInstalledBuild(kind));
+        }
+    }
+
     [Theory]
     [InlineData(InstallKind.WindowsPortable)]
     [InlineData(InstallKind.LinuxTarball)]

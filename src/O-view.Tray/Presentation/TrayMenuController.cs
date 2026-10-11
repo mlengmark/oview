@@ -61,7 +61,11 @@ internal sealed class TrayMenuController
     public TrayMenuSnapshot BuildSnapshot()
     {
         var settings = _currentSettings();
-        return new TrayMenuSnapshot(settings.AlertThresholdPercent, settings.AutoUpdateEnabled, _startupRegistration.IsEnabled());
+        return new TrayMenuSnapshot(
+            settings.AlertThresholdPercent,
+            settings.AutoUpdateEnabled,
+            _startupRegistration.IsEnabled(),
+            UpdatePolicy.IsInstalledBuild(_updateCadence.InstallKind));
     }
 
     public void OnRefreshNow() => _skinToShell.RefreshNow();
@@ -70,7 +74,18 @@ internal sealed class TrayMenuController
 
     public void OnSetThresholdPercent(int percent) => _skinToShell.SetThresholdPercent(percent);
 
-    public void OnSetAutoUpdate(bool enabled) => _skinToShell.SetAutoUpdate(enabled);
+    /// <summary>
+    /// Persists the requested auto-update setting and reads it back (G7 parity slice P23,
+    /// OVI-744): the same "render what the write actually left behind, not the click" rule
+    /// <see cref="OnToggleRunAtStartup"/> already applies to run-at-startup, extended to this
+    /// toggle so a settings-store write that silently fails to persist does not leave the menu
+    /// showing a tick for a setting that never actually changed.
+    /// </summary>
+    public bool OnSetAutoUpdate(bool enabled)
+    {
+        _skinToShell.SetAutoUpdate(enabled);
+        return _currentSettings().AutoUpdateEnabled;
+    }
 
     /// <summary>
     /// Runs the same check the background cadence runs, interactively, and always returns a
@@ -100,7 +115,7 @@ internal sealed class TrayMenuController
 
 /// <summary>The menu's rendered state as of its last <see cref="TrayMenuController.BuildSnapshot"/>
 /// call.</summary>
-internal sealed record TrayMenuSnapshot(int ThresholdPercent, bool AutoUpdateEnabled, bool StartupEnabled);
+internal sealed record TrayMenuSnapshot(int ThresholdPercent, bool AutoUpdateEnabled, bool StartupEnabled, bool AutoUpdateRowVisible);
 
 /// <summary>The outcome of one run-at-startup toggle (ADR-0009 D3).</summary>
 internal sealed record StartupToggleResult(bool Enabled, bool Failed);

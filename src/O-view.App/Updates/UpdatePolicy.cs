@@ -86,6 +86,18 @@ public static class UpdatePolicy
         ActionFor(kind) is UpdateAction.InstallInPlace;
 
     /// <summary>
+    /// Whether this build sits in a fixed, OS- or package-manager-owned location, as opposed
+    /// to a loose exe/tarball the user put wherever they chose (G7 parity slice P23, OVI-744).
+    /// Used only to decide whether a skin's menu shows its "Update automatically" row at all —
+    /// that row gates the periodic background check (D7), which is equally meaningful for every
+    /// <see cref="InstallKind"/>, but a portable build's user already chose not to let anything
+    /// manage it, so offering a setting about managed update behaviour is the wrong question to
+    /// ask them.
+    /// </summary>
+    public static bool IsInstalledBuild(InstallKind kind) =>
+        kind is InstallKind.WindowsInstaller or InstallKind.LinuxPackage;
+
+    /// <summary>
     /// Which published asset proves to <i>this</i> build that a newer version exists. An
     /// architecture this app does not publish for yields <see cref="ReleaseAssets.None"/>,
     /// so it reports <c>Unknown</c> rather than pointing the user at a package that would
