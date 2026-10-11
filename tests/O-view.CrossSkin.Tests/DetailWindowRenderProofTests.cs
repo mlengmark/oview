@@ -193,6 +193,41 @@ public sealed class DetailWindowRenderProofTests : IDisposable
     }
 
     /// <summary>
+    /// ADR-0008 D11a's render-proof obligation, applied to gate G7 parity slice P11: the
+    /// folded "Other" state — a fourth and fifth model beyond the validated palette's own
+    /// three-slot cap — renders in both themes, for both skins, reusing
+    /// <c>FiveModelsFoldedIntoOther</c>'s own populated breakdown so the flipped render also
+    /// exercises the value tile's "excl. N unpriced" note and its unknown-value "Other" bucket.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Themes))]
+    public void TrayRenderProofCapturesTheFoldedOtherStatisticsTilesInBothThemes(ThemePreference theme)
+    {
+        var path = Path.Combine(_directory, $"tray-statistics-tiles-folded-other-{theme}.png");
+
+        OView.Tray.Presentation.DetailWindowRenderProof.RenderToFile(
+            DetailWindowFixtures.FiveModelsFoldedIntoOther.Detail, theme, path, UtcNow,
+            DetailWindowFixtures.FiveModelsFoldedIntoOther.DisplayZone, flipWindowTiles: true);
+
+        Assert.True(File.Exists(path), $"[folded-other/{theme}] wrote no file.");
+        Assert.True(new FileInfo(path).Length > 0, $"[folded-other/{theme}] wrote an empty file.");
+    }
+
+    [Theory]
+    [MemberData(nameof(Themes))]
+    public void LinuxRenderProofCapturesTheFoldedOtherStatisticsTilesInBothThemes(ThemePreference theme)
+    {
+        var path = Path.Combine(_directory, $"linux-statistics-tiles-folded-other-{theme}.png");
+
+        OView.Linux.Presentation.DetailWindowRenderProof.RenderToFile(
+            DetailWindowFixtures.FiveModelsFoldedIntoOther.Detail, theme, path, UtcNow,
+            DetailWindowFixtures.FiveModelsFoldedIntoOther.DisplayZone, flipWindowTiles: true);
+
+        Assert.True(File.Exists(path), $"[folded-other/{theme}] wrote no file.");
+        Assert.True(new FileInfo(path).Length > 0, $"[folded-other/{theme}] wrote an empty file.");
+    }
+
+    /// <summary>
     /// OVI-688: proves OVI-686's height fix actually works, not just that a file exists —
     /// decodes the PNG's own IHDR height for <see cref="DetailWindowFixtures.ManyModelRowsOverflowNominalHeight"/>,
     /// whose 40 model rows provably push the rendered content past the window's nominal

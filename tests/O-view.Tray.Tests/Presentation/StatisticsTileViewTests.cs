@@ -45,17 +45,19 @@ public sealed class StatisticsTileViewTests
         StatisticsTileKind.OutputTokensWindow31d,
         "Output tokens · 31 days",
         "250.0K",
+        Note: "",
         CanFlip: true,
         Breakdown: new[]
         {
-            new StatisticsTileSegment("claude-sonnet-5", 0.75),
-            new StatisticsTileSegment("claude-haiku-5", 0.25),
+            new StatisticsTileSegment("claude-sonnet-5", 0.75, ColourSlot: 0, LegendLabel: "claude-sonnet-5", HoverFigure: "187.5K", HoverCaption: "claude-sonnet-5"),
+            new StatisticsTileSegment("claude-haiku-5", 0.25, ColourSlot: 1, LegendLabel: "claude-haiku-5", HoverFigure: "62.5K", HoverCaption: "claude-haiku-5"),
         });
 
     private static StatisticsTile DisabledTile() => new(
         StatisticsTileKind.OutputTokensToday,
         "Output tokens today",
         "10.0K",
+        Note: "",
         CanFlip: false,
         Breakdown: Array.Empty<StatisticsTileSegment>());
 

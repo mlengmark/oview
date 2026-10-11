@@ -41,10 +41,14 @@ internal sealed class StatisticsTileView : Border
     private readonly TextBlock _label = new() { FontSize = 10, TextWrapping = TextWrapping.Wrap };
     private readonly TextBlock _value = new() { FontSize = 16, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 2, 0, 0) };
     private readonly StackPanel _front;
-    private readonly StackPanel _breakdown = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+    private readonly StackPanel _breakdown = new() { VerticalAlignment = VerticalAlignment.Center };
+    private readonly StackPanel _bar = new() { Orientation = Orientation.Horizontal };
+    private readonly StackPanel _legend = new() { Margin = new Thickness(0, 3, 0, 0) };
+    private readonly TextBlock _note = new() { FontSize = 8, Margin = new Thickness(0, 2, 0, 0) };
     private readonly Border _glyph;
     private WindowThemeColors _colors;
     private bool _canFlip;
+    private IReadOnlyList<StatisticsTileSegment> _segments = Array.Empty<StatisticsTileSegment>();
 
     /// <summary>Whether the back (stacked-bar) face is currently showing.</summary>
     public bool IsFlipped { get; private set; }
@@ -61,6 +65,9 @@ internal sealed class StatisticsTileView : Border
         _front.Children.Add(_label);
         _front.Children.Add(_value);
 
+        _breakdown.Children.Add(_bar);
+        _breakdown.Children.Add(_legend);
+        _breakdown.Children.Add(_note);
         _breakdown.Visibility = Visibility.Hidden;
 
         var faces = new Grid();
@@ -102,17 +109,9 @@ internal sealed class StatisticsTileView : Border
         Cursor = tile.CanFlip ? Cursors.Hand : Cursors.Arrow;
         ToolTip = null;
 
-        _breakdown.Children.Clear();
-        foreach (var segment in tile.Breakdown)
-        {
-            _breakdown.Children.Add(new Border
-            {
-                Width = Math.Max(2.0, BreakdownWidth * segment.Fraction),
-                Height = BreakdownHeight,
-                Margin = new Thickness(0, 0, 1, 0),
-                Background = ToBrush(colors.Accent),
-            });
-        }
+        _segments = tile.Breakdown;
+        _note.Text = tile.Note;
+        _note.Visibility = tile.Note.Length > 0 ? Visibility.Visible : Visibility.Hidden;
 
         IsFlipped = false;
         _front.Visibility = Visibility.Visible;
@@ -120,6 +119,13 @@ internal sealed class StatisticsTileView : Border
         ApplyTheme(colors);
     }
 
+    /// <summary>
+    /// Repaints everything, including the per-model bar/legend swatches — rebuilt from
+    /// <see cref="_segments"/> rather than left as the brushes a previous theme's
+    /// <see cref="Populate"/> created, since gate G7 parity slice P11's model colours (unlike
+    /// the fixed <see cref="WindowThemeColors.Accent"/> this bar used before) vary by theme, and
+    /// a live theme change calls this directly without a matching <see cref="Populate"/>.
+    /// </summary>
     public void ApplyTheme(WindowThemeColors colors)
     {
         _colors = colors;
@@ -127,7 +133,47 @@ internal sealed class StatisticsTileView : Border
         BorderBrush = ToBrush(colors.Border);
         _label.Foreground = ToBrush(colors.Foreground);
         _value.Foreground = ToBrush(colors.Foreground);
+        var muted = ToBrush(colors.Foreground).Clone();
+        muted.Opacity = 0.65;
+        muted.Freeze();
+        _note.Foreground = muted;
         SetGlyphHighlighted(false);
+
+        _bar.Children.Clear();
+        _legend.Children.Clear();
+        foreach (var segment in _segments)
+        {
+            var swatch = ToBrush(WindowThemePalette.ModelColor(colors, segment.ColourSlot));
+
+            var segmentBar = new Border
+            {
+                Width = Math.Max(2.0, BreakdownWidth * segment.Fraction),
+                Height = BreakdownHeight,
+                Margin = new Thickness(0, 0, 1, 0),
+                Background = swatch,
+            };
+            segmentBar.ToolTip = HoverCard.Figure(segment.HoverFigure, segment.HoverCaption, colors, swatch);
+            HoverCard.ApplyTiming(segmentBar);
+            _bar.Children.Add(segmentBar);
+
+            var legendEntry = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 1, 0, 0) };
+            legendEntry.Children.Add(new Border
+            {
+                Width = 6,
+                Height = 6,
+                CornerRadius = new CornerRadius(1),
+                Background = swatch,
+                VerticalAlignment = VerticalAlignment.Center,
+            });
+            legendEntry.Children.Add(new TextBlock
+            {
+                Text = segment.LegendLabel,
+                FontSize = 8,
+                Margin = new Thickness(3, 0, 0, 0),
+                Foreground = ToBrush(colors.Foreground),
+            });
+            _legend.Children.Add(legendEntry);
+        }
     }
 
     private void OnClicked(object sender, MouseButtonEventArgs e)

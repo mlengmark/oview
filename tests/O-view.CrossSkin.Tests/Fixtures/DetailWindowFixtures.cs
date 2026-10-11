@@ -312,6 +312,88 @@ public static class DetailWindowFixtures
         });
 
     /// <summary>
+    /// Gate G7 parity slice P11 (OVI-700): five models — three more than the validated
+    /// palette's own three-slot cap — so the fourth and fifth fold into a neutral "Other"
+    /// bucket. One of the folded models is also unpriced, so the value tile's "Other" reports an
+    /// unknown value rather than a partial sum, and this window's own "excl. N unpriced" note
+    /// names the gap. <c>model-rare-x9</c> is an unrecognised id by construction — this fixture
+    /// proves it never gets a fabricated friendly name.
+    /// </summary>
+    public static readonly DetailWindowFixture FiveModelsFoldedIntoOther = new(
+        Name: "five-models-folded-into-other",
+        Detail: new UsageDetail(
+            Snapshot: new UsageSnapshot(
+                DataSourceKind.Live,
+                new DateTimeOffset(2026, 9, 8, 20, 45, 0, TimeSpan.Zero),
+                new UsagePercent(55, UsageValueStatus.Real),
+                new UsageInstant(SessionReset, UsageValueStatus.Real),
+                new UsagePercent(18, UsageValueStatus.Real),
+                new UsageInstant(WeeklyReset, UsageValueStatus.Real),
+                UsageLevel.Amber),
+            Statistics: new UsageStatistics(
+                OutputTokensToday: new TokenCount(10_000, UsageValueStatus.Real),
+                EstimatedSpendToday: new EstimatedUsd(2.50m, UsageValueStatus.Estimated),
+                OutputTokensWindow31d: new TokenCount(210_000, UsageValueStatus.Real),
+                EstimatedValueWindow31d: new EstimatedUsd(80.00m, UsageValueStatus.Estimated),
+                HistoryCoverage: new HistoryCoverage(31, 31))
+            {
+                UnpricedModels = new UnpricedModels(new[] { "model-rare-x9" }),
+            },
+            Models: new ModelUsageBreakdown(
+                FromLocalDate: new DateOnly(2026, 8, 9),
+                ToLocalDate: new DateOnly(2026, 9, 8),
+                Rows: new[]
+                {
+                    new ModelUsageRow(
+                        "model-top", 500,
+                        new TokenCount(400_000, UsageValueStatus.Real),
+                        new TokenCount(100_000, UsageValueStatus.Real),
+                        new TokenCount(10_000, UsageValueStatus.Real),
+                        new TokenCount(20_000, UsageValueStatus.Real),
+                        new EstimatedUsd(40.00m, UsageValueStatus.Estimated)),
+                    new ModelUsageRow(
+                        "model-second", 250,
+                        new TokenCount(200_000, UsageValueStatus.Real),
+                        new TokenCount(50_000, UsageValueStatus.Real),
+                        new TokenCount(5_000, UsageValueStatus.Real),
+                        new TokenCount(10_000, UsageValueStatus.Real),
+                        new EstimatedUsd(20.00m, UsageValueStatus.Estimated)),
+                    new ModelUsageRow(
+                        "model-third", 150,
+                        new TokenCount(120_000, UsageValueStatus.Real),
+                        new TokenCount(30_000, UsageValueStatus.Real),
+                        new TokenCount(0, UsageValueStatus.Real),
+                        new TokenCount(0, UsageValueStatus.Real),
+                        new EstimatedUsd(12.00m, UsageValueStatus.Estimated)),
+                    new ModelUsageRow(
+                        "model-fourth", 100,
+                        new TokenCount(80_000, UsageValueStatus.Real),
+                        new TokenCount(20_000, UsageValueStatus.Real),
+                        new TokenCount(0, UsageValueStatus.Real),
+                        new TokenCount(0, UsageValueStatus.Real),
+                        new EstimatedUsd(8.00m, UsageValueStatus.Estimated)),
+                    new ModelUsageRow(
+                        "model-rare-x9", 20,
+                        new TokenCount(40_000, UsageValueStatus.Real),
+                        new TokenCount(10_000, UsageValueStatus.Real),
+                        new TokenCount(0, UsageValueStatus.Real),
+                        new TokenCount(0, UsageValueStatus.Real),
+                        new EstimatedUsd(null, UsageValueStatus.Unavailable)),
+                },
+                Coverage: new HistoryCoverage(31, 31),
+                Rates: new RateCardStamp(RateCardSource.Bundled, new DateOnly(2026, 9, 8), isStale: false),
+                Status: UsageValueStatus.Real)),
+        DisplayZone: TimeZoneInfo.Utc,
+        ContentFacts: new[]
+        {
+            ContentFact.Contains("model-top"),
+            ContentFact.Contains("model-rare-x9"),
+            new ContentFact(
+                "never fabricates a friendly name for the unrecognised model id",
+                rendered => rendered.Contains("model-rare-x9", StringComparison.Ordinal)),
+        });
+
+    /// <summary>
     /// The fully unavailable detail — the "no data" explanation D2 requires. Never a
     /// fabricated zero, same rule as <see cref="UsageStatisticsFixtures.Unavailable"/>.
     /// </summary>
@@ -723,6 +805,7 @@ public static class DetailWindowFixtures
         ModelBreakdownUnavailable,
         UnpricedModelInWindow,
         TokenKindTotalsPopulated,
+        FiveModelsFoldedIntoOther,
         UnavailableNoDataExplanation,
         SessionBandBoundaryGreen49,
         SessionBandBoundaryAmber50,
