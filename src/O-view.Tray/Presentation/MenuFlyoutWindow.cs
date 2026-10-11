@@ -22,14 +22,23 @@ namespace OView.Tray.Presentation;
 /// close-then-click grace window (<see cref="DetailPushCoordinator.IconClickAwayGrace"/>) rather
 /// than a second, independently tuned constant. <see cref="Window.Deactivated"/> is this window's
 /// own auto-hide — losing focus (an outside click, Alt-Tab, anything) reports
-/// <see cref="MenuFlyoutToggleController.OnHidden"/> before hiding, the same ordering
-/// <c>DetailWindow</c> already uses for its own focus-loss dismiss.</para>
+/// <see cref="MenuFlyoutToggleController.OnHidden"/> before requesting the hide, the same
+/// ordering <c>DetailWindow</c> already uses for its own focus-loss dismiss.</para>
+///
+/// <para><b>Rise animation (gate G7 parity slice P22, OVI-743).</b> Opening and closing both
+/// animate through <see cref="MenuFlyoutRiseAnimation"/> rather than this window's own
+/// <see cref="Window.Show"/>/<see cref="Window.Hide"/> running instantly — this window still
+/// calls <c>Show()</c> immediately so positioning and activation happen up front, but the actual
+/// OS-level <c>Hide()</c> is deferred until the close animation reports it finished, and the
+/// direction the content reveals from follows whichever corner <see cref="PositionAtDockedCorner"/>
+/// just docked to (<see cref="MenuFlyoutRiseGeometry"/>).</para>
 ///
 /// <para>Not unit-tested (no interactive Windows desktop in this environment — the same boundary
 /// every other real <see cref="Window"/> in this skin already records). Every decision this
-/// window merely carries out is pulled into <see cref="MenuFlyoutPlacement"/> and
-/// <see cref="MenuFlyoutToggleController"/>, both proven against plain structs/fakes with no
-/// window involved.</para>
+/// window merely carries out is pulled into <see cref="MenuFlyoutPlacement"/>,
+/// <see cref="MenuFlyoutToggleController"/>, <see cref="MenuFlyoutRiseGeometry"/>, and
+/// <see cref="MenuFlyoutRiseAnimator"/>, all proven against plain structs/fakes with no window
+/// involved.</para>
 /// </summary>
 internal sealed class MenuFlyoutWindow : Window
 {
@@ -38,6 +47,8 @@ internal sealed class MenuFlyoutWindow : Window
     private readonly IReadOnlyList<string> _rowLabels;
     private ThemePreference _theme;
     private bool _suppressDeactivatedReport;
+    private MenuFlyoutRiseAnimation _rise = null!;
+    private MenuFlyoutCorner _corner = MenuFlyoutCorner.BottomRight;
 
     public MenuFlyoutWindow(string version, IReadOnlyList<string> rowLabels, ThemePreference theme, IClock clock)
     {
@@ -58,18 +69,28 @@ internal sealed class MenuFlyoutWindow : Window
         AllowsTransparency = true;
         Topmost = true;
         Background = System.Windows.Media.Brushes.Transparent;
-        Content = MenuFlyoutChrome.Build(WindowThemePalette.Resolve(theme), _version, _rowLabels).Root;
+        Content = BuildContent();
 
         Deactivated += OnDeactivated;
     }
 
     /// <summary>Applies a live theme change (ADR-0009 slice 7's own pattern): repaint by
     /// rebuilding the content, since this chrome has no partial-repaint path yet and the card is
-    /// cheap to rebuild.</summary>
+    /// cheap to rebuild. The rebuilt content lands on this window's own current actual
+    /// visibility rather than defaulting to hidden, so a theme change while the flyout is open
+    /// does not leave a later hide request stuck no-op'd.</summary>
     public void ApplyTheme(ThemePreference theme)
     {
         _theme = theme;
-        Content = MenuFlyoutChrome.Build(WindowThemePalette.Resolve(theme), _version, _rowLabels).Root;
+        Content = BuildContent();
+    }
+
+    private UIElement BuildContent()
+    {
+        var root = MenuFlyoutChrome.Build(WindowThemePalette.Resolve(_theme), _version, _rowLabels).Root;
+        _rise = new MenuFlyoutRiseAnimation(root, HideWindowNow);
+        _rise.Reset(open: IsVisible);
+        return root;
     }
 
     /// <summary>The flyout's own open/close gesture (not the tray icon's left-click toggle,
@@ -84,13 +105,22 @@ internal sealed class MenuFlyoutWindow : Window
             PositionAtDockedCorner();
             Show();
             Activate();
+            _rise.Show(MenuFlyoutRiseGeometry.ForCorner(_corner));
         }
         else
         {
-            _suppressDeactivatedReport = true;
-            Hide();
-            _suppressDeactivatedReport = false;
+            _rise.RequestHide();
         }
+    }
+
+    /// <summary>The real OS-level hide, deferred until <see cref="MenuFlyoutRiseAnimation"/>
+    /// reports its close animation actually finished — never called synchronously from
+    /// <see cref="SetVisible"/> itself.</summary>
+    private void HideWindowNow()
+    {
+        _suppressDeactivatedReport = true;
+        Hide();
+        _suppressDeactivatedReport = false;
     }
 
     private void OnDeactivated(object? sender, EventArgs e)
@@ -101,7 +131,7 @@ internal sealed class MenuFlyoutWindow : Window
         }
 
         _toggle.OnHidden();
-        Hide();
+        _rise.RequestHide();
     }
 
     /// <summary>Docks to the corner adjacent to the taskbar on whichever monitor the cursor is
@@ -116,6 +146,7 @@ internal sealed class MenuFlyoutWindow : Window
         var heightPx = (int)Math.Round(heightDip * scale);
 
         var placement = MenuFlyoutPlacement.Compute(monitor, work, widthPx, heightPx);
+        _corner = placement.Corner;
 
         Left = placement.Left / scale;
         Top = placement.Top / scale;
