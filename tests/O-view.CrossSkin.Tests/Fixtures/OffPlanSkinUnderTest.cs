@@ -7,7 +7,9 @@ namespace OView.CrossSkin.Tests.Fixtures;
 /// line, the tile sub-label, the flipping "Est. value/spend today" label, and the hover hint.
 /// Wired together the same way <see cref="BoostNoticeSkinUnderTest"/> groups a shared-shape
 /// family — <c>OffPlanTitle</c> and <c>OffPlanDetail</c> share one input shape, and
-/// <c>OffPlanNote</c>/<c>EstTodayLabel</c>/<c>OffPlanHint</c> each take a single bool.
+/// <c>OffPlanNote</c>/<c>EstTodayLabel</c> each take a single bool; <c>OffPlanHint</c> takes
+/// the Core <see cref="UsageFlag"/> directly, since it must distinguish "Core looked and found
+/// none" from "Core could not look" (OVI-702 review).
 /// </summary>
 /// <param name="UsageSettingsUrl">
 /// The link Claude's own usage settings page lives at (source app's constant of the same
@@ -21,5 +23,5 @@ public sealed record OffPlanSkinUnderTest(
     Func<DivergenceReading, ExtraUsageReading?, DateTimeOffset, TimeZoneInfo, string> OffPlanDetail,
     Func<bool, string> OffPlanNote,
     Func<bool, string> EstTodayLabel,
-    Func<bool, string> OffPlanHint,
+    Func<UsageFlag, string> OffPlanHint,
     string UsageSettingsUrl);

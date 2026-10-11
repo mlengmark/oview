@@ -495,6 +495,14 @@ public sealed class DetailWindowContentBuilderTests
 
         Assert.Equal("unknown", content.OffPlanUsageValue);
         Assert.DoesNotContain('$', content.OffPlanUsageValue);
+
+        // The caption must not fabricate either: a null hasCreditUsage (Core could not look)
+        // must not read as the checked negative "No credit-billed usage ... recorded"
+        // (OVI-702 review).
+        if (hasCreditUsage is null)
+        {
+            Assert.DoesNotContain("No credit-billed usage", content.OffPlanUsageCaption);
+        }
     }
 
     /// <summary>
@@ -502,21 +510,31 @@ public sealed class DetailWindowContentBuilderTests
     /// <see cref="UsageStatistics.HasCreditUsage"/> — the "estimated at published API rates"
     /// clause names the credit-billed models only once usage against them was actually recorded;
     /// otherwise the caption says so plainly rather than describing a spend that never happened.
+    /// A review of this slice (OVI-702/PR #122) found the caption had collapsed
+    /// <see cref="UsageValueStatus.Unavailable"/> ("Core could not look") into the same wording
+    /// as <c>(false, Real)</c> ("Core looked and found none") — a fabricated checked negative.
+    /// This test pins that the three states each read distinctly.
     /// </summary>
     [Fact]
     public void Off_plan_usage_caption_differs_by_whether_credit_usage_was_recorded()
     {
         var withUsage = UsageStatistics.Unavailable with { HasCreditUsage = new UsageFlag(true, UsageValueStatus.Real) };
         var withoutUsage = UsageStatistics.Unavailable with { HasCreditUsage = new UsageFlag(false, UsageValueStatus.Real) };
+        var unknownUsage = UsageStatistics.Unavailable with { HasCreditUsage = new UsageFlag(null, UsageValueStatus.Unavailable) };
 
         var contentWithUsage = DetailWindowContentBuilder.Build(
             new UsageDetail(UsageSnapshot.Unavailable, withUsage, ModelUsageBreakdown.Unavailable), UtcNow, TimeZoneInfo.Utc);
         var contentWithoutUsage = DetailWindowContentBuilder.Build(
             new UsageDetail(UsageSnapshot.Unavailable, withoutUsage, ModelUsageBreakdown.Unavailable), UtcNow, TimeZoneInfo.Utc);
+        var contentUnknownUsage = DetailWindowContentBuilder.Build(
+            new UsageDetail(UsageSnapshot.Unavailable, unknownUsage, ModelUsageBreakdown.Unavailable), UtcNow, TimeZoneInfo.Utc);
 
         Assert.Contains("published API rates", contentWithUsage.OffPlanUsageCaption);
         Assert.Contains("check your billing page", contentWithUsage.OffPlanUsageCaption);
         Assert.Contains("No credit-billed usage", contentWithoutUsage.OffPlanUsageCaption);
+        Assert.DoesNotContain("No credit-billed usage", contentUnknownUsage.OffPlanUsageCaption);
+        Assert.Contains("could not determine", contentUnknownUsage.OffPlanUsageCaption);
         Assert.NotEqual(contentWithUsage.OffPlanUsageCaption, contentWithoutUsage.OffPlanUsageCaption);
+        Assert.NotEqual(contentWithoutUsage.OffPlanUsageCaption, contentUnknownUsage.OffPlanUsageCaption);
     }
 }

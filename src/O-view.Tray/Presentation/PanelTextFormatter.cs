@@ -486,13 +486,24 @@ public static class PanelTextFormatter
     /// What the off-plan section means, shown on hover rather than as standing text. Both
     /// wordings carry the caveat that the figure is not what was charged — moving it must not
     /// lose it, which is why it has one definition here rather than being duplicated at every
-    /// call site.
+    /// call site. <paramref name="hasCreditUsage"/>'s <see cref="UsageValueStatus.Unavailable"/>
+    /// status ("Core could not look") gets its own wording — collapsing it into the
+    /// <see langword="false"/> branch would state a checked negative ("no credit-billed usage
+    /// recorded") when the truth is "unknown", which is the same fabrication the "never
+    /// fabricate a number" principle forbids, just on a boolean (OVI-702 review).
     /// </summary>
-    public static string OffPlanHint(bool hasCreditUsage)
+    public static string OffPlanHint(UsageFlag hasCreditUsage)
     {
         var models = string.Join(", ", CreditBilledModelIds.All);
 
-        return hasCreditUsage
+        if (hasCreditUsage.Status == UsageValueStatus.Unavailable)
+        {
+            return $"O-view could not determine whether any usage was billed to credits "
+                + $"({models}) in the last 31 days. Off-plan usage while O-view wasn't running "
+                + "isn't captured.";
+        }
+
+        return hasCreditUsage.Value is true
             ? $"Estimated at published API rates for models billed as extra usage ({models}). "
               + "O-view cannot read your credit balance; check your billing page for exact figures."
             : $"No credit-billed usage ({models}) recorded in the last 31 days. Off-plan usage "

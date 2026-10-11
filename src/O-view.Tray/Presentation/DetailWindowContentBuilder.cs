@@ -195,7 +195,7 @@ public static class DetailWindowContentBuilder
             TokenKindSectionNote: TokenKindSectionNote(detail.TokensToday, detail.Tokens31d),
             OffPlanUsageTitle: OffPlanUsageSectionTitle,
             OffPlanUsageValue: UsageFormatter.Usd(stats.OffPlanUsageAmount),
-            OffPlanUsageCaption: PanelTextFormatter.OffPlanHint(stats.HasCreditUsage.Value is true),
+            OffPlanUsageCaption: PanelTextFormatter.OffPlanHint(stats.HasCreditUsage),
             ModelRows: BuildModelRows(detail.Models),
             ModelSectionNote: ModelSectionNote(detail.Models, stats.UnpricedModels),
             GraphColumns: graphColumns,

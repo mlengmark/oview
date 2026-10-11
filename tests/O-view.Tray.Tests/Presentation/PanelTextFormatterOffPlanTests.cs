@@ -35,12 +35,28 @@ public class PanelTextFormatterOffPlanTests
     [Fact]
     public void OffPlanHintNamesTheCoreOwnedCreditBilledModelIds()
     {
-        var hint = PanelTextFormatter.OffPlanHint(true);
+        var hint = PanelTextFormatter.OffPlanHint(new UsageFlag(true, UsageValueStatus.Real));
 
         foreach (var id in CreditBilledModelIds.All)
         {
             Assert.Contains(id, hint);
         }
+    }
+
+    /// <summary>
+    /// OVI-702 review: <see cref="UsageValueStatus.Unavailable"/> ("Core could not look") must
+    /// not render the same caption as <c>(false, Real)</c> ("Core looked and found none") — the
+    /// former is an unknown, not a checked negative.
+    /// </summary>
+    [Fact]
+    public void OffPlanHintStatesUnknownRatherThanACheckedNegativeWhenUnavailable()
+    {
+        var unavailable = PanelTextFormatter.OffPlanHint(new UsageFlag(null, UsageValueStatus.Unavailable));
+        var checkedNegative = PanelTextFormatter.OffPlanHint(new UsageFlag(false, UsageValueStatus.Real));
+
+        Assert.NotEqual(unavailable, checkedNegative);
+        Assert.DoesNotContain("No credit-billed usage", unavailable);
+        Assert.Contains("could not determine", unavailable);
     }
 
     [Fact]
