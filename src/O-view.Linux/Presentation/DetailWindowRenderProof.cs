@@ -29,9 +29,6 @@ public static class DetailWindowRenderProof
     public const double Width = DetailWindow.DefaultWidth;
     public const double Height = DetailWindow.DefaultHeight;
 
-    private static readonly object InitLock = new();
-    private static bool _platformInitialized;
-
     public static void RenderToFile(
         UsageDetail detail, ThemePreference theme, string filePath, DateTimeOffset utcNow, TimeZoneInfo displayZone,
         bool showTokenKindBreakdown = false, bool flipWindowTiles = false)
@@ -52,10 +49,8 @@ public static class DetailWindowRenderProof
         File.WriteAllBytes(filePath, RenderHoverCards(theme));
     }
 
-    public static byte[] RenderHoverCards(ThemePreference theme)
+    public static byte[] RenderHoverCards(ThemePreference theme) => AvaloniaWorkerThread.Invoke(() =>
     {
-        EnsurePlatformInitialized();
-
         var colors = LinuxWindowThemePalette.Resolve(theme);
 
         var stack = new StackPanel { Margin = new Thickness(16) };
@@ -79,7 +74,7 @@ public static class DetailWindowRenderProof
         using var stream = new MemoryStream();
         bitmap.Save(stream, new PngBitmapEncoderOptions());
         return stream.ToArray();
-    }
+    });
 
     /// <summary>
     /// Gate G7 parity slice P19 (OVI-717), the Linux counterpart of <c>O-view.Tray</c>'s own
@@ -155,10 +150,8 @@ public static class DetailWindowRenderProof
 
     public static byte[] Render(
         UsageDetail detail, ThemePreference theme, DateTimeOffset utcNow, TimeZoneInfo displayZone,
-        bool showTokenKindBreakdown = false, bool flipWindowTiles = false)
+        bool showTokenKindBreakdown = false, bool flipWindowTiles = false) => AvaloniaWorkerThread.Invoke(() =>
     {
-        EnsurePlatformInitialized();
-
         var content = DetailWindowContentBuilder.Build(detail, utcNow, displayZone);
         var colors = LinuxWindowThemePalette.Resolve(theme);
         var visual = BuildVisual(content, colors, showTokenKindBreakdown, flipWindowTiles);
@@ -179,36 +172,7 @@ public static class DetailWindowRenderProof
         using var stream = new MemoryStream();
         bitmap.Save(stream, new PngBitmapEncoderOptions());
         return stream.ToArray();
-    }
-
-    /// <summary>
-    /// Avalonia's render interface (needed by <see cref="RenderTargetBitmap"/>) is registered by
-    /// <see cref="AppBuilder"/>, not by constructing a <see cref="Control"/> directly — the same
-    /// reason <see cref="App"/>'s own remarks give for why <c>DetailWindow</c> waits for
-    /// <c>OnFrameworkInitializationCompleted</c> rather than being built in <c>Program.cs</c>.
-    /// <c>SetupWithoutStarting</c> registers that platform without creating any window or
-    /// entering a message loop; it may only run once per process, so this guards it with the
-    /// same one-time pattern <c>Program.Main</c>'s own composition never needed (it calls
-    /// <c>StartWithClassicDesktopLifetime</c> exactly once already).
-    /// </summary>
-    private static void EnsurePlatformInitialized()
-    {
-        if (_platformInitialized)
-        {
-            return;
-        }
-
-        lock (InitLock)
-        {
-            if (_platformInitialized)
-            {
-                return;
-            }
-
-            AppBuilder.Configure<App>().UsePlatformDetect().SetupWithoutStarting();
-            _platformInitialized = true;
-        }
-    }
+    });
 
     /// <summary>The usage bars' track width (gate G7 parity slice P9) — matches
     /// <see cref="DetailWindow"/>'s own constant so the render proof shows the same proportions
