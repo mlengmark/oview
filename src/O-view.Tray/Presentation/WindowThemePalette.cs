@@ -104,4 +104,23 @@ internal static class WindowThemePalette
         TokenKind.CacheRead => TokenKindCacheRead,
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unrecognised token kind."),
     };
+
+    /// <summary>The 31-day graph's within-week intensity ramp (ADR-0008 D10b, gate G7 parity
+    /// slice P13): light to dark blue, ported from the source's own endpoints. Does not vary
+    /// with <see cref="ThemePreference"/> — the source picked one ramp for both panels and
+    /// nothing here contradicts that.</summary>
+    private static readonly RgbColor GraphBlueLo = new(0xB0, 0xD0, 0xF0);
+    private static readonly RgbColor GraphBlueHi = new(0x18, 0x5F, 0xA5);
+
+    /// <summary>Linearly interpolates between the ramp's two endpoints by <paramref name="intensity"/>
+    /// (clamped to <c>0..1</c>) — the same per-week-normalised fraction
+    /// <see cref="UsageGraphColumn.Intensity"/> carries.</summary>
+    public static RgbColor GraphColor(double intensity)
+    {
+        var t = Math.Clamp(intensity, 0.0, 1.0);
+        return new RgbColor(
+            (byte)(GraphBlueLo.R + (GraphBlueHi.R - GraphBlueLo.R) * t),
+            (byte)(GraphBlueLo.G + (GraphBlueHi.G - GraphBlueLo.G) * t),
+            (byte)(GraphBlueLo.B + (GraphBlueHi.B - GraphBlueLo.B) * t));
+    }
 }
