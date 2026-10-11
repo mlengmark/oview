@@ -18,7 +18,7 @@ internal readonly record struct RgbColor(byte R, byte G, byte B);
 /// sits inside (<see cref="UsageBarBandColors.Amber"/>) stays fixed.</summary>
 internal readonly record struct WindowThemeColors(
     RgbColor Background, RgbColor Foreground, RgbColor Border, RgbColor Accent, RgbColor AccentHover,
-    RgbColor BannerBackground);
+    RgbColor BannerBackground, RgbColor ModelSlot0, RgbColor ModelSlot1, RgbColor ModelSlot2, RgbColor ModelOther);
 
 /// <summary>The three usage-bar bands (ADR-0008 D10b, gate G7 parity slice P9), reusing this
 /// skin's own existing tray-icon hues (<see cref="StatusIconGlyphRenderer.ColorFor"/>) for visual
@@ -52,13 +52,36 @@ internal static class WindowThemePalette
     /// reads as no longer a button there.</summary>
     private static readonly RgbColor AccentHover = new(0xB8, 0x4A, 0x27);
 
+    /// <summary>`#2A78D6`/`#EB6834`/`#1BAF7A` light, `#3987E5`/`#D95926`/`#199E70` dark — the
+    /// source's own validated three-slot categorical order (<c>ui-spec.md</c> §2), carried over
+    /// verbatim rather than re-picked: these are a measured accessibility fact (six-check CVD
+    /// validator against the tile surface, worst case ΔE 9.2 light / 9.4 dark against an 8
+    /// floor), not a stylistic choice either skin is free to vary — unlike <see cref="BandColors"/>
+    /// or the token-kind palette below, which are each skin's own pick.</summary>
+    private static readonly RgbColor ModelSlot0Light = new(0x2A, 0x78, 0xD6);
+    private static readonly RgbColor ModelSlot1Light = new(0xEB, 0x68, 0x34);
+    private static readonly RgbColor ModelSlot2Light = new(0x1B, 0xAF, 0x7A);
+    private static readonly RgbColor ModelSlot0Dark = new(0x39, 0x87, 0xE5);
+    private static readonly RgbColor ModelSlot1Dark = new(0xD9, 0x59, 0x26);
+    private static readonly RgbColor ModelSlot2Dark = new(0x19, 0x9E, 0x70);
+
+    /// <summary>`#8A8A8A` — the neutral "Other"/single-leftover slot, deliberately the same in
+    /// both themes: the validator found no grey that is both inside the dark lightness band and
+    /// separable from the aqua slot for deuteranopes, so one value serves both panels rather than
+    /// two independently tuned ones.</summary>
+    private static readonly RgbColor ModelOther = new(0x8A, 0x8A, 0x8A);
+
     private static readonly WindowThemeColors LightColors = new(
         Background: new RgbColor(255, 255, 255),
         Foreground: new RgbColor(0, 0, 0),
         Border: new RgbColor(128, 128, 128),
         Accent: Accent,
         AccentHover: AccentHover,
-        BannerBackground: new RgbColor(0xFC, 0xF1, 0xDA));
+        BannerBackground: new RgbColor(0xFC, 0xF1, 0xDA),
+        ModelSlot0: ModelSlot0Light,
+        ModelSlot1: ModelSlot1Light,
+        ModelSlot2: ModelSlot2Light,
+        ModelOther: ModelOther);
 
     private static readonly WindowThemeColors DarkColors = new(
         Background: new RgbColor(32, 32, 32),
@@ -66,7 +89,11 @@ internal static class WindowThemePalette
         Border: new RgbColor(90, 90, 90),
         Accent: Accent,
         AccentHover: AccentHover,
-        BannerBackground: new RgbColor(0x4A, 0x3B, 0x14));
+        BannerBackground: new RgbColor(0x4A, 0x3B, 0x14),
+        ModelSlot0: ModelSlot0Dark,
+        ModelSlot1: ModelSlot1Dark,
+        ModelSlot2: ModelSlot2Dark,
+        ModelOther: ModelOther);
 
     public static WindowThemeColors Resolve(ThemePreference preference) => preference switch
     {
@@ -83,6 +110,18 @@ internal static class WindowThemePalette
         Green: new RgbColor(0x32, 0xA0, 0x46),
         Amber: new RgbColor(0xEB, 0xA5, 0x0F),
         Red: new RgbColor(0xD2, 0x32, 0x2D));
+
+    /// <summary>The slot's colour for the current theme (gate G7 parity slice P11) — slot 0/1/2
+    /// resolve to the validated chromatic trio, and anything else (including the neutral -1 the
+    /// panel's shared <c>ModelColourOrder.SlotFor</c> returns) resolves to the single
+    /// <see cref="WindowThemeColors.ModelOther"/> slot.</summary>
+    public static RgbColor ModelColor(WindowThemeColors colors, int slot) => slot switch
+    {
+        0 => colors.ModelSlot0,
+        1 => colors.ModelSlot1,
+        2 => colors.ModelSlot2,
+        _ => colors.ModelOther,
+    };
 
     public static RgbColor BandColor(UsageBarBand band) => band switch
     {

@@ -16,7 +16,7 @@ internal readonly record struct LinuxRgbColor(byte R, byte G, byte B);
 /// varies by theme, same reasoning as <see cref="Background"/> itself.</summary>
 internal readonly record struct LinuxWindowThemeColors(
     LinuxRgbColor Background, LinuxRgbColor Foreground, LinuxRgbColor Border, LinuxRgbColor Accent, LinuxRgbColor AccentHover,
-    LinuxRgbColor BannerBackground);
+    LinuxRgbColor BannerBackground, LinuxRgbColor ModelSlot0, LinuxRgbColor ModelSlot1, LinuxRgbColor ModelSlot2, LinuxRgbColor ModelOther);
 
 /// <summary>The three usage-bar bands (ADR-0008 D10b, gate G7 parity slice P9), reusing this
 /// skin's own existing tray-icon hues (<see cref="StatusIconGlyphRenderer.ColorFor"/>, converted
@@ -50,13 +50,35 @@ internal static class LinuxWindowThemePalette
     /// reads as no longer a button there.</summary>
     private static readonly LinuxRgbColor AccentHover = new(0xB8, 0x4A, 0x27);
 
+    /// <summary>`#2A78D6`/`#EB6834`/`#1BAF7A` light, `#3987E5`/`#D95926`/`#199E70` dark — the
+    /// source's own validated three-slot categorical order (<c>ui-spec.md</c> §2), carried over
+    /// verbatim and kept identical to <c>O-view.Tray</c>'s own values, unlike every other colour
+    /// in this file: this is a measured accessibility fact (six-check CVD validator against the
+    /// tile surface, worst case ΔE 9.2 light / 9.4 dark against an 8 floor), not a per-skin
+    /// stylistic choice, so there is no "independently picked" value to diverge to.</summary>
+    private static readonly LinuxRgbColor ModelSlot0Light = new(0x2A, 0x78, 0xD6);
+    private static readonly LinuxRgbColor ModelSlot1Light = new(0xEB, 0x68, 0x34);
+    private static readonly LinuxRgbColor ModelSlot2Light = new(0x1B, 0xAF, 0x7A);
+    private static readonly LinuxRgbColor ModelSlot0Dark = new(0x39, 0x87, 0xE5);
+    private static readonly LinuxRgbColor ModelSlot1Dark = new(0xD9, 0x59, 0x26);
+    private static readonly LinuxRgbColor ModelSlot2Dark = new(0x19, 0x9E, 0x70);
+
+    /// <summary>`#8A8A8A` — the neutral "Other"/single-leftover slot, deliberately the same in
+    /// both themes: the validator found no grey that is both inside the dark lightness band and
+    /// separable from the aqua slot for deuteranopes, so one value serves both panels.</summary>
+    private static readonly LinuxRgbColor ModelOther = new(0x8A, 0x8A, 0x8A);
+
     private static readonly LinuxWindowThemeColors LightColors = new(
         Background: new LinuxRgbColor(250, 250, 250),
         Foreground: new LinuxRgbColor(20, 20, 20),
         Border: new LinuxRgbColor(160, 160, 160),
         Accent: Accent,
         AccentHover: AccentHover,
-        BannerBackground: new LinuxRgbColor(0xFB, 0xEE, 0xD6));
+        BannerBackground: new LinuxRgbColor(0xFB, 0xEE, 0xD6),
+        ModelSlot0: ModelSlot0Light,
+        ModelSlot1: ModelSlot1Light,
+        ModelSlot2: ModelSlot2Light,
+        ModelOther: ModelOther);
 
     private static readonly LinuxWindowThemeColors DarkColors = new(
         Background: new LinuxRgbColor(45, 45, 48),
@@ -64,7 +86,11 @@ internal static class LinuxWindowThemePalette
         Border: new LinuxRgbColor(80, 80, 85),
         Accent: Accent,
         AccentHover: AccentHover,
-        BannerBackground: new LinuxRgbColor(0x4D, 0x3E, 0x18));
+        BannerBackground: new LinuxRgbColor(0x4D, 0x3E, 0x18),
+        ModelSlot0: ModelSlot0Dark,
+        ModelSlot1: ModelSlot1Dark,
+        ModelSlot2: ModelSlot2Dark,
+        ModelOther: ModelOther);
 
     public static LinuxWindowThemeColors Resolve(ThemePreference preference) => preference switch
     {
@@ -82,6 +108,18 @@ internal static class LinuxWindowThemePalette
         Green: new LinuxRgbColor(0x3C, 0xAA, 0x50),
         Amber: new LinuxRgbColor(0xF5, 0xAF, 0x0A),
         Red: new LinuxRgbColor(0xDC, 0x37, 0x32));
+
+    /// <summary>The slot's colour for the current theme (gate G7 parity slice P11) — slot 0/1/2
+    /// resolve to the validated chromatic trio, and anything else (including the neutral -1 the
+    /// panel's shared <c>ModelColourOrder.SlotFor</c> returns) resolves to the single
+    /// <see cref="LinuxWindowThemeColors.ModelOther"/> slot.</summary>
+    public static LinuxRgbColor ModelColor(LinuxWindowThemeColors colors, int slot) => slot switch
+    {
+        0 => colors.ModelSlot0,
+        1 => colors.ModelSlot1,
+        2 => colors.ModelSlot2,
+        _ => colors.ModelOther,
+    };
 
     public static LinuxRgbColor BandColor(UsageBarBand band) => band switch
     {

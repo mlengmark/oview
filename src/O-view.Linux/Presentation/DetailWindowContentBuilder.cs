@@ -62,12 +62,35 @@ public enum StatisticsTileKind
 
 /// <summary>
 /// One model's proportional share of a flipped tile's figure (ADR-0008 D10b, gate G7 parity
-/// slice P10) — a proportion of a figure Core already handed over, computed here, not a sum
-/// (D10b's own boundary rule). <see cref="Fraction"/> is clamped into <c>0..1</c>. Carries no
-/// colour — the slot palette and the three-slot cap are slice P11's own obligation; this slice
-/// renders every segment in the same neutral tone.
+/// slices P10/P11) — a proportion of a figure Core already handed over, computed here, not a sum
+/// (D10b's own boundary rule). <see cref="Fraction"/> is clamped into <c>0..1</c> and the set of
+/// fractions for one tile never exceeds 1 in total.
 /// </summary>
-public sealed record StatisticsTileSegment(string ModelId, double Fraction);
+/// <param name="ModelId">The model this segment identifies — the raw vendor id, verbatim, for a
+/// named slot or a single folded leftover; the literal <c>"Other"</c> sentinel once two or more
+/// models are folded (source <c>ui-spec.md</c> §2). Never a fabricated friendly name.</param>
+/// <param name="ColourSlot">The index into the panel's shared <see cref="ModelColourOrder"/>
+/// (0..<see cref="ModelColourOrder.MaxChromaticSlots"/>-1), or -1 for the neutral "Other"/single-
+/// leftover slot — <see cref="LinuxWindowThemePalette"/> resolves this to an actual colour per
+/// theme.</param>
+/// <param name="LegendLabel">What the legend names this segment — the model id, or
+/// <c>"Other"</c>. The legend shows names only; exact figures are hover-only
+/// (<paramref name="HoverFigure"/>/<paramref name="HoverCaption"/>), the same relief the source
+/// documents as a known limitation and does not try to fix here.</param>
+/// <param name="HoverFigure">The hover card's headline (<see cref="HoverCard.Figure"/>) — this
+/// segment's own figure, already formatted by <see cref="UsageFormatter"/>, or
+/// <c>"unknown"</c> when an "Other" bucket contains an unpriced model (never a fabricated
+/// partial sum presented as the whole).</param>
+/// <param name="HoverCaption">The hover card's caption — the raw model id, or
+/// <c>"N more models"</c> for a folded bucket of two or more, so "Other" is never an unexplained
+/// slice (source <c>ui-spec.md</c> §2).</param>
+public sealed record StatisticsTileSegment(
+    string ModelId,
+    double Fraction,
+    int ColourSlot,
+    string LegendLabel,
+    string HoverFigure,
+    string HoverCaption);
 
 /// <summary>
 /// One of the detail window's 2x2 statistics tiles (ADR-0008 D10b, gate G7 parity slice P10),
@@ -78,6 +101,10 @@ public sealed record StatisticsTileSegment(string ModelId, double Fraction);
 /// an already-built tile is visible.
 /// </summary>
 /// <param name="Value">The tile's own figure, already run through <see cref="UsageFormatter"/>.</param>
+/// <param name="Note">Empty, or <c>"excl. N unpriced"</c> (gate G7 parity slice P11) when at
+/// least one model in this window could not be priced and was therefore excluded from
+/// <see cref="Breakdown"/> entirely — never a silent gap. Only ever populated on the "Est. value"
+/// tile; the token tile has no "unpriced" concept.</param>
 /// <param name="CanFlip">Whether this tile has anything to flip to. <see langword="false"/> for
 /// both "today" tiles (no per-model split exists for that window) and for a 31-day tile whose
 /// breakdown could not be read, holds no rows, or sums to nothing to show a proportion of.</param>
@@ -86,6 +113,7 @@ public sealed record StatisticsTile(
     StatisticsTileKind Kind,
     string Label,
     string Value,
+    string Note,
     bool CanFlip,
     IReadOnlyList<StatisticsTileSegment> Breakdown);
 
@@ -283,69 +311,153 @@ public static class DetailWindowContentBuilder
     /// Core's; a flippable tile's per-model breakdown is built here, up front, so the window's
     /// click handler never reads Core again (the "no I/O on click" requirement).
     /// </summary>
-    private static IReadOnlyList<StatisticsTile> BuildStatisticsTiles(UsageStatistics stats, ModelUsageBreakdown models) => new[]
+    private static IReadOnlyList<StatisticsTile> BuildStatisticsTiles(UsageStatistics stats, ModelUsageBreakdown models)
     {
-        new StatisticsTile(
-            StatisticsTileKind.OutputTokensToday,
-            "Output tokens, today",
-            UsageFormatter.Tokens(stats.OutputTokensToday),
-            CanFlip: false,
-            Breakdown: Array.Empty<StatisticsTileSegment>()),
-        new StatisticsTile(
-            StatisticsTileKind.EstimatedValueToday,
-            "Estimated value, today",
-            UsageFormatter.Usd(stats.EstimatedSpendToday),
-            CanFlip: false,
-            Breakdown: Array.Empty<StatisticsTileSegment>()),
-        BuildWindowTile(
-            StatisticsTileKind.OutputTokensWindow31d,
-            "Output tokens, 31 days",
-            UsageFormatter.Tokens(stats.OutputTokensWindow31d),
-            models,
-            row => (double)(row.OutputTokens.Value ?? 0),
-            stats.OutputTokensWindow31d.Value is { } outputTotal ? (double)outputTotal : null),
-        BuildWindowTile(
-            StatisticsTileKind.EstimatedValueWindow31d,
-            "Estimated value, 31 days",
-            UsageFormatter.Usd(stats.EstimatedValueWindow31d),
-            models,
-            row => (double)(row.EstimatedSpend.Value ?? 0),
-            stats.EstimatedValueWindow31d.Value is { } spendTotal ? (double)spendTotal : null),
-    };
+        var colourOrder = models.Status == UsageValueStatus.Real
+            ? ModelColourOrder.ColourOrder(models.Rows)
+            : Array.Empty<string>();
+
+        return new[]
+        {
+            new StatisticsTile(
+                StatisticsTileKind.OutputTokensToday,
+                "Output tokens, today",
+                UsageFormatter.Tokens(stats.OutputTokensToday),
+                Note: "",
+                CanFlip: false,
+                Breakdown: Array.Empty<StatisticsTileSegment>()),
+            new StatisticsTile(
+                StatisticsTileKind.EstimatedValueToday,
+                "Estimated value, today",
+                UsageFormatter.Usd(stats.EstimatedSpendToday),
+                Note: "",
+                CanFlip: false,
+                Breakdown: Array.Empty<StatisticsTileSegment>()),
+            BuildWindowTile(
+                StatisticsTileKind.OutputTokensWindow31d,
+                "Output tokens, 31 days",
+                UsageFormatter.Tokens(stats.OutputTokensWindow31d),
+                models,
+                select: row => (double)(row.OutputTokens.Value ?? 0),
+                formatRow: row => UsageFormatter.Tokens(row.OutputTokens),
+                formatOther: rows => UsageFormatter.Tokens(new TokenCount(rows.Sum(r => r.OutputTokens.Value ?? 0), UsageValueStatus.Real)),
+                total: stats.OutputTokensWindow31d.Value is { } outputTotal ? (double)outputTotal : null,
+                colourOrder: colourOrder),
+            BuildWindowTile(
+                StatisticsTileKind.EstimatedValueWindow31d,
+                "Estimated value, 31 days",
+                UsageFormatter.Usd(stats.EstimatedValueWindow31d),
+                models,
+                select: row => row.EstimatedSpend.Value is { } v ? (double)v : (double?)null,
+                formatRow: row => UsageFormatter.Usd(row.EstimatedSpend),
+                formatOther: rows => rows.Any(r => r.EstimatedSpend.Value is null)
+                    ? UsageFormatter.Usd(new EstimatedUsd(null, UsageValueStatus.Unavailable))
+                    : UsageFormatter.Usd(new EstimatedUsd(rows.Sum(r => r.EstimatedSpend.Value ?? 0m), UsageValueStatus.Estimated)),
+                total: stats.EstimatedValueWindow31d.Value is { } spendTotal ? (double)spendTotal : null,
+                colourOrder: colourOrder),
+        };
+    }
 
     /// <summary>
     /// A 31-day tile's breakdown is each row's share of the window total Core already handed
     /// over (<paramref name="total"/>) — never a sum this skin performs over the rows itself
     /// (ADR-0008 D10b). Disabled (no glyph) when the breakdown could not be read, holds no
     /// rows, or the window total is unavailable or nothing to show a share of.
+    ///
+    /// <para>Gate G7 parity slice P11: models are coloured by the panel's shared
+    /// <paramref name="colourOrder"/>, never by this tile's own ranking (<see
+    /// cref="ModelColourOrder"/>'s own remarks). A model outside the colour order folds into a
+    /// neutral "Other" segment, except a single leftover, which keeps its own name. A model
+    /// <paramref name="select"/> cannot price (a null amount) is excluded from the breakdown
+    /// entirely and counted into this tile's own <c>Note</c> — "excl. N unpriced" — rather than
+    /// silently vanishing; an "Other" bucket that still has something priced to show states that
+    /// sum via <paramref name="formatOther"/>, which itself reports "unknown" rather than a
+    /// partial total whenever any model folded into it could not be priced (rule 6).</para>
     /// </summary>
     private static StatisticsTile BuildWindowTile(
-        StatisticsTileKind kind, string label, string value, ModelUsageBreakdown models, Func<ModelUsageRow, double> select, double? total)
+        StatisticsTileKind kind,
+        string label,
+        string value,
+        ModelUsageBreakdown models,
+        Func<ModelUsageRow, double?> select,
+        Func<ModelUsageRow, string> formatRow,
+        Func<IReadOnlyList<ModelUsageRow>, string> formatOther,
+        double? total,
+        IReadOnlyList<string> colourOrder)
     {
         if (models.Status != UsageValueStatus.Real || models.Rows.Count == 0 || total is not { } windowTotal || windowTotal <= 0)
         {
-            return new StatisticsTile(kind, label, value, CanFlip: false, Breakdown: Array.Empty<StatisticsTileSegment>());
+            return new StatisticsTile(kind, label, value, Note: "", CanFlip: false, Breakdown: Array.Empty<StatisticsTileSegment>());
         }
 
-        var segments = new List<StatisticsTileSegment>(models.Rows.Count);
+        var namedRows = new List<ModelUsageRow>();
+        var restRows = new List<ModelUsageRow>();
         foreach (var row in models.Rows)
         {
-            // A row with nothing to show (e.g. an unpriced model, for the Est. value tile) gets
-            // no segment at all — a zero-width slice would read as "recorded, zero spend", a
-            // different fact from "could not be priced" (D9a's own unpriced-model distinction).
+            (ModelColourOrder.SlotFor(row.ModelId, colourOrder) >= 0 ? namedRows : restRows).Add(row);
+        }
+
+        var unpricedCount = 0;
+        var segments = new List<StatisticsTileSegment>(colourOrder.Count + 1);
+
+        foreach (var row in namedRows)
+        {
             var amount = select(row);
-            if (amount > 0)
+            if (amount is null)
             {
-                segments.Add(new StatisticsTileSegment(row.ModelId, Math.Clamp(amount / windowTotal, 0.0, 1.0)));
+                unpricedCount++;
+                continue;
+            }
+
+            // A row with nothing to show (e.g. a model with zero output tokens on this window)
+            // gets no segment at all — a zero-width slice would read as "recorded, zero spend",
+            // a different fact from "could not be priced".
+            if (amount <= 0)
+            {
+                continue;
+            }
+
+            var slot = ModelColourOrder.SlotFor(row.ModelId, colourOrder);
+            segments.Add(new StatisticsTileSegment(
+                row.ModelId, Math.Clamp(amount.Value / windowTotal, 0.0, 1.0), slot, row.ModelId, formatRow(row), row.ModelId));
+        }
+
+        if (restRows.Count > 0)
+        {
+            var restAmounts = restRows.Select(r => (Row: r, Amount: select(r))).ToList();
+            unpricedCount += restAmounts.Count(x => x.Amount is null);
+
+            // Whatever is left to actually show on THIS tile, after dropping anything unpriced
+            // or zero — a model can be in the global "rest" group yet have nothing to show on
+            // one particular tile (e.g. unpriced on the value tile), so whether this folds into
+            // "Other" is decided per tile, not from the rest group's own raw size.
+            var visibleRest = restAmounts.Where(x => x.Amount is { } a && a > 0).ToList();
+            if (visibleRest.Count == 1)
+            {
+                // Still takes the neutral colour — it is not one of the panel's coloured
+                // models — but keeps its own name rather than the "Other" label, since there
+                // is only one model left to name (source ui-spec.md §2: "Other · 1 more models"
+                // would be a clumsy way to say the one model it names).
+                var (row, amount) = visibleRest[0];
+                segments.Add(new StatisticsTileSegment(
+                    row.ModelId, Math.Clamp(amount!.Value / windowTotal, 0.0, 1.0), -1, row.ModelId, formatRow(row), row.ModelId));
+            }
+            else if (visibleRest.Count > 1)
+            {
+                var restSum = visibleRest.Sum(x => x.Amount!.Value);
+                segments.Add(new StatisticsTileSegment(
+                    "Other", Math.Clamp(restSum / windowTotal, 0.0, 1.0), -1, "Other", formatOther(restRows), visibleRest.Count + " more models"));
             }
         }
 
         if (segments.Count == 0)
         {
-            return new StatisticsTile(kind, label, value, CanFlip: false, Breakdown: Array.Empty<StatisticsTileSegment>());
+            var emptyNote = unpricedCount > 0 ? "excl. " + unpricedCount + " unpriced" : "";
+            return new StatisticsTile(kind, label, value, Note: emptyNote, CanFlip: false, Breakdown: Array.Empty<StatisticsTileSegment>());
         }
 
-        return new StatisticsTile(kind, label, value, CanFlip: true, Breakdown: segments);
+        var note = unpricedCount > 0 ? "excl. " + unpricedCount + " unpriced" : "";
+        return new StatisticsTile(kind, label, value, Note: note, CanFlip: true, Breakdown: segments);
     }
 
     /// <summary>

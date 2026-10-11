@@ -531,19 +531,34 @@ public static class DetailWindowRenderProof
         }
         else
         {
-            var bar = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center };
+            var back = new StackPanel();
+            var bar = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal };
+            var legend = new StackPanel { Margin = new Thickness(0, 3, 0, 0) };
             foreach (var segment in tile.Breakdown)
             {
+                var swatch = ToBrush(LinuxWindowThemePalette.ModelColor(colors, segment.ColourSlot));
                 bar.Children.Add(new Border
                 {
                     Width = Math.Max(2.0, 150 * segment.Fraction),
                     Height = 16,
                     Margin = new Thickness(0, 0, 1, 0),
-                    Background = ToBrush(colors.Accent),
+                    Background = swatch,
                 });
+
+                var legendEntry = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Margin = new Thickness(0, 1, 0, 0) };
+                legendEntry.Children.Add(new Border { Width = 6, Height = 6, CornerRadius = new CornerRadius(1), Background = swatch, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center });
+                legendEntry.Children.Add(new TextBlock { Text = segment.LegendLabel, FontSize = 8, Margin = new Thickness(3, 0, 0, 0), Foreground = ToBrush(colors.Foreground) });
+                legend.Children.Add(legendEntry);
             }
 
-            faces.Children.Add(bar);
+            back.Children.Add(bar);
+            back.Children.Add(legend);
+            if (!string.IsNullOrEmpty(tile.Note))
+            {
+                back.Children.Add(new TextBlock { Text = tile.Note, FontSize = 8, Margin = new Thickness(0, 2, 0, 0), Foreground = ToBrush(colors.Foreground) });
+            }
+
+            faces.Children.Add(back);
         }
 
         var root = new Grid();

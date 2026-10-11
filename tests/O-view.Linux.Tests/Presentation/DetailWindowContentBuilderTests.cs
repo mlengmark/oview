@@ -565,4 +565,181 @@ public sealed class DetailWindowContentBuilderTests
         Assert.NotEqual(contentWithUsage.OffPlanUsageCaption, contentWithoutUsage.OffPlanUsageCaption);
         Assert.NotEqual(contentWithoutUsage.OffPlanUsageCaption, contentUnknownUsage.OffPlanUsageCaption);
     }
+
+    private static ModelUsageRow Row(string modelId, long tokens, decimal? value) => new(
+        modelId, 1,
+        new TokenCount(tokens, UsageValueStatus.Real),
+        new TokenCount(tokens, UsageValueStatus.Real),
+        new TokenCount(0, UsageValueStatus.Real),
+        new TokenCount(0, UsageValueStatus.Real),
+        value is { } v ? new EstimatedUsd(v, UsageValueStatus.Estimated) : new EstimatedUsd(null, UsageValueStatus.Unavailable));
+
+    /// <summary>ADR-0008 D10b, gate G7 parity slice P11's own <c>ModelColourOrderFixture</c>,
+    /// the Linux counterpart of <c>O-view.Tray</c>'s own test: colour is decided once for the
+    /// whole panel from the widest window (<see cref="ModelUsageBreakdown.Rows"/>), and both
+    /// 31-day tiles colour by that one order, at every model count from a single model up to
+    /// five — three named slots at 1-3, two named plus a folded "Other" at 4 and 5.</summary>
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    [InlineData(5)]
+    public void Models_keep_the_same_colour_slot_on_every_tile_at_this_model_count(int modelCount)
+    {
+        var rows = new ModelUsageRow[modelCount];
+        long outputTotal = 0;
+        decimal valueTotal = 0m;
+        for (var i = 0; i < modelCount; i++)
+        {
+            var tokens = (modelCount - i) * 10_000L;
+            var value = (modelCount - i) * 4.00m;
+            outputTotal += tokens;
+            valueTotal += value;
+            rows[i] = Row($"model-{i}", tokens, value);
+        }
+
+        var stats = UsageStatistics.Unavailable with
+        {
+            OutputTokensWindow31d = new TokenCount(outputTotal, UsageValueStatus.Real),
+            EstimatedValueWindow31d = new EstimatedUsd(valueTotal, UsageValueStatus.Estimated),
+        };
+        var detail = new UsageDetail(UsageSnapshot.Unavailable, stats, BreakdownWith(rows));
+
+        var content = DetailWindowContentBuilder.Build(detail, UtcNow, TimeZoneInfo.Utc);
+
+        var tokenTile = content.StatisticsTiles[2];
+        var valueTile = content.StatisticsTiles[3];
+
+        var tokenSlots = tokenTile.Breakdown.ToDictionary(s => s.ModelId, s => s.ColourSlot);
+        var valueSlots = valueTile.Breakdown.ToDictionary(s => s.ModelId, s => s.ColourSlot);
+        foreach (var modelId in tokenSlots.Keys.Intersect(valueSlots.Keys))
+        {
+            Assert.Equal(tokenSlots[modelId], valueSlots[modelId]);
+        }
+
+        var expectedSegments = modelCount <= 3 ? modelCount : 3;
+        Assert.Equal(expectedSegments, tokenTile.Breakdown.Count);
+        Assert.Equal(expectedSegments, valueTile.Breakdown.Count);
+
+        if (modelCount > 3)
+        {
+            Assert.Contains(tokenTile.Breakdown, s => s.ModelId == "Other" && s.ColourSlot == -1);
+            Assert.Contains(valueTile.Breakdown, s => s.ModelId == "Other" && s.ColourSlot == -1);
+        }
+    }
+
+    /// <summary>Reproduces the source's own first-round bug directly (source <c>ui-spec.md</c>
+    /// §2): one model ranks first by tokens and second by value — its colour must not follow
+    /// either tile's own ranking, only the panel-wide order Core's 31-day token ranking already
+    /// establishes.</summary>
+    [Fact]
+    public void A_models_colour_does_not_follow_its_own_ranking_within_a_single_tile()
+    {
+        var rowA = Row("model-a", tokens: 100_000, value: 1.00m); // ranks first by tokens, second by value
+        var rowB = Row("model-b", tokens: 50_000, value: 9.00m); // ranks second by tokens, first by value
+
+        var stats = UsageStatistics.Unavailable with
+        {
+            OutputTokensWindow31d = new TokenCount(150_000, UsageValueStatus.Real),
+            EstimatedValueWindow31d = new EstimatedUsd(10.00m, UsageValueStatus.Estimated),
+        };
+        var detail = new UsageDetail(UsageSnapshot.Unavailable, stats, BreakdownWith(rowA, rowB));
+
+        var content = DetailWindowContentBuilder.Build(detail, UtcNow, TimeZoneInfo.Utc);
+
+        var tokenBreakdown = content.StatisticsTiles[2].Breakdown;
+        var valueBreakdown = content.StatisticsTiles[3].Breakdown;
+
+        var tokenSlotA = tokenBreakdown.Single(s => s.ModelId == "model-a").ColourSlot;
+        var valueSlotA = valueBreakdown.Single(s => s.ModelId == "model-a").ColourSlot;
+        Assert.Equal(tokenSlotA, valueSlotA);
+
+        var tokenSlotB = tokenBreakdown.Single(s => s.ModelId == "model-b").ColourSlot;
+        var valueSlotB = valueBreakdown.Single(s => s.ModelId == "model-b").ColourSlot;
+        Assert.Equal(tokenSlotB, valueSlotB);
+
+        Assert.NotEqual(tokenSlotA, tokenSlotB);
+    }
+
+    /// <summary>Gate G7 parity slice P11: a fourth and fifth model fold into a neutral "Other"
+    /// segment; an unpriced model elsewhere in the window is excluded from the value breakdown
+    /// and counted into this tile's own "excl. N unpriced" note rather than silently vanishing.
+    /// An unrecognised model id renders exactly as it appears in the data — never renamed.</summary>
+    [Fact]
+    public void A_fourth_and_later_model_folds_into_other_and_an_unpriced_model_is_noted_not_hidden()
+    {
+        var rows = new[]
+        {
+            Row("model-top", tokens: 100_000, value: 40.00m),
+            Row("model-second", tokens: 50_000, value: 20.00m),
+            Row("model-third", tokens: 30_000, value: 12.00m),
+            Row("model-fourth", tokens: 20_000, value: 8.00m),
+            Row("weird-vendor-id-07", tokens: 10_000, value: null),
+        };
+
+        var stats = UsageStatistics.Unavailable with
+        {
+            OutputTokensWindow31d = new TokenCount(210_000, UsageValueStatus.Real),
+            EstimatedValueWindow31d = new EstimatedUsd(80.00m, UsageValueStatus.Estimated),
+        };
+        var detail = new UsageDetail(UsageSnapshot.Unavailable, stats, BreakdownWith(rows));
+
+        var content = DetailWindowContentBuilder.Build(detail, UtcNow, TimeZoneInfo.Utc);
+
+        var tokenTile = content.StatisticsTiles[2];
+        var valueTile = content.StatisticsTiles[3];
+
+        // Token tile: nothing is unpriced, so all five contribute — two named, three folded.
+        Assert.Equal("", tokenTile.Note);
+        Assert.Equal(3, tokenTile.Breakdown.Count);
+        Assert.Contains(tokenTile.Breakdown, s => s.ModelId == "Other");
+
+        // Value tile: the unrecognised model is unpriced — excluded and counted, never hidden.
+        Assert.Equal("excl. 1 unpriced", valueTile.Note);
+        Assert.Equal(3, valueTile.Breakdown.Count);
+        var other = valueTile.Breakdown.Single(s => s.ModelId == "Other");
+        Assert.Equal(-1, other.ColourSlot);
+
+        // Three models are in the global "rest" group (model-third, model-fourth and the
+        // unpriced weird-vendor-id-07), but the unpriced one has nothing to show on this tile —
+        // the caption counts what is actually folded in here, not the group's raw size.
+        Assert.Equal("2 more models", other.HoverCaption);
+
+        Assert.Contains(content.ModelRows, r => r.ModelId == "weird-vendor-id-07");
+    }
+
+    /// <summary>A single model left outside the colour order keeps its own name — "Other · 1
+    /// more models" would be a clumsy way to say the one model it names (source
+    /// <c>ui-spec.md</c> §2) — but still takes the neutral colour, since it is not one of the
+    /// panel's coloured models. This is a per-tile decision: the same window has four models
+    /// globally, but the value tile's second "rest" model is unpriced, leaving only one visible
+    /// leftover on that tile specifically.</summary>
+    [Fact]
+    public void A_single_visible_leftover_keeps_its_own_name_with_the_neutral_colour()
+    {
+        var rows = new[]
+        {
+            Row("model-top", tokens: 100_000, value: 40.00m),
+            Row("model-second", tokens: 50_000, value: 20.00m),
+            Row("model-third-alone", tokens: 30_000, value: 12.00m),
+            Row("model-fourth-unpriced", tokens: 20_000, value: null),
+        };
+
+        var stats = UsageStatistics.Unavailable with
+        {
+            OutputTokensWindow31d = new TokenCount(200_000, UsageValueStatus.Real),
+            EstimatedValueWindow31d = new EstimatedUsd(72.00m, UsageValueStatus.Estimated),
+        };
+        var detail = new UsageDetail(UsageSnapshot.Unavailable, stats, BreakdownWith(rows));
+
+        var content = DetailWindowContentBuilder.Build(detail, UtcNow, TimeZoneInfo.Utc);
+
+        var valueTile = content.StatisticsTiles[3];
+        Assert.DoesNotContain(valueTile.Breakdown, s => s.ModelId == "Other");
+        var leftover = valueTile.Breakdown.Single(s => s.ModelId == "model-third-alone");
+        Assert.Equal(-1, leftover.ColourSlot);
+        Assert.Equal("model-third-alone", leftover.LegendLabel);
+        Assert.Equal("excl. 1 unpriced", valueTile.Note);
+    }
 }

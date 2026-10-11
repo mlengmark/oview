@@ -37,10 +37,14 @@ internal sealed class StatisticsTileView : Border
     private readonly TextBlock _label = new() { FontSize = 10, TextWrapping = TextWrapping.Wrap };
     private readonly TextBlock _value = new() { FontSize = 16, FontWeight = FontWeight.SemiBold, Margin = new Thickness(0, 2, 0, 0) };
     private readonly StackPanel _front;
-    private readonly StackPanel _breakdown = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+    private readonly StackPanel _breakdown = new() { VerticalAlignment = VerticalAlignment.Center };
+    private readonly StackPanel _bar = new() { Orientation = Orientation.Horizontal };
+    private readonly StackPanel _legend = new() { Margin = new Thickness(0, 3, 0, 0) };
+    private readonly TextBlock _note = new() { FontSize = 8, Margin = new Thickness(0, 2, 0, 0) };
     private readonly Border _glyph;
     private LinuxWindowThemeColors _colors;
     private bool _canFlip;
+    private IReadOnlyList<StatisticsTileSegment> _segments = Array.Empty<StatisticsTileSegment>();
 
     /// <summary>Whether the back (stacked-bar) face is currently showing.</summary>
     public bool IsFlipped { get; private set; }
@@ -57,6 +61,9 @@ internal sealed class StatisticsTileView : Border
         _front.Children.Add(_label);
         _front.Children.Add(_value);
 
+        _breakdown.Children.Add(_bar);
+        _breakdown.Children.Add(_legend);
+        _breakdown.Children.Add(_note);
         _breakdown.IsVisible = false;
 
         var faces = new Grid();
@@ -98,17 +105,9 @@ internal sealed class StatisticsTileView : Border
         Cursor = tile.CanFlip ? new Cursor(StandardCursorType.Hand) : Cursor.Default;
         ToolTip.SetTip(this, null);
 
-        _breakdown.Children.Clear();
-        foreach (var segment in tile.Breakdown)
-        {
-            _breakdown.Children.Add(new Border
-            {
-                Width = Math.Max(2.0, BreakdownWidth * segment.Fraction),
-                Height = BreakdownHeight,
-                Margin = new Thickness(0, 0, 1, 0),
-                Background = ToBrush(colors.Accent),
-            });
-        }
+        _segments = tile.Breakdown;
+        _note.Text = tile.Note;
+        _note.IsVisible = tile.Note.Length > 0;
 
         IsFlipped = false;
         _front.IsVisible = true;
@@ -116,6 +115,14 @@ internal sealed class StatisticsTileView : Border
         ApplyTheme(colors);
     }
 
+    /// <summary>
+    /// Repaints everything, including the per-model bar/legend swatches — rebuilt from
+    /// <see cref="_segments"/> rather than left as the brushes a previous theme's
+    /// <see cref="Populate"/> created, since gate G7 parity slice P11's model colours (unlike
+    /// the fixed <see cref="LinuxWindowThemeColors.Accent"/> this bar used before) vary by
+    /// theme, and a live theme change calls this directly without a matching
+    /// <see cref="Populate"/>.
+    /// </summary>
     public void ApplyTheme(LinuxWindowThemeColors colors)
     {
         _colors = colors;
@@ -123,7 +130,43 @@ internal sealed class StatisticsTileView : Border
         BorderBrush = ToBrush(colors.Border);
         _label.Foreground = ToBrush(colors.Foreground);
         _value.Foreground = ToBrush(colors.Foreground);
+        _note.Foreground = new SolidColorBrush(ToColor(colors.Foreground), 0.65);
         SetGlyphHighlighted(false);
+
+        _bar.Children.Clear();
+        _legend.Children.Clear();
+        foreach (var segment in _segments)
+        {
+            var swatch = ToBrush(LinuxWindowThemePalette.ModelColor(colors, segment.ColourSlot));
+
+            var segmentBar = new Border
+            {
+                Width = Math.Max(2.0, BreakdownWidth * segment.Fraction),
+                Height = BreakdownHeight,
+                Margin = new Thickness(0, 0, 1, 0),
+                Background = swatch,
+            };
+            HoverCard.Figure(segmentBar, segment.HoverFigure, segment.HoverCaption, colors, swatch);
+            _bar.Children.Add(segmentBar);
+
+            var legendEntry = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 1, 0, 0) };
+            legendEntry.Children.Add(new Border
+            {
+                Width = 6,
+                Height = 6,
+                CornerRadius = new CornerRadius(1),
+                Background = swatch,
+                VerticalAlignment = VerticalAlignment.Center,
+            });
+            legendEntry.Children.Add(new TextBlock
+            {
+                Text = segment.LegendLabel,
+                FontSize = 8,
+                Margin = new Thickness(3, 0, 0, 0),
+                Foreground = ToBrush(colors.Foreground),
+            });
+            _legend.Children.Add(legendEntry);
+        }
     }
 
     private void OnPointerPressed(object? sender, PointerPressedEventArgs e)
@@ -181,5 +224,7 @@ internal sealed class StatisticsTileView : Border
     /// actually changes it, without reaching into this control's own visual tree.</summary>
     internal IBrush? GlyphBrush => _glyph.Background;
 
-    private static SolidColorBrush ToBrush(LinuxRgbColor color) => new(Color.FromRgb(color.R, color.G, color.B));
+    private static SolidColorBrush ToBrush(LinuxRgbColor color) => new(ToColor(color));
+
+    private static Color ToColor(LinuxRgbColor color) => Color.FromRgb(color.R, color.G, color.B);
 }
