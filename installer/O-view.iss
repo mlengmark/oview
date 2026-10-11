@@ -56,8 +56,34 @@ WizardStyle=modern
 CloseApplications=yes
 RestartApplications=no
 
+; Brand the setup .exe itself — otherwise Explorer shows the generic Inno
+; download icon for Setup.exe. The installed exe's own icon is a separate,
+; not-yet-built concern (no .csproj ApplicationIcon exists here yet).
+SetupIconFile=..\brand\o-view.ico
+
+; Brand the wizard (ui-spec.md section 6, ported from the original installer's
+; brand\*.bmp, generated from brand/o-view-mark.svg there). 1x and 2x variants
+; so a high-DPI display gets a crisp image instead of an upscale.
+WizardImageFile=brand\wizard-large.bmp,brand\wizard-large-2x.bmp
+WizardSmallImageFile=brand\wizard-small.bmp,brand\wizard-small-2x.bmp
+
+; The large wizard image only appears on the Welcome and Finished pages, and
+; modern wizard style suppresses Welcome by default — so without this the
+; branding would only appear once the install had already finished. One extra
+; click on a first install buys a setup that identifies itself; the in-app
+; update path runs /SILENT and never sees this page.
+DisableWelcomePage=no
+
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
+
+[Messages]
+; Setup's own copy, in the app's voice rather than Inno's generic defaults.
+WelcomeLabel1=Install {#MyAppName}
+WelcomeLabel2=Claude usage and time-to-reset, live in your Windows notification area.%n%nInstalls for your account only — no administrator rights needed, and nothing is written outside your user profile.
+FinishedHeadingLabel={#MyAppName} is installed
+FinishedLabelNoIcons=Look for the O-view icon in the notification area. Left-click it for the detail panel, right-click for settings.
+FinishedLabel=Look for the O-view icon in the notification area. Left-click it for the detail panel, right-click for settings.
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion
