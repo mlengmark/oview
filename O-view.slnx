@@ -5,11 +5,15 @@
     <Project Path="src/O-view.Tray/O-view.Tray.csproj" />
     <Project Path="src/O-view.Linux/O-view.Linux.csproj" />
   </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/release/ReleaseManifestTool/ReleaseManifestTool.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/O-view.Core.Tests/O-view.Core.Tests.csproj" />
     <Project Path="tests/O-view.App.Tests/O-view.App.Tests.csproj" />
     <Project Path="tests/O-view.Tray.Tests/O-view.Tray.Tests.csproj" />
     <Project Path="tests/O-view.Linux.Tests/O-view.Linux.Tests.csproj" />
     <Project Path="tests/O-view.CrossSkin.Tests/O-view.CrossSkin.Tests.csproj" />
+    <Project Path="tests/ReleaseManifestTool.Tests/ReleaseManifestTool.Tests.csproj" />
   </Folder>
 </Solution>
