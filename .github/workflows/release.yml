@@ -95,13 +95,20 @@ jobs:
       # arguments (/D..., /O...) into drive-letter Windows paths before iscc sees them —
       # without it, iscc receives extra converted path arguments and refuses with "You may
       # not specify more than one script filename."
+      #
+      # SourceDir must be absolute: ISCC resolves a [Files] "Source:" path (how
+      # installer/O-view.iss's SourceDir ends up used) relative to the .iss script's own
+      # directory (installer/), not the repo root this job runs from — so a relative value
+      # here silently resolved to installer/artifacts/installer-src and iscc found nothing
+      # (OVI-795). /O is unaffected: command-line switches like /O resolve against the
+      # invocation cwd already, which is why it did not need the same fix.
       - name: Build the Windows installer
         shell: bash
         env:
           MSYS_NO_PATHCONV: "1"
         run: |
           set -euo pipefail
-          iscc "/DSourceDir=artifacts/installer-src" "/DMyAppVersion=$VERSION" \
+          iscc "/DSourceDir=$(pwd -W)/artifacts/installer-src" "/DMyAppVersion=$VERSION" \
             "/Oartifacts/installer-out" installer/O-view.iss
 
       # Every destination filename below comes from ReleaseManifestTool asking
