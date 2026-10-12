@@ -90,8 +90,15 @@ jobs:
 
       # installer/O-view.iss defines no OutputDir, so /O below is the only thing fixing
       # where ISCC writes its result — it does not touch the script's own naming logic.
+      #
+      # MSYS_NO_PATHCONV disables Git Bash's auto-conversion of single-letter-after-slash
+      # arguments (/D..., /O...) into drive-letter Windows paths before iscc sees them —
+      # without it, iscc receives extra converted path arguments and refuses with "You may
+      # not specify more than one script filename."
       - name: Build the Windows installer
         shell: bash
+        env:
+          MSYS_NO_PATHCONV: "1"
         run: |
           set -euo pipefail
           iscc "/DSourceDir=artifacts/installer-src" "/DMyAppVersion=$VERSION" \
