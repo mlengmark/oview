@@ -201,7 +201,7 @@ jobs:
           REPO_NAME: ${{ github.repository }}
         run: |
           set -euo pipefail
-          NOTES=$'**Pre-release warning**\n\nThis is a release candidate for hardware testing only.\n\n**Do not run this build on a real Windows or Linux desktop.**\n\nIt is unsigned, so Windows SmartScreen (and equivalent OS warnings) will flag it as untrusted - this is expected.\n\nPlease report any findings on OVI-761.'
+          NOTES=$'**Pre-release — for hardware testing.** This build has **never been run on a real Windows or Linux desktop**; it is verified only by automated tests and offscreen renders. Expect rough edges. It is unsigned, so Windows SmartScreen (and equivalent OS warnings) will flag it as untrusted - this is expected. Please report findings on OVI-761.'
           gh release create "$TAG_NAME" stage/* \
             --title "O-view $TAG_NAME" \
             --notes "$NOTES" \
